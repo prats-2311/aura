@@ -55,44 +55,34 @@ BACKEND_URL = f"http://localhost:{BACKEND_PORT}"
 # The generic prompt to get a description of the screen from the vision model
 # Simple prompt for basic screen description (faster processing)
 VISION_PROMPT_SIMPLE = """
-Describe what you see on this screen in a few sentences. Focus on the main content, any visible text, buttons, and interactive elements. Keep it concise and natural.
+Describe what you see in this screenshot. What text, buttons, and elements are visible?
 
-IMPORTANT: You MUST respond with ONLY valid JSON in this exact format:
 {
-    "description": "Brief description of what's on the screen",
-    "main_elements": ["list", "of", "key", "elements", "visible"]
+    "description": "what you see on screen",
+    "main_elements": ["list of visible elements"]
 }
-
-Do not include any text before or after the JSON. Only return the JSON object.
 """
 
 # Detailed prompt for comprehensive analysis (when user specifically asks for details)
 VISION_PROMPT_DETAILED = """
-Analyze the provided screenshot and describe it in structured JSON format. Identify all interactive elements including buttons, links, and input fields. For each element, provide a description, its text content if any, and its bounding box coordinates [x1, y1, x2, y2]. Also, transcribe any significant text blocks.
+What do you see on this screen? List any buttons, text, or clickable elements with their actual text.
 
-IMPORTANT: You MUST respond with ONLY valid JSON in this exact format:
 {
-    "elements": [
-        {
-            "type": "button|link|input|text|dropdown|checkbox",
-            "text": "element text content",
-            "coordinates": [x1, y1, x2, y2],
-            "description": "detailed element description"
-        }
-    ],
-    "text_blocks": [
-        {
-            "content": "significant text content",
-            "coordinates": [x1, y1, x2, y2]
-        }
-    ],
-    "metadata": {
-        "timestamp": "current timestamp",
-        "screen_resolution": [width, height]
-    }
+    "description": "what this screen shows",
+    "elements": ["list of buttons and text you can see"]
 }
+"""
 
-Do not include any text before or after the JSON. Only return the JSON object.
+# Clickable elements detection prompt
+VISION_PROMPT_CLICKABLE = """
+What buttons, links, and clickable elements do you see on this screen? List them with their text.
+
+{
+    "clickable_elements": [
+        {"text": "actual button text", "type": "button"}
+    ],
+    "description": "brief description of the screen"
+}
 """
 
 # Default to simple prompt for better performance

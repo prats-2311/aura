@@ -23,6 +23,7 @@ from config import (
     VISION_PROMPT,
     VISION_PROMPT_SIMPLE,
     VISION_PROMPT_DETAILED,
+    VISION_PROMPT_CLICKABLE,
     FORM_VISION_PROMPT,
     VISION_API_TIMEOUT,
     SCREENSHOT_QUALITY,
@@ -237,7 +238,7 @@ class VisionModule:
         with self._request_lock:
             try:
                 # Validate analysis type
-                valid_types = ["simple", "detailed", "form"]
+                valid_types = ["simple", "detailed", "form", "clickable"]
                 if analysis_type not in valid_types:
                     raise ValueError(f"Invalid analysis type: {analysis_type}. Must be one of {valid_types}")
                 
@@ -264,6 +265,8 @@ class VisionModule:
                     prompt = FORM_VISION_PROMPT
                 elif analysis_type == "detailed":
                     prompt = VISION_PROMPT_DETAILED
+                elif analysis_type == "clickable":
+                    prompt = VISION_PROMPT_CLICKABLE
                 else:  # simple (default)
                     prompt = VISION_PROMPT_SIMPLE
                 
