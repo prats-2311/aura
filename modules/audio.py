@@ -95,55 +95,91 @@ class AudioModule:
         try:
             logger.info("Initializing TTS engine...")
             
-            # Try different TTS drivers in order of preference
-            # Skip nsss on macOS if it's causing AppKit issues
             import platform
+            import subprocess
+            
+            # For macOS, try the built-in 'say' command first
             if platform.system() == 'Darwin':
-                tts_drivers = ['espeak', 'sapi5']  # Skip nsss for now
+                try:
+                    # Test if 'say' command is available by running it with a simple test
+                    logger.debug("Testing macOS 'say' command availability...")
+                    result = subprocess.run(['say', ''], 
+                                          capture_output=True, text=True, timeout=5)
+                    logger.debug(f"'say' command test result: returncode={result.returncode}")
+                    # 'say' with empty string should return 0 (success)
+                    if result.returncode == 0:
+                        logger.info("Using macOS built-in 'say' command for TTS")
+                        self.tts_engine = 'macos_say'
+                        self.tts_method = 'system'
+                        return
+                    else:
+                        logger.debug(f"'say' command failed with return code {result.returncode}")
+                except Exception as e:
+                    logger.debug(f"macOS 'say' command test failed: {e}")
+            
+            # Try pyttsx3 with different drivers
+            tts_drivers = []
+            if platform.system() == 'Darwin':
+                # For macOS, avoid nsss which causes AppKit issues
+                tts_drivers = ['espeak']
+                logger.debug("macOS detected, will try espeak driver")
+            elif platform.system() == 'Windows':
+                tts_drivers = ['sapi5']
+                logger.debug("Windows detected, will try sapi5 driver")
             else:
-                tts_drivers = ['nsss', 'sapi5', 'espeak']  # macOS, Windows, Linux
+                tts_drivers = ['espeak', 'festival']
+                logger.debug("Linux detected, will try espeak and festival drivers")
             
             for driver in tts_drivers:
                 try:
-                    logger.debug(f"Trying TTS driver: {driver}")
+                    logger.debug(f"Trying pyttsx3 driver: {driver}")
                     self.tts_engine = pyttsx3.init(driver)
+                    self.tts_method = 'pyttsx3'
+                    logger.info(f"Successfully initialized pyttsx3 with {driver} driver")
                     break
                 except Exception as e:
                     logger.debug(f"TTS driver {driver} failed: {e}")
                     continue
             
-            # If no specific driver worked, try default
-            if not self.tts_engine:
-                logger.debug("Trying default TTS driver")
-                self.tts_engine = pyttsx3.init()
+            # If no specific driver worked, try default pyttsx3
+            if not hasattr(self, 'tts_method'):
+                try:
+                    logger.debug("Trying default pyttsx3 driver")
+                    self.tts_engine = pyttsx3.init()
+                    self.tts_method = 'pyttsx3'
+                    logger.info("Successfully initialized pyttsx3 with default driver")
+                except Exception as e:
+                    logger.debug(f"Default pyttsx3 failed: {e}")
             
-            if not self.tts_engine:
+            # Configure pyttsx3 settings if we're using it
+            if hasattr(self, 'tts_method') and self.tts_method == 'pyttsx3' and self.tts_engine:
+                try:
+                    # Configure TTS settings
+                    self.tts_engine.setProperty('rate', int(200 * TTS_SPEED))
+                    self.tts_engine.setProperty('volume', TTS_VOLUME)
+                    
+                    # Try to set a good voice
+                    voices = self.tts_engine.getProperty('voices')
+                    if voices:
+                        # Look for a female voice first, fallback to first available
+                        female_voice = next((v for v in voices if 'female' in v.name.lower() or 'zira' in v.name.lower()), None)
+                        selected_voice = female_voice if female_voice else voices[0]
+                        self.tts_engine.setProperty('voice', selected_voice.id)
+                        logger.info(f"Selected TTS voice: {selected_voice.name}")
+                    
+                    logger.info("pyttsx3 TTS engine initialized successfully")
+                except Exception as e:
+                    logger.warning(f"Could not configure pyttsx3 settings: {e}")
+            
+            # If nothing worked, set to None
+            if not hasattr(self, 'tts_method'):
                 raise Exception("No TTS engine could be initialized")
-            
-            # Configure TTS settings
-            self.tts_engine.setProperty('rate', int(200 * TTS_SPEED))
-            self.tts_engine.setProperty('volume', TTS_VOLUME)
-            
-            # Try to set a good voice (prefer female voice if available)
-            try:
-                voices = self.tts_engine.getProperty('voices')
-                if voices:
-                    # Look for a female voice first, fallback to first available
-                    female_voice = next((v for v in voices if 'female' in v.name.lower() or 'zira' in v.name.lower()), None)
-                    selected_voice = female_voice if female_voice else voices[0]
-                    self.tts_engine.setProperty('voice', selected_voice.id)
-                    logger.info(f"Selected TTS voice: {selected_voice.name}")
-                else:
-                    logger.warning("No TTS voices available")
-            except Exception as e:
-                logger.warning(f"Could not configure TTS voice: {e}")
-            
-            logger.info("TTS engine initialized successfully")
-            
+                
         except Exception as e:
             logger.error(f"Failed to initialize TTS engine: {e}")
             logger.warning("TTS functionality will not be available")
             self.tts_engine = None
+            self.tts_method = None
     
     def _initialize_porcupine(self) -> None:
         """Initialize the Porcupine wake word detection engine."""
@@ -744,10 +780,10 @@ class AudioModule:
             # Use threading to avoid blocking
             def speak_text():
                 try:
-                    self.tts_engine.say(text)
-                    self.tts_engine.runAndWait()
+                    self._speak_text_internal(text)
                 except Exception as e:
                     logger.error(f"TTS playback failed: {e}")
+                    raise
             
             # Run TTS in separate thread
             tts_thread = threading.Thread(target=speak_text, daemon=True)
@@ -765,6 +801,42 @@ class AudioModule:
         except Exception as e:
             logger.error(f"Text-to-speech conversion failed: {e}")
             raise RuntimeError(f"Text-to-speech failed: {e}")
+    
+    def _speak_text_internal(self, text: str) -> None:
+        """
+        Internal method to handle TTS with proper method selection.
+        
+        Args:
+            text: Text to speak
+        """
+        if hasattr(self, 'tts_method') and self.tts_method == 'system':
+            # Use macOS 'say' command
+            import subprocess
+            import shlex
+            
+            # Escape the text for shell safety
+            safe_text = shlex.quote(text)
+            
+            # Configure voice speed based on TTS_SPEED
+            rate = int(200 * TTS_SPEED)  # Default rate is ~200 wpm
+            
+            # Run the say command
+            result = subprocess.run(
+                ['say', '-r', str(rate), safe_text],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                raise Exception(f"macOS 'say' command failed: {result.stderr}")
+                
+        elif hasattr(self, 'tts_method') and self.tts_method == 'pyttsx3':
+            # Use pyttsx3
+            self.tts_engine.say(text)
+            self.tts_engine.runAndWait()
+        else:
+            raise Exception("No valid TTS method available")
     
     def test_speech_to_text(self, duration: float = 3.0) -> Dict[str, Any]:
         """
@@ -987,8 +1059,7 @@ class AudioModule:
             # Use TTS for confirmation (non-blocking)
             def speak_confirmation():
                 try:
-                    self.tts_engine.say(confirmation_message)
-                    self.tts_engine.runAndWait()
+                    self._speak_text_internal(confirmation_message)
                 except Exception as e:
                     logger.warning(f"TTS confirmation failed: {e}")
             
@@ -1012,8 +1083,7 @@ class AudioModule:
             def speak_timeout():
                 try:
                     if self.tts_engine:
-                        self.tts_engine.say(timeout_message)
-                        self.tts_engine.runAndWait()
+                        self._speak_text_internal(timeout_message)
                 except Exception as e:
                     logger.warning(f"TTS timeout notification failed: {e}")
             
@@ -1038,8 +1108,7 @@ class AudioModule:
             def speak_activation():
                 try:
                     if self.tts_engine:
-                        self.tts_engine.say(activation_message)
-                        self.tts_engine.runAndWait()
+                        self._speak_text_internal(activation_message)
                 except Exception as e:
                     logger.warning(f"TTS activation notification failed: {e}")
             
