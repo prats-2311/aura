@@ -136,6 +136,19 @@ class FeedbackModule:
                         self.sound_cache[sound_name] = None
                         continue
                     
+                    # Check if file is actually an audio file
+                    try:
+                        with open(sound_path, 'rb') as f:
+                            header = f.read(4)
+                            if header != b'RIFF':  # WAV files start with RIFF
+                                logger.debug(f"Skipping non-audio file: {sound_path}")
+                                self.sound_cache[sound_name] = None
+                                continue
+                    except Exception:
+                        logger.debug(f"Could not read file header: {sound_path}")
+                        self.sound_cache[sound_name] = None
+                        continue
+                    
                     # Load sound file
                     sound = pygame.mixer.Sound(sound_path)
                     self.sound_cache[sound_name] = sound

@@ -64,8 +64,8 @@ pywinutils>=0.1.0; sys_platform == "win32" # Windows utilities
 
 # macOS
 pyobjc>=10.0; sys_platform == "darwin"    # macOS API access
-AppKit>=0.2.8; sys_platform == "darwin"   # macOS application framework
+# AppKit comes with pyobjc - no separate package needed
 
 # Linux
 python-xlib>=0.33; sys_platform == "linux" # X11 utilities for Linux
-pycairo>=1.25.0; sys_platform == "linux"   # Cairo graphics library
+# pycairo>=1.25.0; sys_platform == "linux"   # Cairo graphics library - temporarily disabled

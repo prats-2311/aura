@@ -181,6 +181,8 @@ SOUNDS = {
 # Audio processing settings
 AUDIO_SAMPLE_RATE = 16000  # Hz, for speech recognition
 AUDIO_CHUNK_SIZE = 1024    # Buffer size for audio processing
+AUDIO_RECORDING_DURATION = 8.0  # Maximum recording duration in seconds
+AUDIO_SILENCE_THRESHOLD = 0.005  # Threshold for silence detection (0.0 to 1.0) - lower = more sensitive
 TTS_SPEED = 1.0           # Text-to-speech speed multiplier
 TTS_VOLUME = 0.8          # Text-to-speech volume (0.0 to 1.0)
 
@@ -294,6 +296,12 @@ def validate_config():
     if AUDIO_SAMPLE_RATE < 8000:
         warnings.append("AUDIO_SAMPLE_RATE very low (may affect quality)")
     
+    if AUDIO_RECORDING_DURATION < 2.0 or AUDIO_RECORDING_DURATION > 30.0:
+        warnings.append("AUDIO_RECORDING_DURATION should be between 2-30 seconds")
+    
+    if not 0.0 <= AUDIO_SILENCE_THRESHOLD <= 1.0:
+        warnings.append("AUDIO_SILENCE_THRESHOLD must be between 0.0 and 1.0")
+    
     if TTS_VOLUME < 0 or TTS_VOLUME > 1:
         errors.append("TTS_VOLUME must be between 0.0 and 1.0")
     
@@ -344,6 +352,8 @@ def get_config_summary():
         'audio': {
             'wake_word': WAKE_WORD,
             'sample_rate': AUDIO_SAMPLE_RATE,
+            'recording_duration': AUDIO_RECORDING_DURATION,
+            'silence_threshold': AUDIO_SILENCE_THRESHOLD,
             'tts_speed': TTS_SPEED,
             'tts_volume': TTS_VOLUME
         },

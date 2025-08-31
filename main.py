@@ -671,7 +671,24 @@ class AURAApplication:
             
             if not command_text or not command_text.strip():
                 logger.warning("No command text received")
-                self.feedback_module.speak("I didn't hear a command. Please try again.")
+                
+                # Test microphone to help diagnose the issue
+                try:
+                    mic_test = self.audio_module.test_microphone(duration=1.0)
+                    if mic_test["success"]:
+                        if mic_test["volume_rms"] < 0.001:
+                            logger.warning(f"Microphone is very quiet (RMS: {mic_test['volume_rms']:.4f}). Check microphone settings.")
+                            self.feedback_module.speak("I can't hear you clearly. Please check your microphone settings and speak louder.")
+                        else:
+                            logger.info(f"Microphone is working (RMS: {mic_test['volume_rms']:.4f}). Speech may not be clear enough for transcription.")
+                            self.feedback_module.speak("I can hear you but couldn't understand what you said. Please try speaking more clearly.")
+                    else:
+                        logger.error(f"Microphone test failed: {mic_test.get('error', 'Unknown error')}")
+                        self.feedback_module.speak("I'm having trouble with the microphone. Please check your audio settings.")
+                except Exception as e:
+                    logger.error(f"Failed to test microphone: {e}")
+                    self.feedback_module.speak("I didn't hear a command. Please try again.")
+                
                 return
             
             logger.info(f"Command received: '{command_text}'")
