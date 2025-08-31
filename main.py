@@ -24,6 +24,8 @@ from config import (
 from orchestrator import Orchestrator
 from modules.audio import AudioModule
 from modules.feedback import FeedbackModule
+from modules.performance import cleanup_performance_resources
+from modules.performance_dashboard import performance_dashboard
 
 
 class AURAApplication:
@@ -81,6 +83,9 @@ class AURAApplication:
         
         # Register default startup checks and cleanup handlers
         self._register_default_checks_and_handlers()
+        
+        # Add performance cleanup handler
+        self.add_cleanup_handler(self._cleanup_performance_resources)
         
         logger.info(f"AURA Application initialized - Version {PROJECT_VERSION}")
     
@@ -365,6 +370,14 @@ class AURAApplication:
                     
         except Exception as e:
             logger.error(f"Error cleaning up logging handlers: {e}")
+    
+    def _cleanup_performance_resources(self) -> None:
+        """Clean up performance-related resources."""
+        try:
+            cleanup_performance_resources()
+            logger.debug("Performance resources cleaned up")
+        except Exception as e:
+            logger.error(f"Error cleaning up performance resources: {e}")
     
     def startup(self) -> bool:
         """
@@ -698,16 +711,38 @@ class AURAApplication:
         wake_word_status = "Running" if (self.wake_word_thread and self.wake_word_thread.is_alive()) else "Stopped"
         health_monitor_status = "Running" if (self.health_monitor_thread and self.health_monitor_thread.is_alive()) else "Stopped"
         
-        # Log comprehensive status
-        logger.info(
-            f"AURA Status Report - "
-            f"Uptime: {uptime:.1f}s, "
-            f"Wake words: {self.wake_words_detected} ({wake_word_rate:.1f}/hr), "
-            f"Commands: {self.commands_processed} ({command_rate:.1f}/hr), "
-            f"Errors: {self.errors_count}, "
-            f"Threads: {active_threads} (Wake: {wake_word_status}, Health: {health_monitor_status}), "
-            f"Memory: {self.resource_usage['memory_mb']:.1f}MB"
-        )
+        # Get performance metrics
+        try:
+            perf_metrics = performance_dashboard.get_real_time_metrics()
+            cache_stats = perf_metrics.get('cache_statistics', {})
+            system_metrics = perf_metrics.get('system_metrics', {})
+            health_status = perf_metrics.get('health_status', 'unknown')
+            
+            # Log comprehensive status with performance data
+            logger.info(
+                f"AURA Status Report - "
+                f"Uptime: {uptime:.1f}s, "
+                f"Wake words: {self.wake_words_detected} ({wake_word_rate:.1f}/hr), "
+                f"Commands: {self.commands_processed} ({command_rate:.1f}/hr), "
+                f"Errors: {self.errors_count}, "
+                f"Threads: {active_threads} (Wake: {wake_word_status}, Health: {health_monitor_status}), "
+                f"Memory: {system_metrics.get('memory_mb', self.resource_usage['memory_mb']):.1f}MB, "
+                f"CPU: {system_metrics.get('cpu_percent', 0):.1f}%, "
+                f"Cache: {cache_stats.get('hit_rate_percent', 0):.1f}% hit rate, "
+                f"Health: {health_status}"
+            )
+        except Exception as e:
+            # Fallback to basic status if performance metrics fail
+            logger.info(
+                f"AURA Status Report - "
+                f"Uptime: {uptime:.1f}s, "
+                f"Wake words: {self.wake_words_detected} ({wake_word_rate:.1f}/hr), "
+                f"Commands: {self.commands_processed} ({command_rate:.1f}/hr), "
+                f"Errors: {self.errors_count}, "
+                f"Threads: {active_threads} (Wake: {wake_word_status}, Health: {health_monitor_status}), "
+                f"Memory: {self.resource_usage['memory_mb']:.1f}MB"
+            )
+            logger.debug(f"Performance metrics unavailable: {e}")
     
     def shutdown(self) -> None:
         """
@@ -856,6 +891,24 @@ For more information, visit: https://github.com/your-repo/aura
         help=f'Log file path (default: {LOG_FILE})'
     )
     
+    parser.add_argument(
+        '--performance',
+        action='store_true',
+        help='Enable performance monitoring dashboard'
+    )
+    
+    parser.add_argument(
+        '--setup-wizard',
+        action='store_true',
+        help='Run interactive setup wizard'
+    )
+    
+    parser.add_argument(
+        '--mock-apis',
+        action='store_true',
+        help='Use mock APIs for testing'
+    )
+    
     return parser.parse_args()
 
 
@@ -869,7 +922,17 @@ def main() -> int:
     # Parse command-line arguments
     args = parse_arguments()
     
-    # Handle version and config check
+    # Handle special commands
+    if args.setup_wizard:
+        try:
+            from setup_wizard import SetupWizard
+            wizard = SetupWizard()
+            success = wizard.run()
+            return 0 if success else 1
+        except ImportError:
+            print("❌ Setup wizard not available. Please ensure setup_wizard.py is present.")
+            return 1
+    
     if args.config_check:
         print(f"{PROJECT_NAME} {PROJECT_VERSION} - Configuration Check")
         print("=" * 50)
@@ -889,6 +952,10 @@ def main() -> int:
         config_override['LOG_LEVEL'] = args.log_level
     if args.log_file:
         config_override['LOG_FILE'] = args.log_file
+    if args.performance:
+        config_override['ENABLE_PERFORMANCE_MONITORING'] = True
+    if args.mock_apis:
+        config_override['MOCK_APIS'] = True
     
     # Create and run application
     app = None

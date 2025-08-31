@@ -263,6 +263,47 @@ def validate_config():
         if not Path(sound_path).exists():
             warnings.append(f"Sound file not found: {sound_path} (using placeholder)")
     
+    # Validate API endpoints
+    if not VISION_API_BASE or not VISION_API_BASE.startswith('http'):
+        errors.append("Invalid VISION_API_BASE URL")
+    
+    if not REASONING_API_BASE or not REASONING_API_BASE.startswith('http'):
+        errors.append("Invalid REASONING_API_BASE URL")
+    
+    # Check model names
+    if not VISION_MODEL:
+        warnings.append("VISION_MODEL not specified")
+    
+    if not REASONING_MODEL:
+        warnings.append("REASONING_MODEL not specified")
+    
+    # Validate numeric settings
+    if SCREENSHOT_QUALITY < 1 or SCREENSHOT_QUALITY > 100:
+        errors.append("SCREENSHOT_QUALITY must be between 1 and 100")
+    
+    if MAX_SCREENSHOT_SIZE < 100:
+        errors.append("MAX_SCREENSHOT_SIZE too small (minimum 100)")
+    
+    if VISION_API_TIMEOUT < 1:
+        errors.append("VISION_API_TIMEOUT too small (minimum 1 second)")
+    
+    if REASONING_API_TIMEOUT < 1:
+        errors.append("REASONING_API_TIMEOUT too small (minimum 1 second)")
+    
+    # Check audio settings
+    if AUDIO_SAMPLE_RATE < 8000:
+        warnings.append("AUDIO_SAMPLE_RATE very low (may affect quality)")
+    
+    if TTS_VOLUME < 0 or TTS_VOLUME > 1:
+        errors.append("TTS_VOLUME must be between 0.0 and 1.0")
+    
+    # Check automation settings
+    if MOUSE_MOVE_DURATION < 0:
+        errors.append("MOUSE_MOVE_DURATION cannot be negative")
+    
+    if TYPE_INTERVAL < 0:
+        errors.append("TYPE_INTERVAL cannot be negative")
+    
     # Print results
     if warnings:
         print("Configuration Warnings:")
@@ -282,6 +323,46 @@ def validate_config():
         print("⚠️  Configuration has warnings but is functional")
     
     return True
+
+
+def get_config_summary():
+    """Get a summary of current configuration."""
+    return {
+        'project': {
+            'name': PROJECT_NAME,
+            'version': PROJECT_VERSION,
+            'description': PROJECT_DESCRIPTION
+        },
+        'apis': {
+            'vision_base': VISION_API_BASE,
+            'reasoning_base': REASONING_API_BASE,
+            'vision_model': VISION_MODEL,
+            'reasoning_model': REASONING_MODEL,
+            'reasoning_key_set': bool(REASONING_API_KEY and REASONING_API_KEY != "your_ollama_cloud_api_key_here"),
+            'porcupine_key_set': bool(PORCUPINE_API_KEY and PORCUPINE_API_KEY != "your_porcupine_api_key_here")
+        },
+        'audio': {
+            'wake_word': WAKE_WORD,
+            'sample_rate': AUDIO_SAMPLE_RATE,
+            'tts_speed': TTS_SPEED,
+            'tts_volume': TTS_VOLUME
+        },
+        'vision': {
+            'screenshot_quality': SCREENSHOT_QUALITY,
+            'max_screenshot_size': MAX_SCREENSHOT_SIZE,
+            'api_timeout': VISION_API_TIMEOUT
+        },
+        'automation': {
+            'mouse_move_duration': MOUSE_MOVE_DURATION,
+            'type_interval': TYPE_INTERVAL,
+            'scroll_amount': SCROLL_AMOUNT
+        },
+        'system': {
+            'debug_mode': DEBUG_MODE,
+            'mock_apis': MOCK_APIS,
+            'log_level': LOG_LEVEL
+        }
+    }
 
 if __name__ == "__main__":
     # Run configuration validation

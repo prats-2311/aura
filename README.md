@@ -4,6 +4,8 @@ AURA is a hybrid perception-reasoning AI system that enables users to control th
 
 ## Features
 
+### Core Capabilities
+
 - 🎤 **Voice Control**: Activate with wake words and give natural language commands
 - 👁️ **Screen Understanding**: Local vision models analyze your desktop in real-time
 - 🧠 **Intelligent Planning**: Cloud-based LLMs create smart action sequences
@@ -12,6 +14,15 @@ AURA is a hybrid perception-reasoning AI system that enables users to control th
 - 📝 **Form Filling**: Automated web form completion through voice
 - ❓ **Information Extraction**: Ask questions about screen content
 - ⚙️ **Configurable**: Centralized configuration for easy customization
+
+### Performance Optimizations
+
+- ⚡ **Connection Pooling**: Optimized API calls with connection reuse and retry logic
+- 🗄️ **Image Caching**: Intelligent caching with compression and deduplication
+- 🔄 **Parallel Processing**: Concurrent execution of perception and reasoning tasks
+- 📊 **Performance Monitoring**: Real-time metrics and optimization recommendations
+- 🎯 **Automatic Optimization**: Self-tuning performance based on usage patterns
+- 🚀 **Resource Management**: Efficient memory and CPU usage with cleanup routines
 
 ## Architecture
 
@@ -137,6 +148,12 @@ python config.py
 # Start AURA
 python main.py
 
+# Start with performance monitoring
+python main.py --performance-dashboard
+
+# Start in debug mode
+python main.py --debug
+
 # Say the wake word: "Computer"
 # Then give a command: "Click on the search button"
 ```
@@ -159,26 +176,98 @@ Edit `config.py` to customize:
 - **Audio Settings**: Adjust TTS speed, volume, and sound effects
 - **Automation**: Configure mouse movement speed and typing intervals
 
+## Performance Monitoring
+
+AURA includes comprehensive performance monitoring and optimization capabilities:
+
+### Real-time Metrics
+
+- **System Resources**: CPU, memory, disk usage monitoring
+- **API Performance**: Response times, success rates, error tracking
+- **Cache Efficiency**: Hit rates, compression ratios, storage optimization
+- **Operation Timing**: Screen capture, vision analysis, reasoning, automation
+
+### Performance Dashboard
+
+Access performance metrics programmatically:
+
+```python
+from modules.performance_dashboard import performance_dashboard
+
+# Get real-time metrics
+metrics = performance_dashboard.get_real_time_metrics()
+print(f"System Health: {metrics['health_status']}")
+print(f"Cache Hit Rate: {metrics['cache_statistics']['hit_rate_percent']:.1f}%")
+
+# Get optimization recommendations
+recommendations = performance_dashboard.get_optimization_recommendations()
+for rec in recommendations:
+    print(f"- {rec['title']}: {rec['description']}")
+
+# Export metrics for analysis
+json_data = performance_dashboard.export_metrics(format='json')
+```
+
+### Automatic Optimizations
+
+AURA automatically optimizes performance based on usage patterns:
+
+- **Dynamic Cache Management**: Adjusts cache size based on memory usage
+- **Connection Pool Optimization**: Manages HTTP connections for API efficiency
+- **Parallel Processing Tuning**: Balances CPU usage with response time
+- **Resource Cleanup**: Automatic garbage collection and resource management
+
+### Performance Configuration
+
+Customize performance settings in `performance_config.py`:
+
+```python
+# Connection pooling
+CONNECTION_POOL_MAX_CONNECTIONS = 10
+CONNECTION_POOL_MAX_RETRIES = 3
+
+# Image caching
+IMAGE_CACHE_MAX_SIZE_MB = 100
+IMAGE_CACHE_MAX_ENTRIES = 50
+
+# Parallel processing
+PARALLEL_MAX_WORKERS = 4
+PARALLEL_ENABLE_IO_PARALLELIZATION = True
+
+# Performance monitoring
+PERFORMANCE_MAX_METRICS = 1000
+PERFORMANCE_SYSTEM_MONITORING_INTERVAL = 30
+```
+
 ## Development
 
 ### Project Structure
 
 ```
 AURA/
-├── modules/                 # Core system modules
+├── modules/                      # Core system modules
 │   ├── __init__.py
-│   ├── vision.py           # Screen capture and vision AI
-│   ├── reasoning.py        # Cloud LLM reasoning
-│   ├── audio.py            # Speech processing and wake words
-│   ├── automation.py       # GUI automation
-│   └── feedback.py         # Audio feedback system
+│   ├── vision.py                # Screen capture and vision AI
+│   ├── reasoning.py             # Cloud LLM reasoning
+│   ├── audio.py                 # Speech processing and wake words
+│   ├── automation.py            # GUI automation
+│   ├── feedback.py              # Audio feedback system
+│   ├── error_handler.py         # Comprehensive error handling
+│   ├── performance.py           # Performance optimization utilities
+│   └── performance_dashboard.py # Performance monitoring and metrics
+├── tests/                       # Comprehensive test suite
+│   ├── test_*.py               # Unit and integration tests
+│   ├── conftest.py             # Test configuration
+│   └── fixtures/               # Test data and fixtures
 ├── assets/
-│   └── sounds/             # Audio feedback files
-├── config.py               # Central configuration
-├── orchestrator.py         # Main coordinator
-├── main.py                 # Application entry point
-├── requirements.txt        # Python dependencies
-└── README.md              # This file
+│   └── sounds/                 # Audio feedback files
+├── config.py                   # Central configuration
+├── performance_config.py       # Performance optimization settings
+├── orchestrator.py             # Main coordinator
+├── main.py                     # Application entry point
+├── requirements.txt            # Python dependencies
+├── pytest.ini                 # Test configuration
+└── README.md                  # This file
 ```
 
 ### Running Tests

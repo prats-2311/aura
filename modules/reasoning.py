@@ -24,6 +24,12 @@ from .error_handler import (
     ErrorCategory,
     ErrorSeverity
 )
+from .performance import (
+    connection_pool,
+    measure_performance,
+    PerformanceMetrics,
+    performance_monitor
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -50,6 +56,7 @@ class ReasoningModule:
         
         logger.info(f"ReasoningModule initialized with model: {self.model}")
     
+    @measure_performance("reasoning_analysis", include_system_metrics=True)
     @with_error_handling(
         category=ErrorCategory.API_ERROR,
         severity=ErrorSeverity.MEDIUM,
@@ -220,6 +227,9 @@ Please analyze the user's command and the current screen state, then provide a d
         
         logger.debug(f"Making API request to {self.api_base}/chat/completions")
         
+        # Use connection pool for better performance
+        session = connection_pool.get_session(self.api_base)
+        
         # Implement retry logic with exponential backoff
         max_retries = 3
         last_error = None
@@ -228,7 +238,7 @@ Please analyze the user's command and the current screen state, then provide a d
             try:
                 start_time = time.time()
                 
-                response = requests.post(
+                response = session.post(
                     f"{self.api_base}/chat/completions",
                     headers=headers,
                     json=payload,

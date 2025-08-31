@@ -29,6 +29,12 @@ from modules.error_handler import (
     ErrorSeverity,
     ErrorInfo
 )
+from modules.performance import (
+    parallel_processor,
+    measure_performance,
+    PerformanceMetrics,
+    performance_monitor
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +128,7 @@ class Orchestrator:
         # Parallel processing
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=3)
         self.enable_parallel_processing = True
+        self.parallel_perception_reasoning = True
         
         # Command validation patterns
         self._init_validation_patterns()
@@ -133,6 +140,83 @@ class Orchestrator:
         self._initialize_system_health()
         
         logger.info("Orchestrator initialized successfully")
+    
+    @measure_performance("parallel_perception_reasoning", include_system_metrics=True)
+    def execute_parallel_perception_reasoning(self, command: str) -> Tuple[Optional[Dict], Optional[Dict]]:
+        """
+        Execute screen perception and command preprocessing in parallel.
+        
+        Args:
+            command: User command to preprocess
+            
+        Returns:
+            Tuple of (screen_context, preprocessed_command_info)
+        """
+        if not self.enable_parallel_processing or not self.parallel_perception_reasoning:
+            # Fall back to sequential execution
+            return None, None
+        
+        try:
+            logger.debug("Starting parallel perception and reasoning preprocessing")
+            
+            # Define parallel tasks
+            def capture_and_analyze_screen():
+                """Capture and analyze screen in parallel."""
+                try:
+                    if not self.module_availability.get('vision', False):
+                        return None
+                    return self.vision_module.describe_screen()
+                except Exception as e:
+                    logger.error(f"Parallel screen analysis failed: {e}")
+                    return None
+            
+            def preprocess_command():
+                """Preprocess command in parallel."""
+                try:
+                    validation_result = self.validate_command(command)
+                    return {
+                        'validation': validation_result,
+                        'normalized_command': validation_result.normalized_command,
+                        'command_type': validation_result.command_type,
+                        'confidence': validation_result.confidence
+                    }
+                except Exception as e:
+                    logger.error(f"Parallel command preprocessing failed: {e}")
+                    return None
+            
+            # Execute tasks in parallel
+            tasks = [
+                (capture_and_analyze_screen, (), {}),
+                (preprocess_command, (), {})
+            ]
+            
+            results = parallel_processor.execute_parallel_io(tasks)
+            
+            screen_context = results[0] if results and len(results) > 0 else None
+            command_info = results[1] if results and len(results) > 1 else None
+            
+            # Record performance metrics
+            if screen_context and command_info:
+                metric = PerformanceMetrics(
+                    operation="parallel_execution_success",
+                    duration=0.0,  # Duration tracked by decorator
+                    success=True,
+                    parallel_execution=True,
+                    metadata={
+                        'screen_elements': len(screen_context.get('elements', [])) if screen_context else 0,
+                        'command_type': command_info.get('command_type', 'unknown') if command_info else 'unknown'
+                    }
+                )
+                performance_monitor.record_metric(metric)
+            
+            logger.debug(f"Parallel execution completed: screen_context={'available' if screen_context else 'failed'}, "
+                        f"command_info={'available' if command_info else 'failed'}")
+            
+            return screen_context, command_info
+            
+        except Exception as e:
+            logger.error(f"Parallel perception and reasoning failed: {e}")
+            return None, None
     
     def _initialize_system_health(self) -> None:
         """Initialize system health monitoring."""

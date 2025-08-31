@@ -31,6 +31,13 @@ from .error_handler import (
     ErrorCategory,
     ErrorSeverity
 )
+from .performance import (
+    connection_pool,
+    image_cache,
+    measure_performance,
+    PerformanceMetrics,
+    performance_monitor
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +55,7 @@ class VisionModule:
         self.sct = mss.mss()
         logger.info("VisionModule initialized")
     
+    @measure_performance("screen_capture", include_system_metrics=True)
     @with_error_handling(
         category=ErrorCategory.HARDWARE_ERROR,
         severity=ErrorSeverity.HIGH,
@@ -128,7 +136,7 @@ class VisionModule:
                     logger.warning(f"Failed to resize image: {e}. Using original size.")
                     # Continue with original size if resize fails
             
-            # Convert to base64 with error handling
+            # Convert to base64 with caching and optimization
             try:
                 buffer = io.BytesIO()
                 img.save(buffer, format="JPEG", quality=SCREENSHOT_QUALITY)
@@ -138,7 +146,13 @@ class VisionModule:
                 if len(img_bytes) == 0:
                     raise ValueError("Empty image data generated")
                 
-                base64_string = base64.b64encode(img_bytes).decode('utf-8')
+                # Use image cache for compression optimization
+                base64_string = image_cache.get_compressed_image(img_bytes, SCREENSHOT_QUALITY)
+                
+                if not base64_string:
+                    # Fallback to direct encoding if cache fails
+                    base64_string = base64.b64encode(img_bytes).decode('utf-8')
+                    logger.warning("Image cache failed, using direct encoding")
                 
                 # Validate base64 string
                 if not base64_string:
@@ -190,6 +204,7 @@ class VisionModule:
             logger.error(f"Failed to get screen resolution: {e}")
             return 1920, 1080  # Default fallback
     
+    @measure_performance("vision_analysis", include_system_metrics=True)
     @with_error_handling(
         category=ErrorCategory.API_ERROR,
         severity=ErrorSeverity.MEDIUM,
@@ -273,16 +288,19 @@ class VisionModule:
                 "temperature": 0.1
             }
             
-            # Make API request with comprehensive error handling
+            # Make API request with connection pooling and comprehensive error handling
             response = None
             last_error = None
+            
+            # Use connection pool for better performance
+            session = connection_pool.get_session(VISION_API_BASE)
             
             max_retries = 3
             for attempt in range(max_retries):
                 try:
                     logger.debug(f"Sending request to vision API (attempt {attempt + 1})")
                     
-                    response = requests.post(
+                    response = session.post(
                         f"{VISION_API_BASE}/chat/completions",
                         headers=headers,
                         json=payload,
