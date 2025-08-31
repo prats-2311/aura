@@ -93,7 +93,7 @@
 
 - [ ] 7. Implement feedback module
 
-  - [ ] 7.1 Create sound effect system
+  - [x] 7.1 Create sound effect system
 
     - Implement FeedbackModule class with pygame audio integration
     - Add play method for success, failure, and thinking sounds
@@ -101,7 +101,7 @@
     - Write unit tests for audio playback functionality
     - _Requirements: 6.1, 6.2, 6.3_
 
-  - [ ] 7.2 Integrate TTS with feedback
+  - [x] 7.2 Integrate TTS with feedback
     - Add speak method that uses AudioModule for text-to-speech
     - Implement queue management for multiple audio outputs
     - Add priority handling for different types of feedback
