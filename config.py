@@ -197,7 +197,7 @@ TYPE_INTERVAL = 0.05        # Seconds between keystrokes
 SCROLL_AMOUNT = 100         # Default scroll amount in pixels
 
 # API timeout settings
-VISION_API_TIMEOUT = 30     # Seconds
+VISION_API_TIMEOUT = 120    # Seconds - Increased for vision models (was 30)
 REASONING_API_TIMEOUT = 60  # Seconds
 AUDIO_API_TIMEOUT = 30      # Seconds
 

@@ -10,6 +10,7 @@ import base64
 import io
 import json
 import logging
+import threading
 import time
 from typing import Dict, List, Optional, Tuple
 import requests
@@ -53,6 +54,7 @@ class VisionModule:
     def __init__(self):
         """Initialize the VisionModule."""
         self.sct = mss.mss()
+        self._request_lock = threading.Lock()  # Prevent concurrent vision requests
         logger.info("VisionModule initialized")
     
     @measure_performance("screen_capture", include_system_metrics=True)
@@ -208,8 +210,8 @@ class VisionModule:
     @with_error_handling(
         category=ErrorCategory.API_ERROR,
         severity=ErrorSeverity.MEDIUM,
-        max_retries=3,
-        retry_delay=2.0,
+        max_retries=1,
+        retry_delay=10.0,
         user_message="I'm having trouble analyzing your screen. Please try again."
     )
     def describe_screen(self, analysis_type: str = "general") -> Dict:
@@ -225,11 +227,13 @@ class VisionModule:
         Raises:
             Exception: If screen analysis fails after retries
         """
-        try:
-            # Validate analysis type
-            valid_types = ["general", "form"]
-            if analysis_type not in valid_types:
-                raise ValueError(f"Invalid analysis type: {analysis_type}. Must be one of {valid_types}")
+        # Use lock to prevent concurrent vision requests that can overwhelm LM Studio
+        with self._request_lock:
+            try:
+                # Validate analysis type
+                valid_types = ["general", "form"]
+                if analysis_type not in valid_types:
+                    raise ValueError(f"Invalid analysis type: {analysis_type}. Must be one of {valid_types}")
             
             logger.info(f"Starting screen analysis (type: {analysis_type})")
             
@@ -298,7 +302,8 @@ class VisionModule:
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    logger.debug(f"Sending request to vision API (attempt {attempt + 1})")
+                    logger.info(f"Sending vision request to LM Studio (attempt {attempt + 1}, timeout: {VISION_API_TIMEOUT}s)")
+                    request_start_time = time.time()
                     
                     response = session.post(
                         f"{VISION_API_BASE}/chat/completions",
@@ -306,6 +311,9 @@ class VisionModule:
                         json=payload,
                         timeout=VISION_API_TIMEOUT
                     )
+                    
+                    request_duration = time.time() - request_start_time
+                    logger.info(f"Vision API response received in {request_duration:.2f}s (status: {response.status_code})")
                     
                     # Check response status
                     if response.status_code == 200:
@@ -453,18 +461,18 @@ class VisionModule:
             
             return screen_analysis
             
-        except Exception as e:
-            # Re-raise with additional context if not already handled
-            if "Screen analysis failed" not in str(e):
-                error_info = global_error_handler.handle_error(
-                    error=e,
-                    module="vision",
-                    function="describe_screen",
-                    category=ErrorCategory.PROCESSING_ERROR,
-                    context={"analysis_type": analysis_type}
-                )
-                raise Exception(f"Screen analysis failed: {error_info.user_message}")
-            raise
+            except Exception as e:
+                # Re-raise with additional context if not already handled
+                if "Screen analysis failed" not in str(e):
+                    error_info = global_error_handler.handle_error(
+                        error=e,
+                        module="vision",
+                        function="describe_screen",
+                        category=ErrorCategory.PROCESSING_ERROR,
+                        context={"analysis_type": analysis_type}
+                    )
+                    raise Exception(f"Screen analysis failed: {error_info.user_message}")
+                raise
     
     def analyze_forms(self) -> Dict:
         """

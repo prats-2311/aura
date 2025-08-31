@@ -1621,3 +1621,285 @@
 2025-08-31 18:17:28,990 - __main__ - WARNING - Wake word thread did not stop gracefully
 2025-08-31 18:17:29,003 - __main__ - INFO - Step 2: Running cleanup handlers...
 2025-08-31 18:17:29,004 - __main__ - INFO - Running 5 cleanup handlers...
+2025-08-31 18:18:36,739 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-08-31 18:18:36,740 - __main__ - INFO - Starting AURA application...
+2025-08-31 18:18:36,740 - __main__ - INFO - Step 1: Validating configuration...
+2025-08-31 18:18:36,740 - __main__ - INFO - Step 2: Running startup checks...
+2025-08-31 18:18:36,740 - __main__ - INFO - Running 5 startup checks...
+2025-08-31 18:18:36,771 - __main__ - WARNING - Reasoning API connectivity check failed: HTTPSConnectionPool(host='api.ollama.ai', port=443): Max retries exceeded with url: /v1/models (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x1210dd410>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)"))
+2025-08-31 18:18:36,771 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-08-31 18:18:36,771 - __main__ - INFO - Step 3: Initializing core modules...
+2025-08-31 18:18:36,771 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 18:18:38,759 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 18:18:38,759 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 18:18:38,767 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 18:18:38,767 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 18:18:38,767 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 18:18:38,789 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 18:18:38,789 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 18:18:38,789 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 18:18:38,789 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 18:18:38,789 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 18:18:39,242 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 18:18:39,242 - modules.feedback - INFO - Loading sound files...
+2025-08-31 18:18:39,243 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 18:18:39,243 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 18:18:39,243 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 18:18:39,243 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 18:18:39,243 - orchestrator - INFO - Initializing AURA modules...
+2025-08-31 18:18:39,243 - orchestrator - INFO - Initializing Vision Module...
+2025-08-31 18:18:39,246 - modules.vision - INFO - VisionModule initialized
+2025-08-31 18:18:39,246 - orchestrator - INFO - Vision Module initialized successfully
+2025-08-31 18:18:39,246 - orchestrator - INFO - Initializing Reasoning Module...
+2025-08-31 18:18:39,246 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:latest
+2025-08-31 18:18:39,246 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-08-31 18:18:39,246 - orchestrator - INFO - Initializing Automation Module...
+2025-08-31 18:18:39,248 - modules.automation - INFO - AutomationModule initialized. Screen size: 1710x1112
+2025-08-31 18:18:39,248 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-08-31 18:18:39,248 - orchestrator - INFO - Automation Module initialized successfully
+2025-08-31 18:18:39,248 - orchestrator - INFO - Initializing Audio Module...
+2025-08-31 18:18:39,248 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 18:18:41,288 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 18:18:41,288 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 18:18:41,299 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 18:18:41,299 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 18:18:41,299 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 18:18:41,306 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 18:18:41,306 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 18:18:41,306 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 18:18:41,306 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 18:18:41,306 - orchestrator - INFO - Audio Module initialized successfully
+2025-08-31 18:18:41,307 - orchestrator - INFO - Initializing Feedback Module...
+2025-08-31 18:18:41,307 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 18:18:41,307 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 18:18:41,307 - modules.feedback - INFO - Loading sound files...
+2025-08-31 18:18:41,309 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 18:18:41,309 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 18:18:41,309 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 18:18:41,309 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 18:18:41,309 - orchestrator - INFO - Feedback Module initialized successfully
+2025-08-31 18:18:41,309 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback
+2025-08-31 18:18:41,309 - orchestrator - INFO - All modules initialized successfully
+2025-08-31 18:18:41,309 - orchestrator - INFO - System health monitoring initialized
+2025-08-31 18:18:41,309 - orchestrator - INFO - Orchestrator initialized successfully
+2025-08-31 18:18:41,309 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-08-31 18:18:41,309 - __main__ - INFO - All modules verified successfully
+2025-08-31 18:18:41,309 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-08-31 18:18:41,309 - __main__ - INFO - Health monitoring started
+2025-08-31 18:18:41,309 - __main__ - INFO - Step 6: Startup completed successfully
+2025-08-31 18:18:41,310 - __main__ - INFO - AURA application startup completed in 4.57s
+2025-08-31 18:18:41,310 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 18:18:41,310 - __main__ - INFO - Starting main application loop...
+2025-08-31 18:18:41,310 - __main__ - INFO - Wake word monitoring started
+2025-08-31 18:18:41,310 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 18:18:43,359 - modules.audio - INFO - Wake word 'computer' detected!
+2025-08-31 18:18:43,360 - modules.audio - INFO - Providing wake word confirmation
+2025-08-31 18:18:43,492 - __main__ - INFO - Wake word detected (#1)
+2025-08-31 18:18:43,492 - __main__ - INFO - Processing voice command...
+2025-08-31 18:18:43,492 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:18:43,492 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-08-31 18:18:43,492 - modules.audio - INFO - Starting synchronous audio recording...
+2025-08-31 18:18:51,666 - modules.audio - INFO - Audio recording completed:
+2025-08-31 18:18:51,667 - modules.audio - INFO -   Duration: 8.00s
+2025-08-31 18:18:51,667 - modules.audio - INFO -   Samples: 128000
+2025-08-31 18:18:51,667 - modules.audio - INFO -   RMS volume: 0.0062
+2025-08-31 18:18:51,667 - modules.audio - INFO -   Max volume: 0.0626
+2025-08-31 18:18:51,667 - modules.audio - INFO - Audio is quiet but may be usable (RMS: 0.0062)
+2025-08-31 18:18:51,667 - modules.audio - INFO - Applying gain factor: 4.80 (original max volume: 0.0626)
+2025-08-31 18:18:51,667 - modules.audio - INFO - After gain - RMS: 0.0296, Max: 0.3000
+2025-08-31 18:18:51,668 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-08-31 18:18:51,755 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpcgaux2qb.wav
+2025-08-31 18:18:51,755 - modules.audio - INFO -   File size: 256044 bytes
+2025-08-31 18:18:51,755 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-08-31 18:18:51,755 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-08-31 18:18:51,755 - modules.audio - INFO -   Channels: 1
+2025-08-31 18:18:51,755 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-08-31 18:18:51,755 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-08-31 18:18:51,756 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpcgaux2qb.wav
+2025-08-31 18:18:51,756 - modules.audio - INFO - Running Whisper transcription...
+2025-08-31 18:18:56,199 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-08-31 18:18:56,199 - modules.audio - INFO - Whisper transcription completed
+2025-08-31 18:18:56,199 - modules.audio - INFO - Whisper result details:
+2025-08-31 18:18:56,200 - modules.audio - INFO -   Text: 'Hello, my name is Pratik.'
+2025-08-31 18:18:56,200 - modules.audio - INFO -   Language: en
+2025-08-31 18:18:56,200 - modules.audio - INFO -   Segments: 1
+2025-08-31 18:18:56,200 - modules.audio - INFO -     Segment 1: 'Hello, my name is Pratik.' (0.00-6.00s, prob: -0.585)
+2025-08-31 18:18:56,200 - modules.audio - INFO - Transcription result: 'Hello, my name is Pratik.'
+2025-08-31 18:18:56,200 - __main__ - INFO - Command received: 'Hello, my name is Pratik.'
+2025-08-31 18:18:56,201 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:18:56,202 - orchestrator - INFO - Starting command execution [cmd_1756644536201]: 'Hello, my name is Pratik.'
+2025-08-31 18:18:56,202 - orchestrator - INFO - [cmd_1756644536201] Step 1: Command validation
+2025-08-31 18:18:56,206 - orchestrator - INFO - [cmd_1756644536201] Command validated and normalized: 'hello, my name is pratik.'
+2025-08-31 18:18:56,206 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:18:56,207 - orchestrator - INFO - [cmd_1756644536201] Using sequential processing
+2025-08-31 18:18:56,207 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-08-31 18:18:56,210 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:18:56,211 - modules.vision - INFO - Starting screen analysis (type: general)
+2025-08-31 18:18:56,211 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:18:56,497 - modules.vision - INFO - Screenshot captured and encoded: 518256 characters
+2025-08-31 18:19:26,545 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPConnectionPool(host='localhost', port=1234): Read timed out. (read timeout=30)")': /v1/chat/completions
+2025-08-31 18:19:44,649 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-08-31 18:19:44,652 - __main__ - INFO - Initiating AURA shutdown...
+2025-08-31 18:19:44,652 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-08-31 18:19:49,654 - __main__ - WARNING - Wake word thread did not stop gracefully
+2025-08-31 18:19:49,655 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-08-31 18:19:49,656 - __main__ - INFO - Running 5 cleanup handlers...
+2025-08-31 18:21:08,864 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-08-31 18:21:08,865 - __main__ - INFO - Starting AURA application...
+2025-08-31 18:21:08,865 - __main__ - INFO - Step 1: Validating configuration...
+2025-08-31 18:21:08,865 - __main__ - INFO - Step 2: Running startup checks...
+2025-08-31 18:21:08,865 - __main__ - INFO - Running 5 startup checks...
+2025-08-31 18:21:08,897 - __main__ - WARNING - Reasoning API connectivity check failed: HTTPSConnectionPool(host='api.ollama.ai', port=443): Max retries exceeded with url: /v1/models (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x116f54f10>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)"))
+2025-08-31 18:21:08,897 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-08-31 18:21:08,897 - __main__ - INFO - Step 3: Initializing core modules...
+2025-08-31 18:21:08,897 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 18:21:10,961 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 18:21:10,962 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 18:21:10,978 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 18:21:10,978 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 18:21:10,978 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 18:21:10,988 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 18:21:10,989 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 18:21:10,989 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 18:21:10,989 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 18:21:10,989 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 18:21:11,363 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 18:21:11,363 - modules.feedback - INFO - Loading sound files...
+2025-08-31 18:21:11,364 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 18:21:11,364 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 18:21:11,364 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 18:21:11,364 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 18:21:11,365 - orchestrator - INFO - Initializing AURA modules...
+2025-08-31 18:21:11,365 - orchestrator - INFO - Initializing Vision Module...
+2025-08-31 18:21:11,366 - modules.vision - INFO - VisionModule initialized
+2025-08-31 18:21:11,366 - orchestrator - INFO - Vision Module initialized successfully
+2025-08-31 18:21:11,366 - orchestrator - INFO - Initializing Reasoning Module...
+2025-08-31 18:21:11,366 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:latest
+2025-08-31 18:21:11,366 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-08-31 18:21:11,366 - orchestrator - INFO - Initializing Automation Module...
+2025-08-31 18:21:11,368 - modules.automation - INFO - AutomationModule initialized. Screen size: 1710x1112
+2025-08-31 18:21:11,368 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-08-31 18:21:11,368 - orchestrator - INFO - Automation Module initialized successfully
+2025-08-31 18:21:11,368 - orchestrator - INFO - Initializing Audio Module...
+2025-08-31 18:21:11,369 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 18:21:13,452 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 18:21:13,452 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 18:21:13,465 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 18:21:13,465 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 18:21:13,465 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 18:21:13,470 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 18:21:13,470 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 18:21:13,470 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 18:21:13,470 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 18:21:13,471 - orchestrator - INFO - Audio Module initialized successfully
+2025-08-31 18:21:13,471 - orchestrator - INFO - Initializing Feedback Module...
+2025-08-31 18:21:13,471 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 18:21:13,471 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 18:21:13,471 - modules.feedback - INFO - Loading sound files...
+2025-08-31 18:21:13,472 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 18:21:13,472 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 18:21:13,472 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 18:21:13,472 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 18:21:13,472 - orchestrator - INFO - Feedback Module initialized successfully
+2025-08-31 18:21:13,472 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback
+2025-08-31 18:21:13,472 - orchestrator - INFO - All modules initialized successfully
+2025-08-31 18:21:13,472 - orchestrator - INFO - System health monitoring initialized
+2025-08-31 18:21:13,472 - orchestrator - INFO - Orchestrator initialized successfully
+2025-08-31 18:21:13,472 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-08-31 18:21:13,472 - __main__ - INFO - All modules verified successfully
+2025-08-31 18:21:13,472 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-08-31 18:21:13,472 - __main__ - INFO - Health monitoring started
+2025-08-31 18:21:13,472 - __main__ - INFO - Step 6: Startup completed successfully
+2025-08-31 18:21:13,473 - __main__ - INFO - AURA application startup completed in 4.61s
+2025-08-31 18:21:13,473 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 18:21:13,473 - __main__ - INFO - Starting main application loop...
+2025-08-31 18:21:13,473 - __main__ - INFO - Wake word monitoring started
+2025-08-31 18:21:13,473 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 18:21:15,961 - modules.audio - INFO - Wake word 'computer' detected!
+2025-08-31 18:21:15,961 - modules.audio - INFO - Providing wake word confirmation
+2025-08-31 18:21:16,094 - __main__ - INFO - Wake word detected (#1)
+2025-08-31 18:21:16,094 - __main__ - INFO - Processing voice command...
+2025-08-31 18:21:16,095 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:21:16,095 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-08-31 18:21:16,095 - modules.audio - INFO - Starting synchronous audio recording...
+2025-08-31 18:21:24,273 - modules.audio - INFO - Audio recording completed:
+2025-08-31 18:21:24,274 - modules.audio - INFO -   Duration: 8.00s
+2025-08-31 18:21:24,274 - modules.audio - INFO -   Samples: 128000
+2025-08-31 18:21:24,274 - modules.audio - INFO -   RMS volume: 0.0075
+2025-08-31 18:21:24,274 - modules.audio - INFO -   Max volume: 0.0882
+2025-08-31 18:21:24,274 - modules.audio - INFO - Audio is quiet but may be usable (RMS: 0.0075)
+2025-08-31 18:21:24,274 - modules.audio - INFO - Applying gain factor: 3.40 (original max volume: 0.0882)
+2025-08-31 18:21:24,275 - modules.audio - INFO - After gain - RMS: 0.0254, Max: 0.3000
+2025-08-31 18:21:24,275 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-08-31 18:21:24,344 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmphixa9z4y.wav
+2025-08-31 18:21:24,344 - modules.audio - INFO -   File size: 256044 bytes
+2025-08-31 18:21:24,344 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-08-31 18:21:24,344 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-08-31 18:21:24,344 - modules.audio - INFO -   Channels: 1
+2025-08-31 18:21:24,344 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-08-31 18:21:24,344 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-08-31 18:21:24,345 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmphixa9z4y.wav
+2025-08-31 18:21:24,345 - modules.audio - INFO - Running Whisper transcription...
+2025-08-31 18:21:29,478 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-08-31 18:21:29,479 - modules.audio - INFO - Whisper transcription completed
+2025-08-31 18:21:29,479 - modules.audio - INFO - Whisper result details:
+2025-08-31 18:21:29,479 - modules.audio - INFO -   Text: 'What's on my screen?'
+2025-08-31 18:21:29,479 - modules.audio - INFO -   Language: en
+2025-08-31 18:21:29,479 - modules.audio - INFO -   Segments: 1
+2025-08-31 18:21:29,479 - modules.audio - INFO -     Segment 1: 'What's on my screen?' (0.00-8.00s, prob: -0.560)
+2025-08-31 18:21:29,479 - modules.audio - INFO - Transcription result: 'What's on my screen?'
+2025-08-31 18:21:29,480 - __main__ - INFO - Command received: 'What's on my screen?'
+2025-08-31 18:21:29,480 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:21:29,481 - orchestrator - INFO - Starting command execution [cmd_1756644689481]: 'What's on my screen?'
+2025-08-31 18:21:29,481 - orchestrator - INFO - [cmd_1756644689481] Step 1: Command validation
+2025-08-31 18:21:29,484 - orchestrator - INFO - [cmd_1756644689481] Command validated and normalized: 'what's on my screen?'
+2025-08-31 18:21:29,484 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:21:29,484 - orchestrator - INFO - [cmd_1756644689481] Using sequential processing
+2025-08-31 18:21:29,484 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-08-31 18:21:29,488 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:21:29,488 - modules.vision - INFO - Starting screen analysis (type: general)
+2025-08-31 18:21:29,488 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:21:29,752 - modules.vision - INFO - Screenshot captured and encoded: 458764 characters
+2025-08-31 18:21:59,781 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPConnectionPool(host='localhost', port=1234): Read timed out. (read timeout=30)")': /v1/chat/completions
+2025-08-31 18:22:31,801 - urllib3.connectionpool - WARNING - Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPConnectionPool(host='localhost', port=1234): Read timed out. (read timeout=30)")': /v1/chat/completions
+2025-08-31 18:23:05,867 - urllib3.connectionpool - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPConnectionPool(host='localhost', port=1234): Read timed out. (read timeout=30)")': /v1/chat/completions
+2025-08-31 18:23:35,943 - modules.vision - WARNING - Connection error to vision API (attempt 1)
+2025-08-31 18:24:07,000 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPConnectionPool(host='localhost', port=1234): Read timed out. (read timeout=30)")': /v1/chat/completions
+2025-08-31 18:24:39,036 - urllib3.connectionpool - WARNING - Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPConnectionPool(host='localhost', port=1234): Read timed out. (read timeout=30)")': /v1/chat/completions
+2025-08-31 18:25:00,837 - __main__ - INFO - AURA Status Report - Uptime: 232.0s, Wake words: 1 (15.5/hr), Commands: 1 (15.5/hr), Errors: 0, Threads: 6 (Wake: Running, Health: Stopped), Memory: 6690.3MB, CPU: 52.9%, Cache: 0.0% hit rate, Health: fair
+2025-08-31 18:25:13,055 - urllib3.connectionpool - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPConnectionPool(host='localhost', port=1234): Read timed out. (read timeout=30)")': /v1/chat/completions
+2025-08-31 18:25:43,075 - modules.vision - WARNING - Connection error to vision API (attempt 2)
+2025-08-31 18:26:05,246 - modules.error_handler - WARNING - [vision_describe_screen_1756644965] API_ERROR in vision.describe_screen: API error: 400 - {"error":"Model unloaded."}
+2025-08-31 18:26:05,255 - modules.error_handler - INFO - [vision_describe_screen_1756644965] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-08-31 18:26:05,260 - modules.error_handler - WARNING - [modules.vision_describe_screen_1756644965] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-08-31 18:26:05,260 - modules.error_handler - INFO - Attempting recovery for error modules.vision_describe_screen_1756644965
+2025-08-31 18:26:06,266 - modules.error_handler - INFO - Recovery successful for error modules.vision_describe_screen_1756644965
+2025-08-31 18:26:08,271 - modules.vision - INFO - Starting screen analysis (type: general)
+2025-08-31 18:26:08,276 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:26:08,404 - modules.vision - INFO - Screenshot captured and encoded: 309340 characters
+2025-08-31 18:26:11,396 - modules.error_handler - WARNING - [vision_describe_screen_1756644971] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "Failed to load model \"google/gemma-3-4b\". Error: Operation canceled.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-08-31 18:26:11,397 - modules.error_handler - INFO - [vision_describe_screen_1756644971] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-08-31 18:26:11,399 - modules.error_handler - WARNING - [modules.vision_describe_screen_1756644971] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-08-31 18:26:11,399 - modules.error_handler - INFO - Attempting recovery for error modules.vision_describe_screen_1756644971
+2025-08-31 18:26:13,404 - modules.error_handler - INFO - Recovery successful for error modules.vision_describe_screen_1756644971
+2025-08-31 18:26:17,405 - modules.vision - INFO - Starting screen analysis (type: general)
+2025-08-31 18:26:17,406 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 18:26:17,487 - modules.vision - INFO - Screenshot captured and encoded: 438808 characters
+2025-08-31 18:26:17,494 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x147a1d750>: Failed to establish a new connection: [Errno 61] Connection refused')': /v1/chat/completions
+2025-08-31 18:26:19,500 - urllib3.connectionpool - WARNING - Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x147a2dbd0>: Failed to establish a new connection: [Errno 61] Connection refused')': /v1/chat/completions
+2025-08-31 18:26:19,780 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-08-31 18:26:19,780 - __main__ - INFO - Initiating AURA shutdown...
+2025-08-31 18:26:19,780 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-08-31 18:26:23,508 - urllib3.connectionpool - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x147a2ec90>: Failed to establish a new connection: [Errno 61] Connection refused')': /v1/chat/completions
+2025-08-31 18:26:23,511 - modules.vision - WARNING - Connection error to vision API (attempt 1)
+2025-08-31 18:26:24,528 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x147a353d0>: Failed to establish a new connection: [Errno 61] Connection refused')': /v1/chat/completions
+2025-08-31 18:26:24,786 - __main__ - WARNING - Wake word thread did not stop gracefully
+2025-08-31 18:26:24,786 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-08-31 18:26:24,786 - __main__ - INFO - Running 5 cleanup handlers...
