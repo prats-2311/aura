@@ -2585,3 +2585,810 @@
 2025-08-31 19:26:22,109 - __main__ - INFO - Wake word monitoring stopped
 2025-08-31 19:26:22,109 - __main__ - INFO - Step 2: Running cleanup handlers...
 2025-08-31 19:26:22,110 - __main__ - INFO - Running 5 cleanup handlers...
+2025-08-31 19:31:44,478 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-08-31 19:31:44,479 - __main__ - INFO - Starting AURA application...
+2025-08-31 19:31:44,479 - __main__ - INFO - Step 1: Validating configuration...
+2025-08-31 19:31:44,495 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 19:31:44,495 - __main__ - INFO - Step 2: Running startup checks...
+2025-08-31 19:31:44,495 - __main__ - INFO - Running 5 startup checks...
+2025-08-31 19:31:44,528 - __main__ - WARNING - Reasoning API connectivity check failed: HTTPSConnectionPool(host='api.ollama.ai', port=443): Max retries exceeded with url: /v1/models (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x139fa94d0>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)"))
+2025-08-31 19:31:44,528 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-08-31 19:31:44,528 - __main__ - INFO - Step 3: Initializing core modules...
+2025-08-31 19:31:44,528 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 19:31:46,386 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 19:31:46,386 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 19:31:46,390 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 19:31:46,390 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 19:31:46,390 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 19:31:46,399 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 19:31:46,399 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 19:31:46,399 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 19:31:46,399 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 19:31:46,399 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 19:31:48,517 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 19:31:48,517 - modules.feedback - INFO - Loading sound files...
+2025-08-31 19:31:48,519 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 19:31:48,519 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 19:31:48,519 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 19:31:48,519 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 19:31:48,520 - orchestrator - INFO - Initializing AURA modules...
+2025-08-31 19:31:48,520 - orchestrator - INFO - Initializing Vision Module...
+2025-08-31 19:31:48,522 - modules.vision - INFO - VisionModule initialized
+2025-08-31 19:31:48,522 - orchestrator - INFO - Vision Module initialized successfully
+2025-08-31 19:31:48,522 - orchestrator - INFO - Initializing Reasoning Module...
+2025-08-31 19:31:48,522 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:latest
+2025-08-31 19:31:48,522 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-08-31 19:31:48,522 - orchestrator - INFO - Initializing Automation Module...
+2025-08-31 19:31:48,526 - modules.automation - INFO - AutomationModule initialized. Screen size: 1710x1112
+2025-08-31 19:31:48,526 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-08-31 19:31:48,526 - orchestrator - INFO - Automation Module initialized successfully
+2025-08-31 19:31:48,526 - orchestrator - INFO - Initializing Audio Module...
+2025-08-31 19:31:48,526 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 19:31:50,482 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 19:31:50,484 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 19:31:50,495 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 19:31:50,495 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 19:31:50,495 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 19:31:50,521 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 19:31:50,521 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 19:31:50,521 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 19:31:50,521 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 19:31:50,522 - orchestrator - INFO - Audio Module initialized successfully
+2025-08-31 19:31:50,522 - orchestrator - INFO - Initializing Feedback Module...
+2025-08-31 19:31:50,522 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 19:31:50,522 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 19:31:50,522 - modules.feedback - INFO - Loading sound files...
+2025-08-31 19:31:50,526 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 19:31:50,526 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 19:31:50,526 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 19:31:50,526 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 19:31:50,526 - orchestrator - INFO - Feedback Module initialized successfully
+2025-08-31 19:31:50,526 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback
+2025-08-31 19:31:50,526 - orchestrator - INFO - All modules initialized successfully
+2025-08-31 19:31:50,526 - orchestrator - INFO - System health monitoring initialized
+2025-08-31 19:31:50,526 - orchestrator - INFO - Orchestrator initialized successfully
+2025-08-31 19:31:50,526 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-08-31 19:31:50,526 - __main__ - INFO - All modules verified successfully
+2025-08-31 19:31:50,526 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-08-31 19:31:50,526 - __main__ - INFO - Health monitoring started
+2025-08-31 19:31:50,526 - __main__ - INFO - Step 6: Startup completed successfully
+2025-08-31 19:31:50,527 - __main__ - INFO - AURA application startup completed in 6.05s
+2025-08-31 19:31:50,527 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 19:31:50,527 - __main__ - INFO - Starting main application loop...
+2025-08-31 19:31:50,527 - __main__ - INFO - Wake word monitoring started
+2025-08-31 19:31:50,527 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:31:52,745 - modules.audio - INFO - Wake word 'computer' detected!
+2025-08-31 19:31:52,747 - modules.audio - INFO - Providing wake word confirmation
+2025-08-31 19:31:52,863 - __main__ - INFO - Wake word detected (#1)
+2025-08-31 19:31:52,864 - __main__ - INFO - Processing voice command...
+2025-08-31 19:31:52,864 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 19:31:52,864 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-08-31 19:31:52,864 - modules.audio - INFO - Starting synchronous audio recording...
+2025-08-31 19:32:01,074 - modules.audio - INFO - Audio recording completed:
+2025-08-31 19:32:01,074 - modules.audio - INFO -   Duration: 8.00s
+2025-08-31 19:32:01,074 - modules.audio - INFO -   Samples: 128000
+2025-08-31 19:32:01,074 - modules.audio - INFO -   RMS volume: 0.0138
+2025-08-31 19:32:01,074 - modules.audio - INFO -   Max volume: 0.1401
+2025-08-31 19:32:01,074 - modules.audio - INFO - Good audio level detected (RMS: 0.0138)
+2025-08-31 19:32:01,074 - modules.audio - INFO - Applying gain factor: 2.14 (original max volume: 0.1401)
+2025-08-31 19:32:01,075 - modules.audio - INFO - After gain - RMS: 0.0295, Max: 0.3000
+2025-08-31 19:32:01,076 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-08-31 19:32:01,146 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmptffasy8f.wav
+2025-08-31 19:32:01,146 - modules.audio - INFO -   File size: 256044 bytes
+2025-08-31 19:32:01,146 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-08-31 19:32:01,146 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-08-31 19:32:01,146 - modules.audio - INFO -   Channels: 1
+2025-08-31 19:32:01,147 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-08-31 19:32:01,147 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-08-31 19:32:01,148 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmptffasy8f.wav
+2025-08-31 19:32:01,148 - modules.audio - INFO - Running Whisper transcription...
+2025-08-31 19:32:02,605 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-08-31 19:32:02,606 - modules.audio - INFO - Whisper transcription completed
+2025-08-31 19:32:02,606 - modules.audio - INFO - Whisper result details:
+2025-08-31 19:32:02,606 - modules.audio - INFO -   Text: 'What's on my screen?'
+2025-08-31 19:32:02,606 - modules.audio - INFO -   Language: en
+2025-08-31 19:32:02,606 - modules.audio - INFO -   Segments: 1
+2025-08-31 19:32:02,606 - modules.audio - INFO -     Segment 1: 'What's on my screen?' (0.00-8.00s, prob: -0.584)
+2025-08-31 19:32:02,606 - modules.audio - INFO - Transcription result: 'What's on my screen?'
+2025-08-31 19:32:02,606 - __main__ - INFO - Command received: 'What's on my screen?'
+2025-08-31 19:32:02,606 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 19:32:02,606 - orchestrator - INFO - Starting command execution [cmd_1756648922606]: 'What's on my screen?'
+2025-08-31 19:32:02,606 - orchestrator - INFO - [cmd_1756648922606] Step 1: Command validation
+2025-08-31 19:32:02,608 - orchestrator - INFO - [cmd_1756648922606] Command validated and normalized: 'what's on my screen?'
+2025-08-31 19:32:02,608 - orchestrator - INFO - [cmd_1756648922606] Detected question, routing to information extraction mode
+2025-08-31 19:32:02,608 - orchestrator - INFO - [cmd_1756648922606] Processing question in information extraction mode
+2025-08-31 19:32:02,608 - orchestrator - INFO - [qa_1756648922608] Processing question: 'What's on my screen?'
+2025-08-31 19:32:02,608 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 19:32:02,608 - orchestrator - INFO - [qa_1756648922608] Analyzing screen for information extraction (type: simple)
+2025-08-31 19:32:02,608 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-08-31 19:32:02,608 - orchestrator - INFO - [qa_1756648922608] Using simple analysis for screen capture
+2025-08-31 19:32:02,608 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 19:32:02,608 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-08-31 19:32:02,608 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 19:32:02,752 - modules.vision - INFO - Screenshot captured and encoded: 521104 characters
+2025-08-31 19:32:02,778 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 19:32:02,778 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 120s)
+2025-08-31 19:32:09,304 - modules.vision - INFO - Vision API response received in 6.53s (status: 200)
+2025-08-31 19:32:09,305 - modules.vision - INFO - Successfully parsed JSON response from vision model
+2025-08-31 19:32:09,305 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-08-31 19:32:09,307 - orchestrator - INFO - [qa_1756648922608] Generating answer using reasoning module
+2025-08-31 19:32:09,307 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 19:32:09,308 - modules.reasoning - INFO - Generating action plan for command: 'Please analyze the screen content and answer this question: What's on my screen?
+
+Screen Context: Co...'
+2025-08-31 19:32:09,316 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x31f91ced0>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)")': /v1/chat/completions
+2025-08-31 19:32:11,323 - urllib3.connectionpool - WARNING - Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x31f91d410>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)")': /v1/chat/completions
+2025-08-31 19:32:15,330 - urllib3.connectionpool - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x31f91df50>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)")': /v1/chat/completions
+2025-08-31 19:32:15,336 - modules.reasoning - WARNING - Connection error to reasoning API (attempt 1)
+2025-08-31 19:32:16,347 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x31f9205d0>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)")': /v1/chat/completions
+2025-08-31 19:32:18,354 - urllib3.connectionpool - WARNING - Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x31f921210>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)")': /v1/chat/completions
+2025-08-31 19:32:22,360 - urllib3.connectionpool - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x31f921dd0>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)")': /v1/chat/completions
+2025-08-31 19:32:22,363 - modules.reasoning - WARNING - Connection error to reasoning API (attempt 2)
+2025-08-31 19:32:24,373 - urllib3.connectionpool - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x31f923bd0>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)")': /v1/chat/completions
+2025-08-31 19:32:26,378 - urllib3.connectionpool - WARNING - Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x31f924810>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)")': /v1/chat/completions
+2025-08-31 19:32:30,382 - urllib3.connectionpool - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x31f9253d0>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)")': /v1/chat/completions
+2025-08-31 19:32:30,385 - modules.reasoning - WARNING - Connection error to reasoning API (attempt 3)
+2025-08-31 19:32:30,390 - modules.error_handler - WARNING - [reasoning__make_api_request_1756648950] NETWORK_ERROR in reasoning._make_api_request: HTTPSConnectionPool(host='api.ollama.ai', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x31f925e90>: Failed to resolve 'api.ollama.ai' ([Errno 8] nodename nor servname provided, or not known)"))
+2025-08-31 19:32:30,394 - modules.error_handler - WARNING - [reasoning_get_action_plan_1756648950] API_ERROR in reasoning.get_action_plan: Cannot connect to reasoning API: I'm having network connectivity issues. Please check your internet connection.
+2025-08-31 19:32:30,394 - modules.reasoning - WARNING - Using fallback response due to error: Cannot connect to reasoning API: I'm having network connectivity issues. Please check your internet connection.
+2025-08-31 19:32:30,394 - orchestrator - INFO - [qa_1756648922608] Q&A reasoning successful
+2025-08-31 19:32:30,395 - orchestrator - INFO - [qa_1756648922608] Question answered successfully: True
+2025-08-31 19:32:30,395 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 19:32:30,395 - __main__ - INFO - Command executed successfully: What's on my screen?
+2025-08-31 19:32:30,396 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:32:35,503 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:32:35,628 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:32:40,725 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:32:40,843 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:32:45,954 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:32:46,059 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:32:51,153 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:32:51,270 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:32:56,366 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:32:56,484 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:01,568 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:01,689 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:06,776 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:06,886 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:11,954 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:12,071 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:17,169 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:17,293 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:22,363 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:22,477 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:27,567 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:27,707 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:32,792 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:32,914 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:38,017 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:38,135 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:43,221 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:43,336 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:48,430 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:48,547 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:53,641 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:53,751 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:33:58,848 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:33:58,956 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:34:04,054 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:34:04,171 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:34:09,265 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:34:09,381 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:34:14,484 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:34:14,604 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 19:34:19,691 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 19:34:19,811 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:05:37,579 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-08-31 20:05:37,579 - __main__ - INFO - Starting AURA application...
+2025-08-31 20:05:37,579 - __main__ - INFO - Step 1: Validating configuration...
+2025-08-31 20:05:37,615 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:05:37,615 - __main__ - INFO - Step 2: Running startup checks...
+2025-08-31 20:05:37,615 - __main__ - INFO - Running 5 startup checks...
+2025-08-31 20:05:39,932 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-08-31 20:05:39,932 - __main__ - INFO - Step 3: Initializing core modules...
+2025-08-31 20:05:39,933 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 20:05:41,873 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 20:05:41,873 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 20:05:41,881 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 20:05:41,881 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 20:05:41,881 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 20:05:41,951 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 20:05:41,951 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 20:05:41,951 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 20:05:41,951 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 20:05:41,951 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 20:05:42,298 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 20:05:42,298 - modules.feedback - INFO - Loading sound files...
+2025-08-31 20:05:42,299 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 20:05:42,299 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 20:05:42,299 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 20:05:42,300 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 20:05:42,300 - orchestrator - INFO - Initializing AURA modules...
+2025-08-31 20:05:42,300 - orchestrator - INFO - Initializing Vision Module...
+2025-08-31 20:05:42,302 - modules.vision - INFO - VisionModule initialized
+2025-08-31 20:05:42,302 - orchestrator - INFO - Vision Module initialized successfully
+2025-08-31 20:05:42,302 - orchestrator - INFO - Initializing Reasoning Module...
+2025-08-31 20:05:42,324 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-08-31 20:05:42,324 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-08-31 20:05:42,324 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-08-31 20:05:42,324 - orchestrator - INFO - Initializing Automation Module...
+2025-08-31 20:05:42,325 - modules.automation - INFO - AutomationModule initialized. Screen size: 1710x1112
+2025-08-31 20:05:42,325 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-08-31 20:05:42,325 - orchestrator - INFO - Automation Module initialized successfully
+2025-08-31 20:05:42,325 - orchestrator - INFO - Initializing Audio Module...
+2025-08-31 20:05:42,325 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 20:05:44,205 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 20:05:44,205 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 20:05:44,213 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 20:05:44,213 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 20:05:44,213 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 20:05:44,216 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 20:05:44,216 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 20:05:44,216 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 20:05:44,216 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 20:05:44,216 - orchestrator - INFO - Audio Module initialized successfully
+2025-08-31 20:05:44,216 - orchestrator - INFO - Initializing Feedback Module...
+2025-08-31 20:05:44,216 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 20:05:44,216 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 20:05:44,216 - modules.feedback - INFO - Loading sound files...
+2025-08-31 20:05:44,217 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 20:05:44,217 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 20:05:44,217 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 20:05:44,217 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 20:05:44,217 - orchestrator - INFO - Feedback Module initialized successfully
+2025-08-31 20:05:44,217 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback
+2025-08-31 20:05:44,217 - orchestrator - INFO - All modules initialized successfully
+2025-08-31 20:05:44,217 - orchestrator - INFO - System health monitoring initialized
+2025-08-31 20:05:44,217 - orchestrator - INFO - Orchestrator initialized successfully
+2025-08-31 20:05:44,217 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-08-31 20:05:44,217 - __main__ - INFO - All modules verified successfully
+2025-08-31 20:05:44,217 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-08-31 20:05:44,217 - __main__ - INFO - Health monitoring started
+2025-08-31 20:05:44,217 - __main__ - INFO - Step 6: Startup completed successfully
+2025-08-31 20:05:44,217 - __main__ - INFO - AURA application startup completed in 6.64s
+2025-08-31 20:05:44,217 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 20:05:44,217 - __main__ - INFO - Starting main application loop...
+2025-08-31 20:05:44,217 - __main__ - INFO - Wake word monitoring started
+2025-08-31 20:05:44,218 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:05:47,080 - modules.audio - INFO - Wake word 'computer' detected!
+2025-08-31 20:05:47,081 - modules.audio - INFO - Providing wake word confirmation
+2025-08-31 20:05:47,217 - __main__ - INFO - Wake word detected (#1)
+2025-08-31 20:05:47,217 - __main__ - INFO - Processing voice command...
+2025-08-31 20:05:47,218 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:05:47,218 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-08-31 20:05:47,218 - modules.audio - INFO - Starting synchronous audio recording...
+2025-08-31 20:05:55,410 - modules.audio - INFO - Audio recording completed:
+2025-08-31 20:05:55,411 - modules.audio - INFO -   Duration: 8.00s
+2025-08-31 20:05:55,411 - modules.audio - INFO -   Samples: 128000
+2025-08-31 20:05:55,411 - modules.audio - INFO -   RMS volume: 0.0092
+2025-08-31 20:05:55,411 - modules.audio - INFO -   Max volume: 0.0889
+2025-08-31 20:05:55,411 - modules.audio - INFO - Audio is quiet but may be usable (RMS: 0.0092)
+2025-08-31 20:05:55,411 - modules.audio - INFO - Applying gain factor: 3.38 (original max volume: 0.0889)
+2025-08-31 20:05:55,412 - modules.audio - INFO - After gain - RMS: 0.0309, Max: 0.3000
+2025-08-31 20:05:55,413 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-08-31 20:05:55,483 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpyumgt2wo.wav
+2025-08-31 20:05:55,483 - modules.audio - INFO -   File size: 256044 bytes
+2025-08-31 20:05:55,483 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-08-31 20:05:55,483 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-08-31 20:05:55,483 - modules.audio - INFO -   Channels: 1
+2025-08-31 20:05:55,484 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-08-31 20:05:55,484 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-08-31 20:05:55,484 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpyumgt2wo.wav
+2025-08-31 20:05:55,485 - modules.audio - INFO - Running Whisper transcription...
+2025-08-31 20:05:57,417 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-08-31 20:05:57,417 - modules.audio - INFO - Whisper transcription completed
+2025-08-31 20:05:57,417 - modules.audio - INFO - Whisper result details:
+2025-08-31 20:05:57,417 - modules.audio - INFO -   Text: 'What's on my screen?'
+2025-08-31 20:05:57,417 - modules.audio - INFO -   Language: en
+2025-08-31 20:05:57,417 - modules.audio - INFO -   Segments: 1
+2025-08-31 20:05:57,417 - modules.audio - INFO -     Segment 1: 'What's on my screen?' (0.00-8.00s, prob: -0.548)
+2025-08-31 20:05:57,417 - modules.audio - INFO - Transcription result: 'What's on my screen?'
+2025-08-31 20:05:57,417 - __main__ - INFO - Command received: 'What's on my screen?'
+2025-08-31 20:05:57,418 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:05:57,418 - orchestrator - INFO - Starting command execution [cmd_1756650957418]: 'What's on my screen?'
+2025-08-31 20:05:57,418 - orchestrator - INFO - [cmd_1756650957418] Step 1: Command validation
+2025-08-31 20:05:57,419 - orchestrator - INFO - [cmd_1756650957418] Command validated and normalized: 'what's on my screen?'
+2025-08-31 20:05:57,419 - orchestrator - INFO - [cmd_1756650957418] Detected question, routing to information extraction mode
+2025-08-31 20:05:57,419 - orchestrator - INFO - [cmd_1756650957418] Processing question in information extraction mode
+2025-08-31 20:05:57,419 - orchestrator - INFO - [qa_1756650957419] Processing question: 'What's on my screen?'
+2025-08-31 20:05:57,419 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:05:57,419 - orchestrator - INFO - [qa_1756650957419] Analyzing screen for information extraction (type: simple)
+2025-08-31 20:05:57,419 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-08-31 20:05:57,419 - orchestrator - INFO - [qa_1756650957419] Using simple analysis for screen capture
+2025-08-31 20:05:57,420 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:05:57,420 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-08-31 20:05:57,420 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:05:57,619 - modules.vision - INFO - Screenshot captured and encoded: 585664 characters
+2025-08-31 20:05:57,649 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:05:57,649 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 120s)
+2025-08-31 20:06:03,553 - modules.vision - INFO - Vision API response received in 5.90s (status: 200)
+2025-08-31 20:06:03,555 - modules.vision - INFO - Successfully parsed JSON response from vision model
+2025-08-31 20:06:03,556 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-08-31 20:06:03,557 - orchestrator - INFO - [qa_1756650957419] Generating answer using reasoning module
+2025-08-31 20:06:03,558 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:06:03,559 - modules.reasoning - INFO - Generating action plan for command: 'Please analyze the screen content and answer this question: What's on my screen?
+
+Screen Context: Co...'
+2025-08-31 20:06:06,806 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-08-31 20:06:06,810 - modules.reasoning - INFO - Generated action plan with 2 steps
+2025-08-31 20:06:06,811 - orchestrator - INFO - [qa_1756650957419] Q&A reasoning successful
+2025-08-31 20:06:06,812 - orchestrator - INFO - [qa_1756650957419] Question answered successfully: True
+2025-08-31 20:06:06,813 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 20:06:06,814 - __main__ - INFO - Command executed successfully: What's on my screen?
+2025-08-31 20:06:06,815 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:06:12,002 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 20:06:12,143 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:06:17,217 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 20:06:17,350 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:06:20,103 - modules.audio - INFO - Wake word 'computer' detected!
+2025-08-31 20:06:20,104 - modules.audio - INFO - Providing wake word confirmation
+2025-08-31 20:06:20,238 - __main__ - INFO - Wake word detected (#2)
+2025-08-31 20:06:20,238 - __main__ - INFO - Processing voice command...
+2025-08-31 20:06:20,238 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:06:20,238 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-08-31 20:06:20,239 - modules.audio - INFO - Starting synchronous audio recording...
+2025-08-31 20:06:28,431 - modules.audio - INFO - Audio recording completed:
+2025-08-31 20:06:28,432 - modules.audio - INFO -   Duration: 8.00s
+2025-08-31 20:06:28,432 - modules.audio - INFO -   Samples: 128000
+2025-08-31 20:06:28,432 - modules.audio - INFO -   RMS volume: 0.0088
+2025-08-31 20:06:28,432 - modules.audio - INFO -   Max volume: 0.0895
+2025-08-31 20:06:28,432 - modules.audio - INFO - Audio is quiet but may be usable (RMS: 0.0088)
+2025-08-31 20:06:28,432 - modules.audio - INFO - Applying gain factor: 3.35 (original max volume: 0.0895)
+2025-08-31 20:06:28,433 - modules.audio - INFO - After gain - RMS: 0.0294, Max: 0.3000
+2025-08-31 20:06:28,434 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-08-31 20:06:28,505 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpffg1351k.wav
+2025-08-31 20:06:28,505 - modules.audio - INFO -   File size: 256044 bytes
+2025-08-31 20:06:28,505 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-08-31 20:06:28,505 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-08-31 20:06:28,505 - modules.audio - INFO -   Channels: 1
+2025-08-31 20:06:28,506 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-08-31 20:06:28,506 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-08-31 20:06:28,506 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpffg1351k.wav
+2025-08-31 20:06:28,507 - modules.audio - INFO - Running Whisper transcription...
+2025-08-31 20:06:29,925 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-08-31 20:06:29,925 - modules.audio - INFO - Whisper transcription completed
+2025-08-31 20:06:29,925 - modules.audio - INFO - Whisper result details:
+2025-08-31 20:06:29,925 - modules.audio - INFO -   Text: 'What's on my screen?'
+2025-08-31 20:06:29,925 - modules.audio - INFO -   Language: en
+2025-08-31 20:06:29,925 - modules.audio - INFO -   Segments: 1
+2025-08-31 20:06:29,925 - modules.audio - INFO -     Segment 1: 'What's on my screen?' (0.00-2.00s, prob: -0.657)
+2025-08-31 20:06:29,925 - modules.audio - INFO - Transcription result: 'What's on my screen?'
+2025-08-31 20:06:29,925 - __main__ - INFO - Command received: 'What's on my screen?'
+2025-08-31 20:06:29,925 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:06:29,925 - orchestrator - INFO - Starting command execution [cmd_1756650989925]: 'What's on my screen?'
+2025-08-31 20:06:29,925 - orchestrator - INFO - [cmd_1756650989925] Step 1: Command validation
+2025-08-31 20:06:29,925 - orchestrator - INFO - [cmd_1756650989925] Command validated and normalized: 'what's on my screen?'
+2025-08-31 20:06:29,925 - orchestrator - INFO - [cmd_1756650989925] Detected question, routing to information extraction mode
+2025-08-31 20:06:29,925 - orchestrator - INFO - [cmd_1756650989925] Processing question in information extraction mode
+2025-08-31 20:06:29,925 - orchestrator - INFO - [qa_1756650989925] Processing question: 'What's on my screen?'
+2025-08-31 20:06:29,925 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:06:29,926 - orchestrator - INFO - [qa_1756650989925] Analyzing screen for information extraction (type: simple)
+2025-08-31 20:06:29,926 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-08-31 20:06:29,926 - orchestrator - INFO - [qa_1756650989925] Using simple analysis for screen capture
+2025-08-31 20:06:29,926 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:06:29,926 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-08-31 20:06:29,926 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:06:30,005 - modules.vision - INFO - Screenshot captured and encoded: 583876 characters
+2025-08-31 20:06:30,015 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:06:30,015 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 120s)
+2025-08-31 20:06:33,485 - modules.vision - INFO - Vision API response received in 3.47s (status: 200)
+2025-08-31 20:06:33,486 - modules.vision - INFO - Successfully parsed JSON response from vision model
+2025-08-31 20:06:33,487 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-08-31 20:06:33,489 - orchestrator - INFO - [qa_1756650989925] Generating answer using reasoning module
+2025-08-31 20:06:33,490 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:06:33,491 - modules.reasoning - INFO - Generating action plan for command: 'Please analyze the screen content and answer this question: What's on my screen?
+
+Screen Context: Co...'
+2025-08-31 20:06:36,089 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-08-31 20:06:36,091 - modules.reasoning - INFO - Generated action plan with 2 steps
+2025-08-31 20:06:36,091 - orchestrator - INFO - [qa_1756650989925] Q&A reasoning successful
+2025-08-31 20:06:36,092 - orchestrator - INFO - [qa_1756650989925] Question answered successfully: True
+2025-08-31 20:06:36,093 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 20:06:36,094 - __main__ - INFO - Command executed successfully: What's on my screen?
+2025-08-31 20:06:36,094 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:06:41,206 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 20:06:41,340 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:06:46,420 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 20:06:46,557 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:06:51,635 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 20:06:51,771 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:06:54,504 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-08-31 20:06:54,504 - __main__ - INFO - Initiating AURA shutdown...
+2025-08-31 20:06:54,504 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-08-31 20:06:56,826 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 20:06:56,964 - __main__ - INFO - Wake word monitoring stopped
+2025-08-31 20:06:56,964 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-08-31 20:06:56,964 - __main__ - INFO - Running 5 cleanup handlers...
+2025-08-31 20:14:08,807 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-08-31 20:14:08,808 - __main__ - INFO - Starting AURA application...
+2025-08-31 20:14:08,808 - __main__ - INFO - Step 1: Validating configuration...
+2025-08-31 20:14:08,815 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:14:08,815 - __main__ - INFO - Step 2: Running startup checks...
+2025-08-31 20:14:08,815 - __main__ - INFO - Running 5 startup checks...
+2025-08-31 20:14:10,938 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-08-31 20:14:10,938 - __main__ - INFO - Step 3: Initializing core modules...
+2025-08-31 20:14:10,938 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 20:14:13,041 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 20:14:13,042 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 20:14:13,074 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 20:14:13,074 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 20:14:13,074 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 20:14:13,102 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 20:14:13,102 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 20:14:13,102 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 20:14:13,102 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 20:14:13,103 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 20:14:13,370 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 20:14:13,370 - modules.feedback - INFO - Loading sound files...
+2025-08-31 20:14:13,371 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 20:14:13,371 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 20:14:13,371 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 20:14:13,371 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 20:14:13,372 - orchestrator - INFO - Initializing AURA modules...
+2025-08-31 20:14:13,372 - orchestrator - INFO - Initializing Vision Module...
+2025-08-31 20:14:13,375 - modules.vision - INFO - VisionModule initialized
+2025-08-31 20:14:13,375 - orchestrator - INFO - Vision Module initialized successfully
+2025-08-31 20:14:13,375 - orchestrator - INFO - Initializing Reasoning Module...
+2025-08-31 20:14:13,406 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-08-31 20:14:13,406 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-08-31 20:14:13,406 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-08-31 20:14:13,406 - orchestrator - INFO - Initializing Automation Module...
+2025-08-31 20:14:13,408 - modules.automation - INFO - AutomationModule initialized. Screen size: 1710x1112
+2025-08-31 20:14:13,408 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-08-31 20:14:13,408 - orchestrator - INFO - Automation Module initialized successfully
+2025-08-31 20:14:13,408 - orchestrator - INFO - Initializing Audio Module...
+2025-08-31 20:14:13,408 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 20:14:15,700 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 20:14:15,701 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 20:14:15,714 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 20:14:15,714 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 20:14:15,714 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 20:14:15,729 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 20:14:15,729 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 20:14:15,729 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 20:14:15,729 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 20:14:15,729 - orchestrator - INFO - Audio Module initialized successfully
+2025-08-31 20:14:15,729 - orchestrator - INFO - Initializing Feedback Module...
+2025-08-31 20:14:15,729 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 20:14:15,729 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 20:14:15,729 - modules.feedback - INFO - Loading sound files...
+2025-08-31 20:14:15,732 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 20:14:15,733 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 20:14:15,733 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 20:14:15,733 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 20:14:15,733 - orchestrator - INFO - Feedback Module initialized successfully
+2025-08-31 20:14:15,733 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback
+2025-08-31 20:14:15,733 - orchestrator - INFO - All modules initialized successfully
+2025-08-31 20:14:15,733 - orchestrator - INFO - System health monitoring initialized
+2025-08-31 20:14:15,733 - orchestrator - INFO - Orchestrator initialized successfully
+2025-08-31 20:14:15,733 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-08-31 20:14:15,733 - __main__ - INFO - All modules verified successfully
+2025-08-31 20:14:15,733 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-08-31 20:14:15,736 - __main__ - INFO - Health monitoring started
+2025-08-31 20:14:15,736 - __main__ - INFO - Step 6: Startup completed successfully
+2025-08-31 20:14:15,737 - __main__ - INFO - AURA application startup completed in 6.93s
+2025-08-31 20:14:15,737 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 20:14:15,737 - __main__ - INFO - Starting main application loop...
+2025-08-31 20:14:15,737 - __main__ - INFO - Wake word monitoring started
+2025-08-31 20:14:15,737 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:14:18,449 - modules.audio - INFO - Wake word 'computer' detected!
+2025-08-31 20:14:18,449 - modules.audio - INFO - Providing wake word confirmation
+2025-08-31 20:14:18,587 - __main__ - INFO - Wake word detected (#1)
+2025-08-31 20:14:18,587 - __main__ - INFO - Processing voice command...
+2025-08-31 20:14:18,587 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:14:18,587 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-08-31 20:14:18,587 - modules.audio - INFO - Starting synchronous audio recording...
+2025-08-31 20:14:26,773 - modules.audio - INFO - Audio recording completed:
+2025-08-31 20:14:26,773 - modules.audio - INFO -   Duration: 8.00s
+2025-08-31 20:14:26,773 - modules.audio - INFO -   Samples: 128000
+2025-08-31 20:14:26,773 - modules.audio - INFO -   RMS volume: 0.0062
+2025-08-31 20:14:26,773 - modules.audio - INFO -   Max volume: 0.0587
+2025-08-31 20:14:26,773 - modules.audio - INFO - Audio is quiet but may be usable (RMS: 0.0062)
+2025-08-31 20:14:26,773 - modules.audio - INFO - Applying gain factor: 5.11 (original max volume: 0.0587)
+2025-08-31 20:14:26,774 - modules.audio - INFO - After gain - RMS: 0.0314, Max: 0.3000
+2025-08-31 20:14:26,774 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-08-31 20:14:26,831 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmph8jjltza.wav
+2025-08-31 20:14:26,831 - modules.audio - INFO -   File size: 256044 bytes
+2025-08-31 20:14:26,831 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-08-31 20:14:26,831 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-08-31 20:14:26,831 - modules.audio - INFO -   Channels: 1
+2025-08-31 20:14:26,832 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-08-31 20:14:26,832 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-08-31 20:14:26,832 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmph8jjltza.wav
+2025-08-31 20:14:26,832 - modules.audio - INFO - Running Whisper transcription...
+2025-08-31 20:14:28,687 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-08-31 20:14:28,688 - modules.audio - INFO - Whisper transcription completed
+2025-08-31 20:14:28,688 - modules.audio - INFO - Whisper result details:
+2025-08-31 20:14:28,688 - modules.audio - INFO -   Text: 'Words on the screen.'
+2025-08-31 20:14:28,688 - modules.audio - INFO -   Language: en
+2025-08-31 20:14:28,688 - modules.audio - INFO -   Segments: 1
+2025-08-31 20:14:28,688 - modules.audio - INFO -     Segment 1: 'Words on the screen.' (0.00-4.16s, prob: -0.733)
+2025-08-31 20:14:28,688 - modules.audio - INFO - Transcription result: 'Words on the screen.'
+2025-08-31 20:14:28,689 - __main__ - INFO - Command received: 'Words on the screen.'
+2025-08-31 20:14:28,689 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:14:28,689 - orchestrator - INFO - Starting command execution [cmd_1756651468689]: 'Words on the screen.'
+2025-08-31 20:14:28,689 - orchestrator - INFO - [cmd_1756651468689] Step 1: Command validation
+2025-08-31 20:14:28,691 - orchestrator - INFO - [cmd_1756651468689] Command validated and normalized: 'words on screen.'
+2025-08-31 20:14:28,691 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:14:28,691 - orchestrator - INFO - [cmd_1756651468689] Using sequential processing
+2025-08-31 20:14:28,691 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-08-31 20:14:28,691 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:14:28,691 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-08-31 20:14:28,691 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:14:28,898 - modules.vision - INFO - Screenshot captured and encoded: 540324 characters
+2025-08-31 20:14:28,926 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:14:28,926 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 120s)
+2025-08-31 20:14:36,314 - modules.vision - INFO - Vision API response received in 7.39s (status: 200)
+2025-08-31 20:14:36,319 - modules.vision - INFO - Successfully parsed JSON response from vision model
+2025-08-31 20:14:36,319 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-08-31 20:14:36,321 - orchestrator - WARNING - [cmd_1756651468689] Screen perception attempt 1 failed: Invalid screen analysis result
+2025-08-31 20:14:36,321 - orchestrator - INFO - [cmd_1756651468689] Retrying screen perception in 1.0s...
+2025-08-31 20:14:37,327 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:14:37,328 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-08-31 20:14:37,329 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:14:37,537 - modules.vision - INFO - Screenshot captured and encoded: 553676 characters
+2025-08-31 20:14:37,559 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:14:37,560 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 120s)
+2025-08-31 20:14:41,180 - modules.vision - INFO - Vision API response received in 3.62s (status: 200)
+2025-08-31 20:14:41,181 - modules.vision - INFO - Successfully parsed JSON response from vision model
+2025-08-31 20:14:41,181 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-08-31 20:14:41,181 - orchestrator - WARNING - [cmd_1756651468689] Screen perception attempt 2 failed: Invalid screen analysis result
+2025-08-31 20:14:41,181 - orchestrator - INFO - [cmd_1756651468689] Retrying screen perception in 1.0s...
+2025-08-31 20:14:42,182 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:14:42,182 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-08-31 20:14:42,183 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:14:42,263 - modules.vision - INFO - Screenshot captured and encoded: 563328 characters
+2025-08-31 20:14:42,267 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:14:42,267 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 120s)
+2025-08-31 20:14:43,522 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-08-31 20:14:43,522 - __main__ - INFO - Initiating AURA shutdown...
+2025-08-31 20:14:43,522 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-08-31 20:14:45,799 - modules.vision - INFO - Vision API response received in 3.53s (status: 200)
+2025-08-31 20:14:45,800 - modules.vision - INFO - Successfully parsed JSON response from vision model
+2025-08-31 20:14:45,800 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-08-31 20:14:45,800 - orchestrator - WARNING - [cmd_1756651468689] Screen perception attempt 3 failed: Invalid screen analysis result
+2025-08-31 20:14:45,800 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:14:45,801 - orchestrator - ERROR - [cmd_1756651468689] Command execution failed: Screen perception failed after 3 attempts: Invalid screen analysis result
+2025-08-31 20:14:45,801 - modules.feedback - WARNING - Sound 'failure' not available
+2025-08-31 20:14:45,801 - __main__ - WARNING - Command execution had issues: ['Screen perception failed after 3 attempts: Invalid screen analysis result', 'Screen perception failed after 3 attempts: Invalid screen analysis result']
+2025-08-31 20:14:45,803 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 20:14:45,803 - __main__ - INFO - Wake word monitoring stopped
+2025-08-31 20:14:45,803 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-08-31 20:14:45,803 - __main__ - INFO - Running 5 cleanup handlers...
+2025-08-31 20:14:57,469 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-08-31 20:14:57,469 - __main__ - INFO - Starting AURA application...
+2025-08-31 20:14:57,469 - __main__ - INFO - Step 1: Validating configuration...
+2025-08-31 20:14:57,475 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:14:57,475 - __main__ - INFO - Step 2: Running startup checks...
+2025-08-31 20:14:57,475 - __main__ - INFO - Running 5 startup checks...
+2025-08-31 20:15:00,620 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-08-31 20:15:00,621 - __main__ - INFO - Step 3: Initializing core modules...
+2025-08-31 20:15:00,621 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 20:15:02,419 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 20:15:02,419 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 20:15:02,423 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 20:15:02,423 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 20:15:02,423 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 20:15:02,431 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 20:15:02,431 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 20:15:02,431 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 20:15:02,431 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 20:15:02,431 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 20:15:02,590 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 20:15:02,591 - modules.feedback - INFO - Loading sound files...
+2025-08-31 20:15:02,591 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 20:15:02,591 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 20:15:02,592 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 20:15:02,592 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 20:15:02,592 - orchestrator - INFO - Initializing AURA modules...
+2025-08-31 20:15:02,592 - orchestrator - INFO - Initializing Vision Module...
+2025-08-31 20:15:02,592 - modules.vision - INFO - VisionModule initialized
+2025-08-31 20:15:02,592 - orchestrator - INFO - Vision Module initialized successfully
+2025-08-31 20:15:02,593 - orchestrator - INFO - Initializing Reasoning Module...
+2025-08-31 20:15:02,611 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-08-31 20:15:02,611 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-08-31 20:15:02,611 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-08-31 20:15:02,611 - orchestrator - INFO - Initializing Automation Module...
+2025-08-31 20:15:02,611 - modules.automation - INFO - AutomationModule initialized. Screen size: 1710x1112
+2025-08-31 20:15:02,611 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-08-31 20:15:02,611 - orchestrator - INFO - Automation Module initialized successfully
+2025-08-31 20:15:02,611 - orchestrator - INFO - Initializing Audio Module...
+2025-08-31 20:15:02,612 - modules.audio - INFO - Loading Whisper model...
+2025-08-31 20:15:04,387 - modules.audio - INFO - Whisper model loaded successfully
+2025-08-31 20:15:04,387 - modules.audio - INFO - Initializing TTS engine...
+2025-08-31 20:15:04,391 - modules.audio - ERROR - Failed to initialize TTS engine: cannot import name 'NSSpeechSynthesizer' from 'AppKit' (unknown location)
+2025-08-31 20:15:04,391 - modules.audio - WARNING - TTS functionality will not be available
+2025-08-31 20:15:04,391 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-08-31 20:15:04,394 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-08-31 20:15:04,394 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-08-31 20:15:04,394 - modules.audio - INFO - Expected frame length: 512 samples
+2025-08-31 20:15:04,394 - modules.audio - INFO - AudioModule initialized successfully
+2025-08-31 20:15:04,394 - orchestrator - INFO - Audio Module initialized successfully
+2025-08-31 20:15:04,394 - orchestrator - INFO - Initializing Feedback Module...
+2025-08-31 20:15:04,394 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-08-31 20:15:04,394 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-08-31 20:15:04,394 - modules.feedback - INFO - Loading sound files...
+2025-08-31 20:15:04,394 - modules.feedback - INFO - Loaded 0 sound files
+2025-08-31 20:15:04,395 - modules.feedback - INFO - Feedback processing loop started
+2025-08-31 20:15:04,395 - modules.feedback - INFO - Feedback processing thread started
+2025-08-31 20:15:04,395 - modules.feedback - INFO - FeedbackModule initialized successfully
+2025-08-31 20:15:04,395 - orchestrator - INFO - Feedback Module initialized successfully
+2025-08-31 20:15:04,395 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback
+2025-08-31 20:15:04,395 - orchestrator - INFO - All modules initialized successfully
+2025-08-31 20:15:04,395 - orchestrator - INFO - System health monitoring initialized
+2025-08-31 20:15:04,395 - orchestrator - INFO - Orchestrator initialized successfully
+2025-08-31 20:15:04,395 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-08-31 20:15:04,395 - __main__ - INFO - All modules verified successfully
+2025-08-31 20:15:04,395 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-08-31 20:15:04,395 - __main__ - INFO - Health monitoring started
+2025-08-31 20:15:04,395 - __main__ - INFO - Step 6: Startup completed successfully
+2025-08-31 20:15:04,395 - __main__ - INFO - AURA application startup completed in 6.93s
+2025-08-31 20:15:04,395 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 20:15:04,395 - __main__ - INFO - Starting main application loop...
+2025-08-31 20:15:04,395 - __main__ - INFO - Wake word monitoring started
+2025-08-31 20:15:04,395 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:15:06,554 - modules.audio - INFO - Wake word 'computer' detected!
+2025-08-31 20:15:06,554 - modules.audio - INFO - Providing wake word confirmation
+2025-08-31 20:15:06,691 - __main__ - INFO - Wake word detected (#1)
+2025-08-31 20:15:06,691 - __main__ - INFO - Processing voice command...
+2025-08-31 20:15:06,692 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:06,692 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-08-31 20:15:06,692 - modules.audio - INFO - Starting synchronous audio recording...
+2025-08-31 20:15:14,882 - modules.audio - INFO - Audio recording completed:
+2025-08-31 20:15:14,883 - modules.audio - INFO -   Duration: 8.00s
+2025-08-31 20:15:14,883 - modules.audio - INFO -   Samples: 128000
+2025-08-31 20:15:14,883 - modules.audio - INFO -   RMS volume: 0.0385
+2025-08-31 20:15:14,883 - modules.audio - INFO -   Max volume: 0.6166
+2025-08-31 20:15:14,883 - modules.audio - INFO - Good audio level detected (RMS: 0.0385)
+2025-08-31 20:15:14,886 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-08-31 20:15:14,955 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpuzvmfd3m.wav
+2025-08-31 20:15:14,955 - modules.audio - INFO -   File size: 256044 bytes
+2025-08-31 20:15:14,955 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-08-31 20:15:14,955 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-08-31 20:15:14,955 - modules.audio - INFO -   Channels: 1
+2025-08-31 20:15:14,956 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-08-31 20:15:14,956 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-08-31 20:15:14,956 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpuzvmfd3m.wav
+2025-08-31 20:15:14,956 - modules.audio - INFO - Running Whisper transcription...
+2025-08-31 20:15:16,487 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-08-31 20:15:16,488 - modules.audio - INFO - Whisper transcription completed
+2025-08-31 20:15:16,488 - modules.audio - INFO - Whisper result details:
+2025-08-31 20:15:16,488 - modules.audio - INFO -   Text: 'What's on my screen?'
+2025-08-31 20:15:16,488 - modules.audio - INFO -   Language: en
+2025-08-31 20:15:16,488 - modules.audio - INFO -   Segments: 1
+2025-08-31 20:15:16,488 - modules.audio - INFO -     Segment 1: 'What's on my screen?' (0.00-4.00s, prob: -0.529)
+2025-08-31 20:15:16,488 - modules.audio - INFO - Transcription result: 'What's on my screen?'
+2025-08-31 20:15:16,489 - __main__ - INFO - Command received: 'What's on my screen?'
+2025-08-31 20:15:16,489 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:16,489 - orchestrator - INFO - Starting command execution [cmd_1756651516489]: 'What's on my screen?'
+2025-08-31 20:15:16,489 - orchestrator - INFO - [cmd_1756651516489] Step 1: Command validation
+2025-08-31 20:15:16,490 - orchestrator - INFO - [cmd_1756651516489] Command validated and normalized: 'what's on my screen?'
+2025-08-31 20:15:16,490 - orchestrator - INFO - [cmd_1756651516489] Detected question, routing to information extraction mode
+2025-08-31 20:15:16,490 - orchestrator - INFO - [cmd_1756651516489] Processing question in information extraction mode
+2025-08-31 20:15:16,490 - orchestrator - INFO - [qa_1756651516490] Processing question: 'What's on my screen?'
+2025-08-31 20:15:16,490 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:16,490 - orchestrator - INFO - [qa_1756651516490] Analyzing screen for information extraction (type: simple)
+2025-08-31 20:15:16,490 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-08-31 20:15:16,490 - orchestrator - INFO - [qa_1756651516490] Using simple analysis for screen capture
+2025-08-31 20:15:16,490 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:16,490 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-08-31 20:15:16,490 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:16,730 - modules.vision - INFO - Screenshot captured and encoded: 550720 characters
+2025-08-31 20:15:16,744 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:15:16,744 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 120s)
+2025-08-31 20:15:22,052 - modules.vision - INFO - Vision API response received in 5.31s (status: 200)
+2025-08-31 20:15:22,221 - modules.vision - INFO - Successfully parsed JSON response from vision model
+2025-08-31 20:15:22,221 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-08-31 20:15:22,231 - orchestrator - INFO - [qa_1756651516490] Generating answer using reasoning module
+2025-08-31 20:15:22,235 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:22,237 - modules.reasoning - INFO - Generating action plan for command: 'Please analyze the screen content and answer this question: What's on my screen?
+
+Screen Context: Co...'
+2025-08-31 20:15:25,487 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-08-31 20:15:25,490 - modules.reasoning - INFO - Generated action plan with 2 steps
+2025-08-31 20:15:25,491 - orchestrator - INFO - [qa_1756651516490] Q&A reasoning successful
+2025-08-31 20:15:25,491 - orchestrator - INFO - [qa_1756651516490] Action plan received: {'plan': [{'action': 'speak', 'message': 'Your screen is displaying a code editor with lines of code and options for debugging, running, and saving.'}, {'action': 'finish'}], 'metadata': {'confidence': 0.98, 'estimated_duration': 2.3}}
+2025-08-31 20:15:25,491 - orchestrator - INFO - Extracting answer from 2 actions
+2025-08-31 20:15:25,491 - orchestrator - INFO - Action 0: {'action': 'speak', 'message': 'Your screen is displaying a code editor with lines of code and options for debugging, running, and saving.'}
+2025-08-31 20:15:25,492 - orchestrator - INFO - Found speak action with message: 'Your screen is displaying a code editor with lines of code and options for debugging, running, and saving.'
+2025-08-31 20:15:25,492 - orchestrator - INFO - Action 1: {'action': 'finish'}
+2025-08-31 20:15:25,492 - orchestrator - INFO - Combined answer: 'Your screen is displaying a code editor with lines of code and options for debugging, running, and saving.'
+2025-08-31 20:15:25,492 - orchestrator - INFO - [qa_1756651516490] Extracted answer: 'Your screen is displaying a code editor with lines of code and options for debugging, running, and saving.'
+2025-08-31 20:15:25,492 - orchestrator - INFO - [qa_1756651516490] AURA Response: Your screen is displaying a code editor with lines of code and options for debugging, running, and saving.
+2025-08-31 20:15:25,493 - orchestrator - INFO - [qa_1756651516490] Question answered successfully: True
+2025-08-31 20:15:25,494 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 20:15:25,495 - __main__ - INFO - Command executed successfully: What's on my screen?
+2025-08-31 20:15:25,496 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:15:30,674 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 20:15:30,815 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:15:35,890 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 20:15:36,025 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:15:38,279 - modules.audio - INFO - Wake word 'computer' detected!
+2025-08-31 20:15:38,279 - modules.audio - INFO - Providing wake word confirmation
+2025-08-31 20:15:38,416 - __main__ - INFO - Wake word detected (#2)
+2025-08-31 20:15:38,416 - __main__ - INFO - Processing voice command...
+2025-08-31 20:15:38,416 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:38,417 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-08-31 20:15:38,417 - modules.audio - INFO - Starting synchronous audio recording...
+2025-08-31 20:15:46,611 - modules.audio - INFO - Audio recording completed:
+2025-08-31 20:15:46,612 - modules.audio - INFO -   Duration: 8.00s
+2025-08-31 20:15:46,612 - modules.audio - INFO -   Samples: 128000
+2025-08-31 20:15:46,612 - modules.audio - INFO -   RMS volume: 0.0291
+2025-08-31 20:15:46,612 - modules.audio - INFO -   Max volume: 0.2499
+2025-08-31 20:15:46,612 - modules.audio - INFO - Good audio level detected (RMS: 0.0291)
+2025-08-31 20:15:46,612 - modules.audio - INFO - Applying gain factor: 1.20 (original max volume: 0.2499)
+2025-08-31 20:15:46,613 - modules.audio - INFO - After gain - RMS: 0.0350, Max: 0.3000
+2025-08-31 20:15:46,614 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-08-31 20:15:46,687 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpnisf7uc6.wav
+2025-08-31 20:15:46,687 - modules.audio - INFO -   File size: 256044 bytes
+2025-08-31 20:15:46,687 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-08-31 20:15:46,687 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-08-31 20:15:46,687 - modules.audio - INFO -   Channels: 1
+2025-08-31 20:15:46,687 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-08-31 20:15:46,687 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-08-31 20:15:46,687 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpnisf7uc6.wav
+2025-08-31 20:15:46,688 - modules.audio - INFO - Running Whisper transcription...
+2025-08-31 20:15:49,305 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-08-31 20:15:49,305 - modules.audio - INFO - Whisper transcription completed
+2025-08-31 20:15:49,305 - modules.audio - INFO - Whisper result details:
+2025-08-31 20:15:49,306 - modules.audio - INFO -   Text: 'Tell me what is presently on my'
+2025-08-31 20:15:49,306 - modules.audio - INFO -   Language: en
+2025-08-31 20:15:49,306 - modules.audio - INFO -   Segments: 1
+2025-08-31 20:15:49,306 - modules.audio - INFO -     Segment 1: 'Tell me what is presently on my' (0.00-8.04s, prob: -0.472)
+2025-08-31 20:15:49,306 - modules.audio - INFO - Transcription result: 'Tell me what is presently on my'
+2025-08-31 20:15:49,306 - __main__ - INFO - Command received: 'Tell me what is presently on my'
+2025-08-31 20:15:49,306 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:49,306 - orchestrator - INFO - Starting command execution [cmd_1756651549306]: 'Tell me what is presently on my'
+2025-08-31 20:15:49,306 - orchestrator - INFO - [cmd_1756651549306] Step 1: Command validation
+2025-08-31 20:15:49,306 - orchestrator - INFO - [cmd_1756651549306] Command validated and normalized: 'tell me what is presently on my'
+2025-08-31 20:15:49,306 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:49,306 - orchestrator - INFO - [cmd_1756651549306] Using sequential processing
+2025-08-31 20:15:49,306 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-08-31 20:15:49,307 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:49,307 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-08-31 20:15:49,307 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:49,382 - modules.vision - INFO - Screenshot captured and encoded: 442548 characters
+2025-08-31 20:15:49,392 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:15:49,392 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 120s)
+2025-08-31 20:15:52,990 - modules.vision - INFO - Vision API response received in 3.60s (status: 200)
+2025-08-31 20:15:52,992 - modules.vision - INFO - Successfully parsed JSON response from vision model
+2025-08-31 20:15:52,993 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-08-31 20:15:52,999 - orchestrator - WARNING - [cmd_1756651549306] Screen perception attempt 1 failed: Invalid screen analysis result
+2025-08-31 20:15:52,999 - orchestrator - INFO - [cmd_1756651549306] Retrying screen perception in 1.0s...
+2025-08-31 20:15:54,005 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:54,006 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-08-31 20:15:54,006 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:54,158 - modules.vision - INFO - Screenshot captured and encoded: 452940 characters
+2025-08-31 20:15:54,178 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:15:54,180 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 120s)
+2025-08-31 20:15:57,235 - modules.vision - INFO - Vision API response received in 3.06s (status: 200)
+2025-08-31 20:15:57,236 - modules.vision - INFO - Successfully parsed JSON response from vision model
+2025-08-31 20:15:57,236 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-08-31 20:15:57,237 - orchestrator - WARNING - [cmd_1756651549306] Screen perception attempt 2 failed: Invalid screen analysis result
+2025-08-31 20:15:57,237 - orchestrator - INFO - [cmd_1756651549306] Retrying screen perception in 1.0s...
+2025-08-31 20:15:58,243 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:58,244 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-08-31 20:15:58,244 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:15:58,331 - modules.vision - INFO - Screenshot captured and encoded: 459704 characters
+2025-08-31 20:15:58,336 - config - INFO - Detected active model in LM Studio: smolvlm2-2.2b-instruct
+2025-08-31 20:15:58,340 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 120s)
+2025-08-31 20:16:01,563 - modules.vision - INFO - Vision API response received in 3.22s (status: 200)
+2025-08-31 20:16:01,564 - modules.vision - INFO - Successfully parsed JSON response from vision model
+2025-08-31 20:16:01,564 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-08-31 20:16:01,567 - orchestrator - WARNING - [cmd_1756651549306] Screen perception attempt 3 failed: Invalid screen analysis result
+2025-08-31 20:16:01,568 - modules.error_handler - INFO - ErrorHandler initialized
+2025-08-31 20:16:01,570 - orchestrator - ERROR - [cmd_1756651549306] Command execution failed: Screen perception failed after 3 attempts: Invalid screen analysis result
+2025-08-31 20:16:01,571 - __main__ - WARNING - Command execution had issues: ['Screen perception failed after 3 attempts: Invalid screen analysis result', 'Screen perception failed after 3 attempts: Invalid screen analysis result']
+2025-08-31 20:16:01,571 - modules.feedback - WARNING - Sound 'failure' not available
+2025-08-31 20:16:01,572 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:16:01,572 - modules.audio - WARNING - TTS engine not available, skipping text-to-speech
+2025-08-31 20:16:06,716 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 20:16:06,855 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:16:11,933 - modules.audio - INFO - Wake word detection timeout reached
+2025-08-31 20:16:12,072 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-08-31 20:16:12,089 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-08-31 20:16:12,089 - __main__ - INFO - Initiating AURA shutdown...
+2025-08-31 20:16:12,089 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-08-31 20:16:17,094 - __main__ - WARNING - Wake word thread did not stop gracefully
+2025-08-31 20:16:17,096 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-08-31 20:16:17,096 - __main__ - INFO - Running 5 cleanup handlers...

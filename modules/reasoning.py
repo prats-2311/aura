@@ -18,6 +18,14 @@ from config import (
     REASONING_META_PROMPT,
     REASONING_API_TIMEOUT
 )
+
+# Try to import Ollama client, fallback to requests if not available
+try:
+    from ollama import Client
+    OLLAMA_CLIENT_AVAILABLE = True
+except ImportError:
+    OLLAMA_CLIENT_AVAILABLE = False
+    Client = None
 from .error_handler import (
     global_error_handler,
     with_error_handling,
@@ -49,6 +57,23 @@ class ReasoningModule:
         self.api_key = REASONING_API_KEY
         self.model = REASONING_MODEL
         self.timeout = REASONING_API_TIMEOUT
+        
+        # Initialize Ollama client for cloud API
+        self.ollama_client = None
+        if OLLAMA_CLIENT_AVAILABLE and self.api_key and self.api_key != "your_ollama_cloud_api_key_here":
+            try:
+                # Use the correct Ollama Cloud endpoint
+                self.ollama_client = Client(
+                    host="https://ollama.com",
+                    headers={'Authorization': self.api_key}
+                )
+                logger.info("Initialized Ollama client for cloud API")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Ollama client: {e}")
+                self.ollama_client = None
+        
+        if not self.ollama_client:
+            logger.info("Using requests method for API calls")
         
         # Validate configuration
         if not self.api_key or self.api_key == "your_ollama_cloud_api_key_here":
@@ -183,6 +208,7 @@ Please analyze the user's command and the current screen state, then provide a d
     def _make_api_request(self, prompt: str) -> Dict[str, Any]:
         """
         Make API request to the cloud reasoning model with comprehensive error handling.
+        Uses Ollama client if available, falls back to requests.
         
         Args:
             prompt (str): The complete prompt to send
@@ -207,12 +233,102 @@ Please analyze the user's command and the current screen state, then provide a d
         if len(prompt) > 50000:  # Reasonable limit
             raise ValueError("Prompt too long (maximum 50000 characters)")
         
+        # Try Ollama client first if available
+        if self.ollama_client:
+            return self._make_ollama_request(prompt)
+        else:
+            return self._make_requests_api_call(prompt)
+    
+    def _make_ollama_request(self, prompt: str) -> Dict[str, Any]:
+        """
+        Make API request using Ollama client with correct cloud format.
+        
+        Args:
+            prompt (str): The complete prompt to send
+            
+        Returns:
+            dict: API response in OpenAI format
+            
+        Raises:
+            Exception: If API request fails
+        """
+        max_retries = 3
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                start_time = time.time()
+                
+                # Prepare messages in Ollama format
+                messages = [
+                    {
+                        'role': 'user',
+                        'content': prompt,
+                    }
+                ]
+                
+                logger.debug(f"Making Ollama Cloud API request (attempt {attempt + 1})")
+                
+                # Make the request using Ollama client with correct model format
+                # Use the model name directly as configured
+                response = self.ollama_client.chat(
+                    model=self.model,  # e.g., 'gpt-oss:latest' or 'gpt-oss:120b'
+                    messages=messages,
+                    stream=False
+                )
+                
+                response_time = time.time() - start_time
+                logger.debug(f"Ollama Cloud API request completed in {response_time:.2f}s")
+                
+                # Convert Ollama response to OpenAI format for compatibility
+                openai_format_response = {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": response['message']['content']
+                            }
+                        }
+                    ]
+                }
+                
+                return openai_format_response
+                
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Ollama Cloud API request failed (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+        
+        # All retries failed, raise the last error
+        error_info = global_error_handler.handle_error(
+            error=last_error,
+            module="reasoning",
+            function="_make_ollama_request",
+            category=ErrorCategory.API_ERROR,
+            context={"attempts": max_retries, "model": self.model}
+        )
+        raise Exception(f"Ollama Cloud API request failed: {error_info.user_message}")
+    
+    def _make_requests_api_call(self, prompt: str) -> Dict[str, Any]:
+        """
+        Make API request using requests library (fallback method).
+        
+        Args:
+            prompt (str): The complete prompt to send
+            
+        Returns:
+            dict: Raw API response
+            
+        Raises:
+            Exception: If API request fails after retries
+        """
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
         }
         
-        # Prepare request payload (format may vary by provider)
+        # Prepare request payload in Ollama format
         payload = {
             "model": self.model,
             "messages": [
@@ -221,11 +337,10 @@ Please analyze the user's command and the current screen state, then provide a d
                     "content": prompt
                 }
             ],
-            "temperature": 0.1,  # Low temperature for consistent responses
-            "max_tokens": 2000
+            "stream": False
         }
         
-        logger.debug(f"Making API request to {self.api_base}/chat/completions")
+        logger.debug(f"Making requests API call to {self.api_base}/v1/chat/completions")
         
         # Use connection pool for better performance
         session = connection_pool.get_session(self.api_base)
@@ -238,8 +353,12 @@ Please analyze the user's command and the current screen state, then provide a d
             try:
                 start_time = time.time()
                 
+                # For Ollama Cloud, use the correct API endpoint
+                # Ollama Cloud uses a different endpoint structure
+                endpoint_url = f"{self.api_base}/api/chat"
+                
                 response = session.post(
-                    f"{self.api_base}/chat/completions",
+                    endpoint_url,
                     headers=headers,
                     json=payload,
                     timeout=self.timeout
@@ -251,22 +370,42 @@ Please analyze the user's command and the current screen state, then provide a d
                 # Handle different HTTP status codes
                 if response.status_code == 200:
                     try:
-                        return response.json()
+                        ollama_response = response.json()
+                        # Convert Ollama response to OpenAI format for compatibility
+                        openai_format_response = {
+                            "choices": [
+                                {
+                                    "message": {
+                                        "content": ollama_response['message']['content']
+                                    }
+                                }
+                            ]
+                        }
+                        return openai_format_response
                     except json.JSONDecodeError as e:
                         error_info = global_error_handler.handle_error(
                             error=e,
                             module="reasoning",
-                            function="_make_api_request",
+                            function="_make_requests_api_call",
                             category=ErrorCategory.PROCESSING_ERROR,
                             context={"response_text": response.text[:500]}
                         )
                         raise Exception(f"Invalid JSON response: {error_info.user_message}")
+                    except KeyError as e:
+                        error_info = global_error_handler.handle_error(
+                            error=e,
+                            module="reasoning",
+                            function="_make_requests_api_call",
+                            category=ErrorCategory.PROCESSING_ERROR,
+                            context={"response_data": str(ollama_response)[:500]}
+                        )
+                        raise Exception(f"Unexpected response format: {error_info.user_message}")
                 
                 elif response.status_code == 401:
                     error_info = global_error_handler.handle_error(
                         error=Exception("Authentication failed"),
                         module="reasoning",
-                        function="_make_api_request",
+                        function="_make_requests_api_call",
                         category=ErrorCategory.CONFIGURATION_ERROR,
                         context={"status_code": response.status_code}
                     )
@@ -283,7 +422,7 @@ Please analyze the user's command and the current screen state, then provide a d
                         error_info = global_error_handler.handle_error(
                             error=Exception("Rate limit exceeded"),
                             module="reasoning",
-                            function="_make_api_request",
+                            function="_make_requests_api_call",
                             category=ErrorCategory.API_ERROR,
                             context={"status_code": response.status_code, "attempts": attempt + 1}
                         )
@@ -300,7 +439,7 @@ Please analyze the user's command and the current screen state, then provide a d
                         error_info = global_error_handler.handle_error(
                             error=Exception(f"Server error: {response.status_code}"),
                             module="reasoning",
-                            function="_make_api_request",
+                            function="_make_requests_api_call",
                             category=ErrorCategory.API_ERROR,
                             context={"status_code": response.status_code, "response": response.text[:500]}
                         )
@@ -311,7 +450,7 @@ Please analyze the user's command and the current screen state, then provide a d
                     error_info = global_error_handler.handle_error(
                         error=Exception(f"HTTP {response.status_code}: {response.text}"),
                         module="reasoning",
-                        function="_make_api_request",
+                        function="_make_requests_api_call",
                         category=ErrorCategory.API_ERROR,
                         context={"status_code": response.status_code, "response": response.text[:500]}
                     )
@@ -344,7 +483,7 @@ Please analyze the user's command and the current screen state, then provide a d
                 error_info = global_error_handler.handle_error(
                     error=last_error,
                     module="reasoning",
-                    function="_make_api_request",
+                    function="_make_requests_api_call",
                     category=ErrorCategory.TIMEOUT_ERROR,
                     context={"timeout": self.timeout, "attempts": max_retries}
                 )
@@ -353,7 +492,7 @@ Please analyze the user's command and the current screen state, then provide a d
                 error_info = global_error_handler.handle_error(
                     error=last_error,
                     module="reasoning",
-                    function="_make_api_request",
+                    function="_make_requests_api_call",
                     category=ErrorCategory.NETWORK_ERROR,
                     context={"api_base": self.api_base, "attempts": max_retries}
                 )
@@ -362,7 +501,7 @@ Please analyze the user's command and the current screen state, then provide a d
                 error_info = global_error_handler.handle_error(
                     error=last_error,
                     module="reasoning",
-                    function="_make_api_request",
+                    function="_make_requests_api_call",
                     category=ErrorCategory.API_ERROR,
                     context={"attempts": max_retries}
                 )

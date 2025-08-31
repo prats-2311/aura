@@ -1564,14 +1564,21 @@ class Orchestrator:
             action_plan = self._get_qa_action_plan(execution_id, qa_command, screen_context)
             
             # Extract and validate answer from action plan
+            logger.debug(f"[{execution_id}] Action plan received: {action_plan}")
             answer = self._extract_and_validate_answer(action_plan, question)
+            logger.debug(f"[{execution_id}] Extracted answer: '{answer}'")
             
-            # Provide the answer via TTS
+            # Provide the answer via TTS and console output
             if answer and answer != "Information not available":
+                # Print to console for user feedback (since TTS may not be working)
+                print(f"\n🤖 AURA: {answer}\n")
+                logger.info(f"[{execution_id}] AURA Response: {answer}")
                 self.feedback_module.speak(answer, FeedbackPriority.NORMAL)
                 success = True
             else:
                 fallback_answer = "I couldn't find the information you're looking for on the current screen."
+                print(f"\n🤖 AURA: {fallback_answer}\n")
+                logger.info(f"[{execution_id}] AURA Fallback Response: {fallback_answer}")
                 self.feedback_module.speak(fallback_answer, FeedbackPriority.NORMAL)
                 answer = fallback_answer
                 success = False

@@ -25,7 +25,7 @@ PROJECT_DESCRIPTION = "Autonomous User-side Robotic Assistant"
 VISION_API_BASE = "http://localhost:1234/v1"
 
 # Cloud endpoint for reasoning model (Ollama Cloud or OpenAI)
-REASONING_API_BASE = "https://api.ollama.ai/v1"  # Example URL from a turbo plan
+REASONING_API_BASE = "https://ollama.com"  # Ollama Cloud endpoint
 REASONING_API_KEY = os.getenv("REASONING_API_KEY", "4a1181add3774859831c5d5bde617ddc.8jshsyAYcMNquYAN7dxYb7kM")
 
 # Alternative OpenAI configuration (uncomment to use)
@@ -35,7 +35,7 @@ REASONING_API_KEY = os.getenv("REASONING_API_KEY", "4a1181add3774859831c5d5bde61
 # -- Model Names --
 # Vision model will be auto-detected from LM Studio
 VISION_MODEL = None  # Will be dynamically set by get_active_vision_model()
-REASONING_MODEL = "gpt-oss:latest"  # The model name in your Ollama cloud service
+REASONING_MODEL = "gpt-oss:120b"  # The model name in your Ollama cloud service
 
 # Alternative OpenAI model (uncomment to use)
 # REASONING_MODEL = "gpt-4-vision-preview"
