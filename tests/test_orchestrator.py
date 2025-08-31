@@ -18,11 +18,11 @@ class TestOrchestrator:
     @pytest.fixture
     def mock_modules(self):
         """Create mock modules for testing."""
-        with patch('modules.vision.VisionModule') as mock_vision, \
-             patch('modules.reasoning.ReasoningModule') as mock_reasoning, \
-             patch('modules.automation.AutomationModule') as mock_automation, \
-             patch('modules.audio.AudioModule') as mock_audio, \
-             patch('modules.feedback.FeedbackModule') as mock_feedback:
+        with patch('orchestrator.VisionModule') as mock_vision, \
+             patch('orchestrator.ReasoningModule') as mock_reasoning, \
+             patch('orchestrator.AutomationModule') as mock_automation, \
+             patch('orchestrator.AudioModule') as mock_audio, \
+             patch('orchestrator.FeedbackModule') as mock_feedback:
             
             # Configure mock vision module
             mock_vision_instance = Mock()
@@ -332,6 +332,323 @@ class TestOrchestrator:
         assert "error" in result["answer"].lower()
         assert "error" in result
     
+    def test_question_detection_and_routing(self, mock_modules):
+        """Test that questions are detected and routed to answer_question method."""
+        orchestrator = Orchestrator()
+        
+        # Ensure vision module mock is properly configured
+        mock_modules['vision'].describe_screen.return_value = {
+            "elements": [
+                {
+                    "type": "button",
+                    "text": "Submit",
+                    "coordinates": [100, 200, 150, 230],
+                    "description": "Submit button"
+                },
+                {
+                    "type": "button", 
+                    "text": "Cancel",
+                    "coordinates": [200, 200, 250, 230],
+                    "description": "Cancel button"
+                },
+                {
+                    "type": "button",
+                    "text": "Help", 
+                    "coordinates": [300, 200, 350, 230],
+                    "description": "Help button"
+                }
+            ],
+            "metadata": {
+                "timestamp": time.time(),
+                "screen_resolution": [1920, 1080]
+            }
+        }
+        
+        # Configure reasoning module to return Q&A response
+        mock_modules['reasoning'].get_action_plan.return_value = {
+            "plan": [
+                {
+                    "action": "speak",
+                    "message": "There are 3 buttons visible on the screen: Submit, Cancel, and Help"
+                },
+                {
+                    "action": "finish"
+                }
+            ],
+            "metadata": {"confidence": 0.9}
+        }
+        
+        # Execute a question command
+        result = orchestrator.execute_command("What buttons are on the screen?")
+        
+        # Verify it was routed to Q&A mode
+        assert result["success"] is True
+        assert "qa_result" in result
+        assert result["qa_result"]["success"] is True
+        assert "buttons" in result["qa_result"]["answer"]
+        
+        # Verify vision and reasoning were called
+        mock_modules['vision'].describe_screen.assert_called()
+        mock_modules['reasoning'].get_action_plan.assert_called()
+        mock_modules['feedback'].speak.assert_called()
+    
+    def test_question_detection_patterns(self):
+        """Test various question patterns are detected correctly."""
+        with patch('orchestrator.Orchestrator._initialize_modules'):
+            orchestrator = Orchestrator()
+            
+            question_patterns = [
+                "What is on the screen?",
+                "Where is the submit button?",
+                "How do I click the link?",
+                "Tell me about this page",
+                "Explain what I'm seeing"
+            ]
+            
+            for question in question_patterns:
+                validation = orchestrator.validate_command(question)
+                assert validation.command_type == "question", f"Failed to detect question: {question}"
+                assert validation.confidence > 0.0
+    
+    def test_screen_analysis_for_information_extraction(self, mock_modules):
+        """Test enhanced screen analysis for information extraction."""
+        orchestrator = Orchestrator()
+        
+        # Configure vision module with mixed element types
+        mock_modules['vision'].describe_screen.return_value = {
+            "elements": [
+                {
+                    "type": "text",
+                    "text": "Welcome to our website",
+                    "coordinates": [10, 10, 200, 30],
+                    "description": "Heading text"
+                },
+                {
+                    "type": "button",
+                    "text": "Submit",
+                    "coordinates": [100, 200, 150, 230],
+                    "description": "Submit button"
+                },
+                {
+                    "type": "label",
+                    "text": "Email address:",
+                    "coordinates": [10, 100, 100, 120],
+                    "description": "Input label"
+                }
+            ],
+            "metadata": {
+                "timestamp": time.time(),
+                "screen_resolution": [1920, 1080]
+            }
+        }
+        
+        # Test screen analysis
+        screen_context = orchestrator._analyze_screen_for_information("test_id")
+        
+        # Verify categorization
+        assert "text_elements" in screen_context
+        assert "interactive_elements" in screen_context
+        assert len(screen_context["text_elements"]) == 2  # text and label elements
+        assert len(screen_context["interactive_elements"]) == 1  # button element
+    
+    def test_qa_reasoning_prompt_creation(self):
+        """Test creation of specialized Q&A reasoning prompts."""
+        with patch('orchestrator.Orchestrator._initialize_modules'):
+            orchestrator = Orchestrator()
+            
+            screen_context = {
+                "elements": [{"type": "button", "text": "Submit"}],
+                "text_elements": [{"type": "text", "text": "Welcome"}]
+            }
+            
+            question = "What buttons are available?"
+            prompt = orchestrator._create_qa_reasoning_prompt(question, screen_context)
+            
+            # Verify prompt contains question and instructions
+            assert question in prompt
+            assert "analyze the screen content" in prompt.lower()
+            assert "speak" in prompt.lower()
+            assert "1 total screen elements" in prompt
+            assert "1 text elements" in prompt
+    
+    def test_answer_validation(self):
+        """Test answer validation logic."""
+        with patch('orchestrator.Orchestrator._initialize_modules'):
+            orchestrator = Orchestrator()
+            
+            # Test valid answer
+            action_plan = {
+                "plan": [
+                    {"action": "speak", "message": "There are three buttons on the screen: Submit, Cancel, and Help"}
+                ]
+            }
+            answer = orchestrator._extract_and_validate_answer(action_plan, "What buttons are available?")
+            assert answer == "There are three buttons on the screen: Submit, Cancel, and Help"
+            
+            # Test generic/unhelpful answer
+            action_plan = {
+                "plan": [
+                    {"action": "speak", "message": "I don't know"}
+                ]
+            }
+            answer = orchestrator._extract_and_validate_answer(action_plan, "What buttons are available?")
+            # The new implementation provides context-aware fallback responses
+            assert "can't identify" in answer.lower() or "information not available" in answer.lower()
+            
+            # Test too short answer for non-yes/no question
+            action_plan = {
+                "plan": [
+                    {"action": "speak", "message": "Yes"}
+                ]
+            }
+            answer = orchestrator._extract_and_validate_answer(action_plan, "What buttons are available?")
+            # The new implementation provides context-aware fallback responses
+            assert ("can't identify" in answer.lower() or 
+                   "information not available" in answer.lower() or
+                   "isn't clearly visible" in answer.lower())
+    
+    def test_qa_retry_logic(self, mock_modules):
+        """Test retry logic for Q&A reasoning failures."""
+        orchestrator = Orchestrator()
+        
+        # Make reasoning fail twice, then succeed
+        call_count = 0
+        def reasoning_side_effect(command, screen_context):
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 2:
+                raise Exception("Temporary reasoning failure")
+            return {
+                "plan": [
+                    {"action": "speak", "message": "The screen shows a login form"}
+                ],
+                "metadata": {"confidence": 0.8}
+            }
+        
+        mock_modules['reasoning'].get_action_plan.side_effect = reasoning_side_effect
+        
+        # Ask a question
+        result = orchestrator.answer_question("What's on the screen?")
+        
+        # Verify success after retries
+        assert result["success"] is True
+        assert mock_modules['reasoning'].get_action_plan.call_count == 3
+        assert "login form" in result["answer"]
+    
+    def test_text_extraction_and_summarization(self):
+        """Test text extraction and summarization functionality."""
+        with patch('orchestrator.Orchestrator._initialize_modules'):
+            orchestrator = Orchestrator()
+            
+            # Test text elements with various types
+            text_elements = [
+                {
+                    "type": "heading",
+                    "text": "Welcome to Our Website",
+                    "coordinates": [10, 10, 300, 40]
+                },
+                {
+                    "type": "text",
+                    "text": "This is a sample paragraph with some content.",
+                    "coordinates": [10, 50, 400, 80]
+                },
+                {
+                    "type": "label",
+                    "text": "Email:",
+                    "coordinates": [10, 100, 60, 120]
+                },
+                {
+                    "type": "text",
+                    "text": "Contact us at info@example.com",
+                    "coordinates": [10, 150, 250, 170]
+                }
+            ]
+            
+            # Test text extraction
+            extracted_text = orchestrator._extract_text_content(text_elements)
+            
+            # Verify extraction
+            assert len(extracted_text) == 4
+            assert extracted_text[0]["is_heading"] is True  # Should be sorted with headings first
+            assert extracted_text[0]["content"] == "Welcome to Our Website"
+            
+            # Test text summarization
+            summary = orchestrator._summarize_text_content(extracted_text)
+            
+            # Verify summary
+            assert summary["total_blocks"] == 4
+            assert summary["total_words"] > 0
+            assert len(summary["headings"]) == 1
+            assert "Welcome to Our Website" in summary["headings"]
+            assert summary["has_forms"] is True  # Should detect "Email" as form-related
+    
+    def test_context_aware_qa_prompt(self):
+        """Test context-aware Q&A prompt generation."""
+        with patch('orchestrator.Orchestrator._initialize_modules'):
+            orchestrator = Orchestrator()
+            
+            # Create screen context with summary
+            screen_context = {
+                "elements": [{"type": "button", "text": "Submit"}],
+                "text_elements": [{"type": "text", "text": "Welcome"}],
+                "text_summary": {
+                    "headings": ["Login Page", "User Account"],
+                    "has_forms": True,
+                    "has_navigation": False,
+                    "content_density": "medium",
+                    "total_words": 45
+                }
+            }
+            
+            question = "What is this page about?"
+            prompt = orchestrator._create_qa_reasoning_prompt(question, screen_context)
+            
+            # Verify context-aware elements
+            assert question in prompt
+            assert "Login Page" in prompt
+            assert "form elements" in prompt
+            assert "medium" in prompt
+            assert "45 words" in prompt
+    
+    def test_fallback_response_generation(self):
+        """Test context-aware fallback response generation."""
+        with patch('orchestrator.Orchestrator._initialize_modules'):
+            orchestrator = Orchestrator()
+            
+            # Test different question types with more flexible assertions
+            test_cases = [
+                ("What is on the screen?", "can't identify"),
+                ("Where is the login button?", "can't locate"),
+                ("How do I submit the form?", "can't determine"),
+                ("Why is this error showing?", "can't determine"),
+                ("When will this be available?", "can't see any time"),
+                ("Who can I contact?", "can't identify any person")
+            ]
+            
+            for question, expected_content in test_cases:
+                fallback = orchestrator._generate_fallback_response(question, "no_answer")
+                assert expected_content in fallback.lower(), f"Failed for question: {question}. Got: {fallback}"
+    
+    def test_answer_relevance_checking(self):
+        """Test answer relevance validation."""
+        with patch('orchestrator.Orchestrator._initialize_modules'):
+            orchestrator = Orchestrator()
+            
+            # Test relevant answer with keyword overlap
+            question = "What buttons are available on the screen?"
+            answer = "There are three buttons: Submit, Cancel, and Help"
+            assert orchestrator._answer_addresses_question(answer, question) is True
+            
+            # Test irrelevant answer
+            question = "What buttons are available on the screen?"
+            answer = "The weather is nice today"
+            assert orchestrator._answer_addresses_question(answer, question) is False
+            
+            # Test substantial answer (should be considered relevant even without keyword overlap)
+            question = "What is this page about?"
+            answer = "This appears to be a comprehensive user registration interface with multiple input fields for personal information, account preferences, and security settings."
+            assert orchestrator._answer_addresses_question(answer, question) is True
+    
     def test_get_current_status(self, mock_modules):
         """Test getting current orchestrator status."""
         orchestrator = Orchestrator()
@@ -563,11 +880,11 @@ class TestOrchestratorAdvancedFeatures:
     @pytest.fixture
     def mock_modules(self):
         """Create mock modules for testing advanced features."""
-        with patch('modules.vision.VisionModule') as mock_vision, \
-             patch('modules.reasoning.ReasoningModule') as mock_reasoning, \
-             patch('modules.automation.AutomationModule') as mock_automation, \
-             patch('modules.audio.AudioModule') as mock_audio, \
-             patch('modules.feedback.FeedbackModule') as mock_feedback:
+        with patch('orchestrator.VisionModule') as mock_vision, \
+             patch('orchestrator.ReasoningModule') as mock_reasoning, \
+             patch('orchestrator.AutomationModule') as mock_automation, \
+             patch('orchestrator.AudioModule') as mock_audio, \
+             patch('orchestrator.FeedbackModule') as mock_feedback:
             
             # Configure mock vision module with realistic delay
             mock_vision_instance = Mock()

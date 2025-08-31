@@ -439,6 +439,11 @@ class Orchestrator:
             normalized_command = validation_result.normalized_command
             logger.info(f"[{execution_id}] Command validated and normalized: '{normalized_command}'")
             
+            # Check if this is a question and route to answer_question method
+            if validation_result.command_type == "question":
+                logger.info(f"[{execution_id}] Detected question, routing to information extraction mode")
+                return self._route_to_question_answering(command, execution_context)
+            
             # Provide initial feedback
             self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
             
@@ -869,44 +874,49 @@ class Orchestrator:
             # Provide thinking feedback
             self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
             
-            # Capture and analyze screen for information
-            logger.info(f"[{execution_id}] Analyzing screen for information")
-            screen_context = self.vision_module.describe_screen()
+            # Capture and analyze screen for information extraction
+            logger.info(f"[{execution_id}] Analyzing screen for information extraction")
+            screen_context = self._analyze_screen_for_information(execution_id)
             
-            # Create a special reasoning prompt for Q&A
-            qa_command = f"Please analyze the screen content and answer this question: {question}"
+            # Create a specialized reasoning prompt for Q&A with enhanced context
+            qa_command = self._create_qa_reasoning_prompt(question, screen_context)
             
-            # Use reasoning module to generate answer
+            # Use reasoning module to generate answer with retry logic
             logger.info(f"[{execution_id}] Generating answer using reasoning module")
-            action_plan = self.reasoning_module.get_action_plan(qa_command, screen_context)
+            action_plan = self._get_qa_action_plan(execution_id, qa_command, screen_context)
             
-            # Extract answer from action plan (should contain speak actions with the answer)
-            answer = self._extract_answer_from_plan(action_plan)
+            # Extract and validate answer from action plan
+            answer = self._extract_and_validate_answer(action_plan, question)
             
             # Provide the answer via TTS
-            if answer:
+            if answer and answer != "Information not available":
                 self.feedback_module.speak(answer, FeedbackPriority.NORMAL)
+                success = True
             else:
                 fallback_answer = "I couldn't find the information you're looking for on the current screen."
                 self.feedback_module.speak(fallback_answer, FeedbackPriority.NORMAL)
                 answer = fallback_answer
+                success = False
             
-            # Format result
+            # Format result with enhanced metadata
             result = {
                 "execution_id": execution_id,
                 "question": question,
                 "answer": answer,
                 "status": "completed",
                 "duration": time.time() - start_time,
-                "success": True,
+                "success": success,
                 "metadata": {
                     "screen_elements_analyzed": len(screen_context.get("elements", [])),
+                    "text_blocks_analyzed": len(screen_context.get("text_blocks", [])),
                     "confidence": action_plan.get("metadata", {}).get("confidence", 0.0),
-                    "timestamp": start_time
+                    "information_extraction_mode": True,
+                    "timestamp": start_time,
+                    "screen_resolution": screen_context.get("metadata", {}).get("screen_resolution", [0, 0])
                 }
             }
             
-            logger.info(f"[{execution_id}] Question answered successfully")
+            logger.info(f"[{execution_id}] Question answered successfully: {success}")
             return result
             
         except Exception as e:
@@ -927,10 +937,481 @@ class Orchestrator:
                 "success": False,
                 "error": str(e),
                 "metadata": {
-                    "timestamp": start_time
+                    "timestamp": start_time,
+                    "information_extraction_mode": True
                 }
             }
     
+    def _route_to_question_answering(self, question: str, execution_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Route question to information extraction mode.
+        
+        Args:
+            question: User's question
+            execution_context: Current execution context
+            
+        Returns:
+            Formatted execution result for question answering
+        """
+        execution_id = execution_context["execution_id"]
+        
+        try:
+            logger.info(f"[{execution_id}] Processing question in information extraction mode")
+            
+            # Call the answer_question method
+            qa_result = self.answer_question(question)
+            
+            # Convert Q&A result to execution result format
+            execution_context["status"] = CommandStatus.COMPLETED if qa_result["success"] else CommandStatus.FAILED
+            execution_context["end_time"] = time.time()
+            execution_context["total_duration"] = execution_context["end_time"] - execution_context["start_time"]
+            execution_context["steps_completed"] = ["validation", "perception", "reasoning"]
+            
+            if qa_result["success"]:
+                execution_context["qa_result"] = qa_result
+                self._update_progress(execution_id, CommandStatus.COMPLETED, progress_percentage=100)
+            else:
+                execution_context["errors"].append(qa_result.get("error", "Question answering failed"))
+                self._update_progress(execution_id, CommandStatus.FAILED, error=qa_result.get("error"))
+            
+            # Add to history
+            self.command_history.append(execution_context.copy())
+            
+            return self._format_execution_result(execution_context)
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Question routing failed: {e}")
+            execution_context["status"] = CommandStatus.FAILED
+            execution_context["errors"].append(str(e))
+            self._update_progress(execution_id, CommandStatus.FAILED, error=str(e))
+            
+            # Add to history
+            self.command_history.append(execution_context.copy())
+            
+            return self._format_execution_result(execution_context)
+
+    def _analyze_screen_for_information(self, execution_id: str) -> Dict[str, Any]:
+        """
+        Analyze screen content specifically for information extraction.
+        
+        Args:
+            execution_id: Current execution ID for logging
+            
+        Returns:
+            Enhanced screen context with information extraction focus
+        """
+        try:
+            # Capture screen with standard vision module
+            screen_context = self.vision_module.describe_screen()
+            
+            # Enhance context for information extraction
+            if "elements" in screen_context:
+                # Filter and categorize elements for better information extraction
+                text_elements = []
+                interactive_elements = []
+                
+                for element in screen_context["elements"]:
+                    element_type = element.get("type", "")
+                    element_text = element.get("text", "")
+                    
+                    if element_type in ["text", "label", "heading"] or element_text:
+                        text_elements.append(element)
+                    
+                    if element_type in ["button", "link", "input", "dropdown"]:
+                        interactive_elements.append(element)
+                
+                # Add categorized elements to context
+                screen_context["text_elements"] = text_elements
+                screen_context["interactive_elements"] = interactive_elements
+                
+                # Extract and summarize text content
+                screen_context["extracted_text"] = self._extract_text_content(text_elements)
+                screen_context["text_summary"] = self._summarize_text_content(screen_context["extracted_text"])
+                
+                logger.debug(f"[{execution_id}] Categorized {len(text_elements)} text elements and {len(interactive_elements)} interactive elements")
+                logger.debug(f"[{execution_id}] Extracted {len(screen_context['extracted_text'])} text blocks")
+            
+            return screen_context
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Screen analysis for information extraction failed: {e}")
+            raise
+    
+    def _extract_text_content(self, text_elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Extract and organize text content from screen elements.
+        
+        Args:
+            text_elements: List of text-containing elements
+            
+        Returns:
+            List of extracted text blocks with metadata
+        """
+        extracted_text = []
+        
+        for element in text_elements:
+            text_content = element.get("text", "").strip()
+            if text_content and len(text_content) > 1:  # Skip single characters
+                text_block = {
+                    "content": text_content,
+                    "type": element.get("type", "text"),
+                    "coordinates": element.get("coordinates", []),
+                    "length": len(text_content),
+                    "word_count": len(text_content.split()),
+                    "is_heading": element.get("type") == "heading" or text_content.isupper(),
+                    "contains_numbers": any(char.isdigit() for char in text_content),
+                    "contains_special_chars": any(char in "!@#$%^&*()_+-=[]{}|;:,.<>?" for char in text_content)
+                }
+                extracted_text.append(text_block)
+        
+        # Sort by importance (headings first, then by length)
+        extracted_text.sort(key=lambda x: (not x["is_heading"], -x["length"]))
+        
+        return extracted_text
+    
+    def _summarize_text_content(self, extracted_text: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Create a summary of extracted text content.
+        
+        Args:
+            extracted_text: List of extracted text blocks
+            
+        Returns:
+            Summary of text content
+        """
+        if not extracted_text:
+            return {
+                "total_blocks": 0,
+                "total_words": 0,
+                "headings": [],
+                "key_content": [],
+                "has_forms": False,
+                "has_navigation": False
+            }
+        
+        headings = []
+        key_content = []
+        total_words = 0
+        has_forms = False
+        has_navigation = False
+        
+        # Analyze text blocks
+        for block in extracted_text:
+            content = block["content"].lower()
+            total_words += block["word_count"]
+            
+            if block["is_heading"]:
+                headings.append(block["content"])
+            elif block["word_count"] >= 3:  # Meaningful content
+                key_content.append(block["content"])
+            
+            # Detect forms
+            if any(keyword in content for keyword in ["email", "password", "username", "login", "register", "submit"]):
+                has_forms = True
+            
+            # Detect navigation
+            if any(keyword in content for keyword in ["home", "about", "contact", "menu", "navigation", "back", "next"]):
+                has_navigation = True
+        
+        return {
+            "total_blocks": len(extracted_text),
+            "total_words": total_words,
+            "headings": headings[:5],  # Top 5 headings
+            "key_content": key_content[:10],  # Top 10 content blocks
+            "has_forms": has_forms,
+            "has_navigation": has_navigation,
+            "content_density": "high" if total_words > 100 else "medium" if total_words > 20 else "low"
+        }
+    
+    def _create_qa_reasoning_prompt(self, question: str, screen_context: Dict[str, Any]) -> str:
+        """
+        Create a specialized reasoning prompt for question answering.
+        
+        Args:
+            question: User's question
+            screen_context: Screen analysis context
+            
+        Returns:
+            Specialized Q&A prompt
+        """
+        # Count available information
+        element_count = len(screen_context.get("elements", []))
+        text_element_count = len(screen_context.get("text_elements", []))
+        text_summary = screen_context.get("text_summary", {})
+        
+        # Create context-aware prompt based on screen content
+        context_info = []
+        
+        # Add heading information if available
+        if text_summary.get("headings"):
+            headings_text = ", ".join(text_summary["headings"][:3])
+            context_info.append(f"Main headings visible: {headings_text}")
+        
+        # Add content type information
+        if text_summary.get("has_forms"):
+            context_info.append("The screen contains form elements")
+        
+        if text_summary.get("has_navigation"):
+            context_info.append("The screen contains navigation elements")
+        
+        # Add content density information
+        content_density = text_summary.get("content_density", "unknown")
+        context_info.append(f"Content density: {content_density}")
+        
+        # Build context string
+        context_string = ". ".join(context_info) if context_info else "Limited context available"
+        
+        # Create enhanced prompt for information extraction
+        qa_prompt = f"""Please analyze the screen content and answer this question: {question}
+
+Screen Context: {context_string}
+
+Available Information:
+- {element_count} total screen elements
+- {text_element_count} text elements
+- {text_summary.get('total_words', 0)} words of text content
+
+Instructions:
+1. Look for information directly related to the question in the screen elements
+2. Use the headings and key content to understand the page structure and purpose
+3. If the exact information isn't visible, provide the closest relevant information available
+4. Consider the context (forms, navigation, content type) when formulating your answer
+5. If no relevant information is found, clearly state that the information is not available on the current screen
+6. Keep the answer concise, accurate, and directly address the question
+7. Use the 'speak' action to provide the answer to the user
+
+Focus on being helpful while being honest about what information is actually visible on the screen."""
+        
+        return qa_prompt
+    
+    def _get_qa_action_plan(self, execution_id: str, qa_command: str, screen_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Get action plan for question answering with retry logic.
+        
+        Args:
+            execution_id: Current execution ID
+            qa_command: Q&A reasoning prompt
+            screen_context: Screen context
+            
+        Returns:
+            Action plan from reasoning module
+        """
+        last_error = None
+        
+        for attempt in range(self.max_retries + 1):
+            try:
+                logger.debug(f"[{execution_id}] Q&A reasoning attempt {attempt + 1}")
+                
+                action_plan = self.reasoning_module.get_action_plan(qa_command, screen_context)
+                
+                # Validate action plan for Q&A
+                if not action_plan or "plan" not in action_plan:
+                    raise OrchestratorError("Invalid Q&A action plan result")
+                
+                # Check if plan contains speak actions (required for Q&A)
+                has_speak_action = any(action.get("action") == "speak" for action in action_plan["plan"])
+                if not has_speak_action:
+                    logger.warning(f"[{execution_id}] Q&A action plan missing speak actions, attempt {attempt + 1}")
+                    if attempt < self.max_retries:
+                        continue
+                
+                logger.info(f"[{execution_id}] Q&A reasoning successful")
+                return action_plan
+                
+            except Exception as e:
+                last_error = e
+                logger.warning(f"[{execution_id}] Q&A reasoning attempt {attempt + 1} failed: {e}")
+                
+                if attempt < self.max_retries:
+                    logger.info(f"[{execution_id}] Retrying Q&A reasoning in {self.retry_delay}s...")
+                    time.sleep(self.retry_delay)
+        
+        # All attempts failed
+        error_msg = f"Q&A reasoning failed after {self.max_retries + 1} attempts: {last_error}"
+        raise OrchestratorError(error_msg)
+    
+    def _extract_and_validate_answer(self, action_plan: Dict[str, Any], question: str) -> str:
+        """
+        Extract and validate answer from action plan with enhanced fallback responses.
+        
+        Args:
+            action_plan: Action plan from reasoning module
+            question: Original question for validation
+            
+        Returns:
+            Validated answer text with context-aware fallbacks
+        """
+        try:
+            # Extract answer using existing method
+            answer = self._extract_answer_from_plan(action_plan)
+            
+            # Validate answer quality
+            if not answer:
+                return self._generate_fallback_response(question, "no_answer")
+            
+            # Basic answer validation
+            answer = answer.strip()
+            
+            # Check if answer is too generic or unhelpful
+            generic_responses = [
+                "i don't know",
+                "i can't see",
+                "not sure",
+                "unclear",
+                "unable to determine",
+                "i cannot",
+                "not visible",
+                "can't tell"
+            ]
+            
+            if any(generic in answer.lower() for generic in generic_responses):
+                logger.warning("Answer appears to be generic, providing fallback response")
+                return self._generate_fallback_response(question, "generic_answer")
+            
+            # Check minimum answer length (should be more than just "yes" or "no" for most questions)
+            question_lower = question.lower()
+            is_yes_no_question = question_lower.startswith(("is", "are", "can", "do", "does", "will", "would", "should"))
+            
+            if len(answer.split()) < 2 and not is_yes_no_question:
+                logger.warning("Answer appears too short for the question type")
+                return self._generate_fallback_response(question, "short_answer")
+            
+            # Check if answer actually addresses the question
+            if not self._answer_addresses_question(answer, question):
+                logger.warning("Answer doesn't seem to address the question")
+                return self._generate_fallback_response(question, "irrelevant_answer")
+            
+            return answer
+            
+        except Exception as e:
+            logger.error(f"Error validating answer: {e}")
+            return self._generate_fallback_response(question, "error")
+    
+    def _generate_fallback_response(self, question: str, reason: str) -> str:
+        """
+        Generate context-aware fallback responses when information is not available.
+        
+        Args:
+            question: Original question
+            reason: Reason for fallback (no_answer, generic_answer, short_answer, irrelevant_answer, error)
+            
+        Returns:
+            Context-aware fallback response
+        """
+        question_lower = question.lower()
+        
+        # Determine question type for better fallback
+        if any(word in question_lower for word in ["what", "which"]):
+            question_type = "what"
+        elif any(word in question_lower for word in ["where", "location"]):
+            question_type = "where"
+        elif any(word in question_lower for word in ["how", "way"]):
+            question_type = "how"
+        elif any(word in question_lower for word in ["why", "reason"]):
+            question_type = "why"
+        elif any(word in question_lower for word in ["when", "time"]):
+            question_type = "when"
+        elif any(word in question_lower for word in ["who", "person"]):
+            question_type = "who"
+        else:
+            question_type = "general"
+        
+        # Generate appropriate fallback based on question type and reason
+        fallback_templates = {
+            "what": [
+                "I can't identify what you're asking about on the current screen.",
+                "The specific information you're looking for isn't clearly visible to me.",
+                "I don't see the details you're asking about on this screen."
+            ],
+            "where": [
+                "I can't locate that item on the current screen.",
+                "The location you're asking about isn't visible to me right now.",
+                "I don't see that element on the screen at the moment."
+            ],
+            "how": [
+                "I can't determine the process you're asking about from what's visible.",
+                "The steps you're looking for aren't clear from the current screen.",
+                "I don't see enough information to explain how to do that."
+            ],
+            "why": [
+                "I can't determine the reason from what's currently visible.",
+                "The explanation you're looking for isn't available on this screen.",
+                "I don't see enough context to explain why that is."
+            ],
+            "when": [
+                "I can't see any time or date information related to your question.",
+                "The timing information you're asking about isn't visible.",
+                "I don't see any schedule or time details on the screen."
+            ],
+            "who": [
+                "I can't identify any person or contact information related to your question.",
+                "The person you're asking about isn't mentioned on this screen.",
+                "I don't see any names or contact details visible."
+            ],
+            "general": [
+                "I couldn't find the information you're looking for on the current screen.",
+                "The answer to your question isn't visible to me right now.",
+                "I don't see enough relevant information to answer your question."
+            ]
+        }
+        
+        # Select appropriate template
+        templates = fallback_templates.get(question_type, fallback_templates["general"])
+        
+        # Add helpful suggestions based on reason
+        if reason == "error":
+            return "I encountered an issue while trying to analyze the screen. Please try asking your question again."
+        elif reason == "generic_answer":
+            return f"{templates[0]} You might want to scroll or navigate to find more information."
+        elif reason == "short_answer":
+            return f"{templates[1]} Could you try rephrasing your question more specifically?"
+        elif reason == "irrelevant_answer":
+            return f"{templates[2]} The screen might not contain what you're looking for."
+        else:
+            return templates[0]
+    
+    def _answer_addresses_question(self, answer: str, question: str) -> bool:
+        """
+        Check if the answer actually addresses the question asked.
+        
+        Args:
+            answer: Generated answer
+            question: Original question
+            
+        Returns:
+            True if answer seems relevant to question
+        """
+        try:
+            # Extract key words from question (excluding common words)
+            common_words = {"what", "where", "how", "why", "when", "who", "is", "are", "can", "do", "does", 
+                          "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
+                          "available", "screen"}  # Remove overly generic words
+            
+            # Clean and extract words, removing punctuation
+            import re
+            
+            question_clean = re.sub(r'[^\w\s]', ' ', question.lower())
+            answer_clean = re.sub(r'[^\w\s]', ' ', answer.lower())
+            
+            question_words = set(word for word in question_clean.split() 
+                               if len(word) > 2 and word not in common_words)
+            
+            answer_words = set(word for word in answer_clean.split() 
+                             if len(word) > 2)
+            
+            # Check if there's some overlap between question and answer keywords
+            overlap = question_words.intersection(answer_words)
+            
+            # If there's meaningful overlap or the answer is substantial, consider it relevant
+            has_overlap = len(overlap) > 0
+            is_substantial = len(answer.split()) > 10
+            
+            return has_overlap or is_substantial
+            
+        except Exception as e:
+            logger.warning(f"Error checking answer relevance: {e}")
+            return True  # Default to accepting the answer if we can't validate
+
     def _extract_answer_from_plan(self, action_plan: Dict[str, Any]) -> str:
         """
         Extract answer text from an action plan generated for Q&A.
