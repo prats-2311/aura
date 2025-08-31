@@ -78,6 +78,64 @@ Return the response in this JSON structure:
 }
 """
 
+# Enhanced prompt specifically for form detection and analysis
+FORM_VISION_PROMPT = """
+Analyze the provided screenshot specifically for web forms and form elements. Identify all form-related elements with detailed classification and structure analysis.
+
+For each form element, determine:
+1. Element type (text_input, password, email, number, textarea, select, checkbox, radio, button, submit)
+2. Field label or associated text
+3. Current value or placeholder text
+4. Required/optional status (if visible)
+5. Validation state (error, success, neutral)
+6. Form grouping or section
+
+Return the response in this JSON structure:
+{
+    "forms": [
+        {
+            "form_id": "unique_form_identifier",
+            "form_title": "form title or heading",
+            "coordinates": [x1, y1, x2, y2],
+            "fields": [
+                {
+                    "type": "text_input|password|email|number|textarea|select|checkbox|radio|button|submit",
+                    "label": "field label text",
+                    "placeholder": "placeholder text if any",
+                    "current_value": "current field value",
+                    "coordinates": [x1, y1, x2, y2],
+                    "required": true|false,
+                    "validation_state": "error|success|neutral",
+                    "error_message": "validation error text if any",
+                    "options": ["option1", "option2"]  // for select/radio elements
+                }
+            ]
+        }
+    ],
+    "form_errors": [
+        {
+            "message": "error message text",
+            "coordinates": [x1, y1, x2, y2],
+            "associated_field": "field_label"
+        }
+    ],
+    "submit_buttons": [
+        {
+            "text": "button text",
+            "coordinates": [x1, y1, x2, y2],
+            "type": "submit|button|reset"
+        }
+    ],
+    "metadata": {
+        "has_forms": true|false,
+        "form_count": 1,
+        "total_fields": 5,
+        "timestamp": "current timestamp",
+        "screen_resolution": [width, height]
+    }
+}
+"""
+
 # The meta-prompt for the reasoning model
 REASONING_META_PROMPT = """
 You are AURA, an AI assistant. Your goal is to help a user by controlling their computer. You will be given a user's command and a JSON object describing the current state of their screen. Your task is to reason about this information and return a precise action plan in JSON format.

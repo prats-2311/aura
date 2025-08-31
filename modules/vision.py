@@ -11,7 +11,7 @@ import io
 import json
 import logging
 import time
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import requests
 from PIL import Image
 import mss
@@ -20,6 +20,7 @@ from config import (
     VISION_API_BASE,
     VISION_MODEL,
     VISION_PROMPT,
+    FORM_VISION_PROMPT,
     VISION_API_TIMEOUT,
     SCREENSHOT_QUALITY,
     MAX_SCREENSHOT_SIZE
@@ -106,9 +107,12 @@ class VisionModule:
             logger.error(f"Failed to get screen resolution: {e}")
             return 1920, 1080  # Default fallback
     
-    def describe_screen(self) -> Dict:
+    def describe_screen(self, analysis_type: str = "general") -> Dict:
         """
         Capture screen and get structured description from vision model.
+        
+        Args:
+            analysis_type: Type of analysis to perform ("general" or "form")
         
         Returns:
             Dictionary containing structured screen analysis
@@ -117,13 +121,16 @@ class VisionModule:
             Exception: If screen analysis fails
         """
         try:
-            logger.info("Starting screen analysis")
+            logger.info(f"Starting screen analysis (type: {analysis_type})")
             
             # Capture screenshot
             screenshot_b64 = self.capture_screen_as_base64()
             
             # Get screen resolution for metadata
             width, height = self.get_screen_resolution()
+            
+            # Select appropriate prompt based on analysis type
+            prompt = FORM_VISION_PROMPT if analysis_type == "form" else VISION_PROMPT
             
             # Prepare API request
             headers = {
@@ -138,7 +145,7 @@ class VisionModule:
                         "content": [
                             {
                                 "type": "text",
-                                "text": VISION_PROMPT
+                                "text": prompt
                             },
                             {
                                 "type": "image_url",
@@ -149,7 +156,7 @@ class VisionModule:
                         ]
                     }
                 ],
-                "max_tokens": 2000,
+                "max_tokens": 3000,  # Increased for form analysis
                 "temperature": 0.1
             }
             
@@ -212,15 +219,234 @@ class VisionModule:
             
             screen_analysis["metadata"].update({
                 "timestamp": time.time(),
-                "screen_resolution": [width, height]
+                "screen_resolution": [width, height],
+                "analysis_type": analysis_type
             })
             
-            logger.info(f"Screen analysis completed: {len(screen_analysis.get('elements', []))} elements found")
+            if analysis_type == "form":
+                form_count = len(screen_analysis.get('forms', []))
+                total_fields = sum(len(form.get('fields', [])) for form in screen_analysis.get('forms', []))
+                logger.info(f"Form analysis completed: {form_count} forms, {total_fields} fields found")
+            else:
+                element_count = len(screen_analysis.get('elements', []))
+                logger.info(f"Screen analysis completed: {element_count} elements found")
+            
             return screen_analysis
             
         except Exception as e:
             logger.error(f"Screen analysis failed: {e}")
             raise Exception(f"Screen analysis failed: {e}")
+    
+    def analyze_forms(self) -> Dict:
+        """
+        Analyze screen specifically for form elements and structure.
+        
+        Returns:
+            Dictionary containing detailed form analysis
+            
+        Raises:
+            Exception: If form analysis fails
+        """
+        try:
+            logger.info("Starting form-specific analysis")
+            raw_analysis = self.describe_screen(analysis_type="form")
+            # Validate and normalize the form structure
+            validated_analysis = self.validate_form_structure(raw_analysis)
+            return validated_analysis
+        except Exception as e:
+            logger.error(f"Form analysis failed: {e}")
+            raise Exception(f"Form analysis failed: {e}")
+    
+    def classify_form_field(self, field_data: Dict) -> Dict:
+        """
+        Classify and validate form field data.
+        
+        Args:
+            field_data: Raw field data from vision analysis
+            
+        Returns:
+            Classified and validated field data
+        """
+        try:
+            # Define valid field types
+            valid_types = {
+                'text_input', 'password', 'email', 'number', 'textarea', 
+                'select', 'checkbox', 'radio', 'button', 'submit'
+            }
+            
+            # Ensure field has required properties
+            classified_field = {
+                'type': field_data.get('type', 'text_input'),
+                'label': field_data.get('label', ''),
+                'placeholder': field_data.get('placeholder', ''),
+                'current_value': field_data.get('current_value', ''),
+                'coordinates': field_data.get('coordinates', [0, 0, 0, 0]),
+                'required': field_data.get('required', False),
+                'validation_state': field_data.get('validation_state', 'neutral'),
+                'error_message': field_data.get('error_message', ''),
+                'options': field_data.get('options', [])
+            }
+            
+            # Validate field type
+            if classified_field['type'] not in valid_types:
+                logger.warning(f"Unknown field type: {classified_field['type']}, defaulting to text_input")
+                classified_field['type'] = 'text_input'
+            
+            # Validate coordinates
+            coords = classified_field['coordinates']
+            if not isinstance(coords, list) or len(coords) != 4:
+                logger.warning(f"Invalid coordinates for field {classified_field['label']}")
+                classified_field['coordinates'] = [0, 0, 0, 0]
+            
+            # Validate validation state
+            valid_states = {'error', 'success', 'neutral'}
+            if classified_field['validation_state'] not in valid_states:
+                classified_field['validation_state'] = 'neutral'
+            
+            return classified_field
+            
+        except Exception as e:
+            logger.error(f"Field classification failed: {e}")
+            # Return a safe default field
+            return {
+                'type': 'text_input',
+                'label': field_data.get('label', 'Unknown Field'),
+                'placeholder': '',
+                'current_value': '',
+                'coordinates': [0, 0, 0, 0],
+                'required': False,
+                'validation_state': 'neutral',
+                'error_message': '',
+                'options': []
+            }
+    
+    def detect_form_errors(self, form_analysis: Dict) -> List[Dict]:
+        """
+        Detect and extract form validation errors from analysis.
+        
+        Args:
+            form_analysis: Form analysis data from vision model
+            
+        Returns:
+            List of detected form errors
+        """
+        try:
+            errors = []
+            
+            # Extract explicit form errors
+            form_errors = form_analysis.get('form_errors', [])
+            for error in form_errors:
+                errors.append({
+                    'type': 'validation_error',
+                    'message': error.get('message', ''),
+                    'coordinates': error.get('coordinates', [0, 0, 0, 0]),
+                    'associated_field': error.get('associated_field', '')
+                })
+            
+            # Check for field-level errors
+            forms = form_analysis.get('forms', [])
+            for form in forms:
+                fields = form.get('fields', [])
+                for field in fields:
+                    if field.get('validation_state') == 'error':
+                        errors.append({
+                            'type': 'field_error',
+                            'message': field.get('error_message', 'Field validation error'),
+                            'coordinates': field.get('coordinates', [0, 0, 0, 0]),
+                            'associated_field': field.get('label', 'Unknown Field')
+                        })
+            
+            logger.info(f"Detected {len(errors)} form errors")
+            return errors
+            
+        except Exception as e:
+            logger.error(f"Error detection failed: {e}")
+            return []
+    
+    def validate_form_structure(self, form_analysis: Dict) -> Dict:
+        """
+        Validate and normalize form structure data.
+        
+        Args:
+            form_analysis: Raw form analysis from vision model
+            
+        Returns:
+            Validated and normalized form structure
+        """
+        try:
+            validated_analysis = {
+                'forms': [],
+                'form_errors': [],
+                'submit_buttons': [],
+                'metadata': form_analysis.get('metadata', {})
+            }
+            
+            # Validate forms
+            forms = form_analysis.get('forms', [])
+            for i, form in enumerate(forms):
+                validated_form = {
+                    'form_id': form.get('form_id', f'form_{i}'),
+                    'form_title': form.get('form_title', f'Form {i+1}'),
+                    'coordinates': form.get('coordinates', [0, 0, 0, 0]),
+                    'fields': []
+                }
+                
+                # Validate and classify fields
+                fields = form.get('fields', [])
+                for field in fields:
+                    validated_field = self.classify_form_field(field)
+                    validated_form['fields'].append(validated_field)
+                
+                validated_analysis['forms'].append(validated_form)
+            
+            # Validate form errors
+            form_errors = form_analysis.get('form_errors', [])
+            for error in form_errors:
+                validated_error = {
+                    'message': error.get('message', ''),
+                    'coordinates': error.get('coordinates', [0, 0, 0, 0]),
+                    'associated_field': error.get('associated_field', '')
+                }
+                validated_analysis['form_errors'].append(validated_error)
+            
+            # Validate submit buttons
+            submit_buttons = form_analysis.get('submit_buttons', [])
+            for button in submit_buttons:
+                validated_button = {
+                    'text': button.get('text', 'Submit'),
+                    'coordinates': button.get('coordinates', [0, 0, 0, 0]),
+                    'type': button.get('type', 'submit')
+                }
+                validated_analysis['submit_buttons'].append(validated_button)
+            
+            # Update metadata
+            validated_analysis['metadata'].update({
+                'has_forms': len(validated_analysis['forms']) > 0,
+                'form_count': len(validated_analysis['forms']),
+                'total_fields': sum(len(form['fields']) for form in validated_analysis['forms']),
+                'validation_timestamp': time.time()
+            })
+            
+            logger.info(f"Form structure validated: {validated_analysis['metadata']['form_count']} forms, "
+                       f"{validated_analysis['metadata']['total_fields']} fields")
+            
+            return validated_analysis
+            
+        except Exception as e:
+            logger.error(f"Form structure validation failed: {e}")
+            # Return safe default structure
+            return {
+                'forms': [],
+                'form_errors': [],
+                'submit_buttons': [],
+                'metadata': {
+                    'has_forms': False,
+                    'form_count': 0,
+                    'total_fields': 0,
+                    'validation_timestamp': time.time(),
+                    'validation_error': str(e)
+                }
+            }
     
     def __del__(self):
         """Cleanup resources."""
