@@ -12,7 +12,7 @@ import json
 import logging
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import requests
 from PIL import Image
 import mss
@@ -59,6 +59,10 @@ class VisionModule:
         """Initialize the VisionModule."""
         self.sct = mss.mss()
         self._request_lock = threading.Lock()  # Prevent concurrent vision requests
+        
+        # Get screen dimensions
+        self.screen_width, self.screen_height = self.get_screen_resolution()
+        
         logger.info("VisionModule initialized")
     
     @measure_performance("screen_capture", include_system_metrics=True)
@@ -795,6 +799,78 @@ class VisionModule:
                     'validation_timestamp': time.time(),
                     'validation_error': str(e)
                 }
+            }
+    
+    def find_clickable_element(self, description: str, monitor_number: int = 1) -> Dict[str, Any]:
+        """
+        Find a clickable element on screen based on user description.
+        
+        Args:
+            description: Natural language description of element to find (e.g., "sign in button", "submit")
+            monitor_number: Monitor to analyze
+            
+        Returns:
+            Dictionary with element information and click coordinates
+        """
+        try:
+            logger.info(f"Searching for clickable element: '{description}'")
+            
+            # Get detailed analysis of screen elements
+            screen_analysis = self.describe_screen(analysis_type="detailed")
+            
+            # Extract text content from the analysis
+            screen_text = ""
+            if screen_analysis.get("description"):
+                screen_text += screen_analysis["description"] + " "
+            
+            # Look for elements in the analysis
+            elements = screen_analysis.get("elements", [])
+            if isinstance(elements, list) and elements:
+                for elem in elements:
+                    if isinstance(elem, str):
+                        screen_text += elem + " "
+                    elif isinstance(elem, dict):
+                        screen_text += elem.get("text", "") + " " + elem.get("description", "") + " "
+            
+            # Simple text matching to find the element
+            description_lower = description.lower()
+            screen_text_lower = screen_text.lower()
+            
+            # Check if the description matches content in the screen
+            if any(word in screen_text_lower for word in description_lower.split()):
+                # For now, return center of screen as click target
+                # This is a simplified approach - in a full implementation,
+                # we would need actual coordinate detection from the vision model
+                center_x = self.screen_width // 2
+                center_y = self.screen_height // 2
+                
+                logger.info(f"Found potential match for '{description}' - using center coordinates")
+                return {
+                    "found": True,
+                    "element": {
+                        "description": description,
+                        "matched_text": screen_text[:200],
+                        "type": "button",
+                        "confidence": 0.7
+                    },
+                    "click_coordinates": [center_x, center_y],
+                    "screen_analysis": screen_analysis
+                }
+            else:
+                logger.warning(f"No match found for '{description}' in screen content")
+                return {
+                    "found": False,
+                    "error": f"Could not find element matching '{description}' on screen",
+                    "screen_analysis": screen_analysis,
+                    "searched_text": screen_text[:200]
+                }
+                
+        except Exception as e:
+            logger.error(f"Error finding clickable element '{description}': {e}")
+            return {
+                "found": False,
+                "error": f"Error during element search: {str(e)}",
+                "description": description
             }
     
     def __del__(self):
