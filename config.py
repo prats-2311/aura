@@ -33,7 +33,8 @@ REASONING_API_KEY = os.getenv("REASONING_API_KEY", "4a1181add3774859831c5d5bde61
 # REASONING_API_KEY = os.getenv("OPENAI_API_KEY", "your_openai_api_key_here")
 
 # -- Model Names --
-VISION_MODEL = "google/gemma-3-4b"  # The model name in LM Studio
+# Vision model will be auto-detected from LM Studio
+VISION_MODEL = None  # Will be dynamically set by get_active_vision_model()
 REASONING_MODEL = "gpt-oss:latest"  # The model name in your Ollama cloud service
 
 # Alternative OpenAI model (uncomment to use)
@@ -52,10 +53,24 @@ BACKEND_URL = f"http://localhost:{BACKEND_PORT}"
 
 # -- Prompt Engineering --
 # The generic prompt to get a description of the screen from the vision model
-VISION_PROMPT = """
+# Simple prompt for basic screen description (faster processing)
+VISION_PROMPT_SIMPLE = """
+Describe what you see on this screen in a few sentences. Focus on the main content, any visible text, buttons, and interactive elements. Keep it concise and natural.
+
+IMPORTANT: You MUST respond with ONLY valid JSON in this exact format:
+{
+    "description": "Brief description of what's on the screen",
+    "main_elements": ["list", "of", "key", "elements", "visible"]
+}
+
+Do not include any text before or after the JSON. Only return the JSON object.
+"""
+
+# Detailed prompt for comprehensive analysis (when user specifically asks for details)
+VISION_PROMPT_DETAILED = """
 Analyze the provided screenshot and describe it in structured JSON format. Identify all interactive elements including buttons, links, and input fields. For each element, provide a description, its text content if any, and its bounding box coordinates [x1, y1, x2, y2]. Also, transcribe any significant text blocks.
 
-Return the response in this JSON structure:
+IMPORTANT: You MUST respond with ONLY valid JSON in this exact format:
 {
     "elements": [
         {
@@ -76,7 +91,12 @@ Return the response in this JSON structure:
         "screen_resolution": [width, height]
     }
 }
+
+Do not include any text before or after the JSON. Only return the JSON object.
 """
+
+# Default to simple prompt for better performance
+VISION_PROMPT = VISION_PROMPT_SIMPLE
 
 # Enhanced prompt specifically for form detection and analysis
 FORM_VISION_PROMPT = """
@@ -238,6 +258,73 @@ def print_setup_instructions():
     print("   python main.py")
     print("\n" + "="*60)
 
+# -- Dynamic Model Detection --
+def get_active_vision_model():
+    """
+    Get the currently active model from LM Studio.
+    
+    This function queries LM Studio to find whatever model is currently loaded
+    and returns its name for use in API requests. It doesn't filter for specific
+    model types since the user wants to use whatever model is running.
+    
+    Returns:
+        str: The name of the active model, or None if detection fails
+    """
+    import requests
+    import json
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Query LM Studio for available models
+        response = requests.get(f"{VISION_API_BASE}/models", timeout=5)
+        
+        if response.status_code == 200:
+            models_data = response.json()
+            
+            # LM Studio typically returns models in this format
+            if "data" in models_data and models_data["data"]:
+                # Get the first available model (usually the loaded one)
+                active_model = models_data["data"][0]["id"]
+                logger.info(f"Detected active model in LM Studio: {active_model}")
+                return active_model
+            else:
+                logger.warning("No models found in LM Studio response")
+                return None
+                
+    except requests.exceptions.ConnectionError:
+        logger.warning("Cannot connect to LM Studio. Make sure it's running on http://localhost:1234")
+    except requests.exceptions.Timeout:
+        logger.warning("LM Studio connection timeout")
+    except Exception as e:
+        logger.warning(f"Error detecting model: {e}")
+    
+    return None
+
+def get_current_model_name():
+    """
+    Get the current model name for API requests.
+    Always queries LM Studio fresh to get the currently loaded model.
+    
+    Returns:
+        str: Current model name or a generic fallback that works with most setups
+    """
+    current_model = get_active_vision_model()
+    if current_model:
+        return current_model
+    else:
+        # Return a generic model identifier that LM Studio will accept
+        # Most LM Studio setups will route requests to the loaded model regardless of name
+        return "loaded-model"
+
+def update_vision_model():
+    """Update the VISION_MODEL global variable with the active model."""
+    global VISION_MODEL
+    if VISION_MODEL is None:
+        VISION_MODEL = get_active_vision_model()
+    return VISION_MODEL
+
 # -- Configuration Validation --
 def validate_config():
     """Validate configuration settings and provide helpful error messages."""
@@ -274,7 +361,15 @@ def validate_config():
     
     # Check model names
     if not VISION_MODEL:
-        warnings.append("VISION_MODEL not specified")
+        # Try to auto-detect the vision model
+        try:
+            update_vision_model()
+            if VISION_MODEL:
+                print(f"✅ Auto-detected vision model: {VISION_MODEL}")
+            else:
+                warnings.append("VISION_MODEL could not be auto-detected")
+        except Exception as e:
+            warnings.append(f"VISION_MODEL auto-detection failed: {e}")
     
     if not REASONING_MODEL:
         warnings.append("REASONING_MODEL not specified")

@@ -73,6 +73,44 @@ def check_api_keys():
     
     return all_set
 
+def check_lm_studio():
+    """Check if LM Studio is running and has a model loaded."""
+    try:
+        import requests
+        from config import VISION_API_BASE, get_current_model_name
+        
+        # Check if LM Studio is running
+        response = requests.get(f"{VISION_API_BASE}/models", timeout=5)
+        
+        if response.status_code == 200:
+            models_data = response.json()
+            
+            if "data" in models_data and models_data["data"]:
+                current_model = get_current_model_name()
+                print(f"✅ LM Studio is running with model: {current_model}")
+                return True
+            else:
+                print("❌ LM Studio is running but no model is loaded")
+                print("   Please load a model in LM Studio")
+                return False
+        else:
+            print(f"❌ LM Studio API returned status {response.status_code}")
+            return False
+            
+    except ImportError:
+        print("❌ Cannot import required modules (requests, config)")
+        return False
+    except requests.exceptions.ConnectionError:
+        print("❌ Cannot connect to LM Studio")
+        print("   Please ensure LM Studio is running on http://localhost:1234")
+        return False
+    except requests.exceptions.Timeout:
+        print("❌ LM Studio connection timeout")
+        return False
+    except Exception as e:
+        print(f"❌ Error checking LM Studio: {e}")
+        return False
+
 def check_project_structure():
     """Check if project structure matches plan.md."""
     required_files = [
@@ -132,7 +170,8 @@ def main():
         ("Conda Environment", check_conda_environment),
         ("Project Structure", check_project_structure),
         ("Dependencies", check_dependencies),
-        ("API Keys", check_api_keys)
+        ("API Keys", check_api_keys),
+        ("LM Studio", check_lm_studio)
     ]
     
     results = []

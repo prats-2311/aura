@@ -21,10 +21,13 @@ from config import (
     VISION_API_BASE,
     VISION_MODEL,
     VISION_PROMPT,
+    VISION_PROMPT_SIMPLE,
+    VISION_PROMPT_DETAILED,
     FORM_VISION_PROMPT,
     VISION_API_TIMEOUT,
     SCREENSHOT_QUALITY,
-    MAX_SCREENSHOT_SIZE
+    MAX_SCREENSHOT_SIZE,
+    get_current_model_name
 )
 from .error_handler import (
     global_error_handler,
@@ -214,12 +217,15 @@ class VisionModule:
         retry_delay=10.0,
         user_message="I'm having trouble analyzing your screen. Please try again."
     )
-    def describe_screen(self, analysis_type: str = "general") -> Dict:
+    def describe_screen(self, analysis_type: str = "simple") -> Dict:
         """
         Capture screen and get structured description from vision model.
         
         Args:
-            analysis_type: Type of analysis to perform ("general" or "form")
+            analysis_type: Type of analysis to perform:
+                - "simple": Fast, basic description (default)
+                - "detailed": Comprehensive analysis with coordinates
+                - "form": Form-specific analysis
         
         Returns:
             Dictionary containing structured screen analysis
@@ -231,235 +237,235 @@ class VisionModule:
         with self._request_lock:
             try:
                 # Validate analysis type
-                valid_types = ["general", "form"]
+                valid_types = ["simple", "detailed", "form"]
                 if analysis_type not in valid_types:
                     raise ValueError(f"Invalid analysis type: {analysis_type}. Must be one of {valid_types}")
+                
+                logger.info(f"Starting screen analysis (type: {analysis_type})")
             
-            logger.info(f"Starting screen analysis (type: {analysis_type})")
-            
-            # Capture screenshot with error handling
-            try:
-                screenshot_b64 = self.capture_screen_as_base64()
-            except Exception as e:
-                error_info = global_error_handler.handle_error(
-                    error=e,
-                    module="vision",
-                    function="describe_screen",
-                    category=ErrorCategory.HARDWARE_ERROR,
-                    context={"analysis_type": analysis_type}
-                )
-                raise Exception(f"Screenshot capture failed: {error_info.user_message}")
-            
-            # Get screen resolution for metadata
-            width, height = self.get_screen_resolution()
-            
-            # Select appropriate prompt based on analysis type
-            prompt = FORM_VISION_PROMPT if analysis_type == "form" else VISION_PROMPT
-            
-            # Validate configuration
-            if not VISION_API_BASE:
-                raise ValueError("Vision API base URL not configured")
-            if not VISION_MODEL:
-                raise ValueError("Vision model not configured")
-            if not prompt:
-                raise ValueError(f"Prompt not configured for analysis type: {analysis_type}")
-            
-            # Prepare API request
-            headers = {
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": VISION_MODEL,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": prompt
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{screenshot_b64}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                "max_tokens": 3000,  # Increased for form analysis
-                "temperature": 0.1
-            }
-            
-            # Make API request with connection pooling and comprehensive error handling
-            response = None
-            last_error = None
-            
-            # Use connection pool for better performance
-            session = connection_pool.get_session(VISION_API_BASE)
-            
-            max_retries = 3
-            for attempt in range(max_retries):
+                # Capture screenshot with error handling
                 try:
-                    logger.info(f"Sending vision request to LM Studio (attempt {attempt + 1}, timeout: {VISION_API_TIMEOUT}s)")
-                    request_start_time = time.time()
-                    
-                    response = session.post(
-                        f"{VISION_API_BASE}/chat/completions",
-                        headers=headers,
-                        json=payload,
-                        timeout=VISION_API_TIMEOUT
-                    )
-                    
-                    request_duration = time.time() - request_start_time
-                    logger.info(f"Vision API response received in {request_duration:.2f}s (status: {response.status_code})")
-                    
-                    # Check response status
-                    if response.status_code == 200:
-                        break
-                    elif response.status_code == 429:
-                        # Rate limited
-                        wait_time = min(5 * (attempt + 1), 30)
-                        logger.warning(f"Rate limited, waiting {wait_time}s before retry")
-                        time.sleep(wait_time)
-                        continue
-                    elif response.status_code >= 500:
-                        # Server error, retry
-                        logger.warning(f"Server error {response.status_code}, retrying...")
-                        time.sleep(2 ** attempt)
-                        continue
-                    else:
-                        # Client error, don't retry
-                        error_info = global_error_handler.handle_error(
-                            error=Exception(f"API error: {response.status_code} - {response.text}"),
-                            module="vision",
-                            function="describe_screen",
-                            category=ErrorCategory.API_ERROR,
-                            context={"status_code": response.status_code, "response": response.text[:500]}
-                        )
-                        raise Exception(f"Vision API error: {error_info.user_message}")
-                        
-                except requests.exceptions.Timeout as e:
-                    last_error = e
-                    logger.warning(f"API request timed out (attempt {attempt + 1})")
-                    if attempt < max_retries - 1:
-                        time.sleep(2 ** attempt)
-                        continue
-                        
-                except requests.exceptions.ConnectionError as e:
-                    last_error = e
-                    logger.warning(f"Connection error to vision API (attempt {attempt + 1})")
-                    if attempt < max_retries - 1:
-                        time.sleep(2 ** attempt)
-                        continue
-                        
-                except requests.exceptions.RequestException as e:
-                    last_error = e
-                    logger.warning(f"Request error (attempt {attempt + 1}): {e}")
-                    if attempt < max_retries - 1:
-                        time.sleep(2 ** attempt)
-                        continue
-            
-            # Check if we got a successful response
-            if not response or response.status_code != 200:
-                error_info = global_error_handler.handle_error(
-                    error=last_error or Exception("Vision API request failed"),
-                    module="vision",
-                    function="describe_screen",
-                    category=ErrorCategory.API_ERROR,
-                    context={"max_retries": max_retries, "analysis_type": analysis_type}
-                )
-                raise Exception(f"Vision API unavailable: {error_info.user_message}")
-            
-            # Parse response with error handling
-            try:
-                response_data = response.json()
-            except json.JSONDecodeError as e:
-                error_info = global_error_handler.handle_error(
-                    error=e,
-                    module="vision",
-                    function="describe_screen",
-                    category=ErrorCategory.PROCESSING_ERROR,
-                    context={"response_text": response.text[:500]}
-                )
-                raise Exception(f"Invalid JSON response: {error_info.user_message}")
-            
-            # Validate response structure
-            if "choices" not in response_data or not response_data["choices"]:
-                error_info = global_error_handler.handle_error(
-                    error=Exception("Invalid API response format"),
-                    module="vision",
-                    function="describe_screen",
-                    category=ErrorCategory.VALIDATION_ERROR,
-                    context={"response_data": str(response_data)[:500]}
-                )
-                raise Exception(f"Invalid response format: {error_info.user_message}")
-            
-            content = response_data["choices"][0]["message"]["content"]
-            
-            # Parse JSON response from model with error handling
-            screen_analysis = None
-            try:
-                screen_analysis = json.loads(content)
-            except json.JSONDecodeError:
-                # Try to extract JSON from response if it's wrapped in text
-                import re
-                json_match = re.search(r'\{.*\}', content, re.DOTALL)
-                if json_match:
-                    try:
-                        screen_analysis = json.loads(json_match.group())
-                    except json.JSONDecodeError as e:
-                        error_info = global_error_handler.handle_error(
-                            error=e,
-                            module="vision",
-                            function="describe_screen",
-                            category=ErrorCategory.PROCESSING_ERROR,
-                            context={"content": content[:500]}
-                        )
-                        raise Exception(f"Could not parse vision model response: {error_info.user_message}")
-                else:
+                    screenshot_b64 = self.capture_screen_as_base64()
+                except Exception as e:
                     error_info = global_error_handler.handle_error(
-                        error=Exception("No JSON found in response"),
+                        error=e,
+                        module="vision",
+                        function="describe_screen",
+                        category=ErrorCategory.HARDWARE_ERROR,
+                        context={"analysis_type": analysis_type}
+                    )
+                    raise Exception(f"Screenshot capture failed: {error_info.user_message}")
+                
+                # Get screen resolution for metadata
+                width, height = self.get_screen_resolution()
+                
+                # Select appropriate prompt based on analysis type
+                if analysis_type == "form":
+                    prompt = FORM_VISION_PROMPT
+                elif analysis_type == "detailed":
+                    prompt = VISION_PROMPT_DETAILED
+                else:  # simple (default)
+                    prompt = VISION_PROMPT_SIMPLE
+                
+                # Validate configuration
+                if not VISION_API_BASE:
+                    raise ValueError("Vision API base URL not configured")
+                if not prompt:
+                    raise ValueError(f"Prompt not configured for analysis type: {analysis_type}")
+                
+                # Get the current model dynamically from LM Studio
+                current_model = get_current_model_name()
+                if not current_model:
+                    raise ValueError("No model detected in LM Studio. Please ensure LM Studio is running with a model loaded.")
+            
+                # Prepare API request
+                headers = {
+                    "Content-Type": "application/json"
+                }
+                
+                payload = {
+                    "model": current_model,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": prompt
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{screenshot_b64}"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "max_tokens": 3000,  # Increased for form analysis
+                    "temperature": 0.1
+                }
+                
+                # Make API request with connection pooling and comprehensive error handling
+                response = None
+                last_error = None
+                
+                # Use connection pool for better performance
+                session = connection_pool.get_session(VISION_API_BASE)
+            
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        logger.info(f"Sending vision request to LM Studio (attempt {attempt + 1}, timeout: {VISION_API_TIMEOUT}s)")
+                        request_start_time = time.time()
+                        
+                        response = session.post(
+                            f"{VISION_API_BASE}/chat/completions",
+                            headers=headers,
+                            json=payload,
+                            timeout=VISION_API_TIMEOUT
+                        )
+                        
+                        request_duration = time.time() - request_start_time
+                        logger.info(f"Vision API response received in {request_duration:.2f}s (status: {response.status_code})")
+                        
+                        # Check response status
+                        if response.status_code == 200:
+                            break
+                        elif response.status_code == 429:
+                            # Rate limited
+                            wait_time = min(5 * (attempt + 1), 30)
+                            logger.warning(f"Rate limited, waiting {wait_time}s before retry")
+                            time.sleep(wait_time)
+                            continue
+                        elif response.status_code >= 500:
+                            # Server error, retry
+                            logger.warning(f"Server error {response.status_code}, retrying...")
+                            time.sleep(2 ** attempt)
+                            continue
+                        else:
+                            # Client error, don't retry
+                            error_info = global_error_handler.handle_error(
+                                error=Exception(f"API error: {response.status_code} - {response.text}"),
+                                module="vision",
+                                function="describe_screen",
+                                category=ErrorCategory.API_ERROR,
+                                context={"status_code": response.status_code, "response": response.text[:500]}
+                            )
+                            raise Exception(f"Vision API error: {error_info.user_message}")
+                            
+                    except requests.exceptions.Timeout as e:
+                        last_error = e
+                        logger.warning(f"API request timed out (attempt {attempt + 1})")
+                        if attempt < max_retries - 1:
+                            time.sleep(2 ** attempt)
+                            continue
+                            
+                    except requests.exceptions.ConnectionError as e:
+                        last_error = e
+                        logger.warning(f"Connection error to vision API (attempt {attempt + 1})")
+                        if attempt < max_retries - 1:
+                            time.sleep(2 ** attempt)
+                            continue
+                            
+                    except requests.exceptions.RequestException as e:
+                        last_error = e
+                        logger.warning(f"Request error (attempt {attempt + 1}): {e}")
+                        if attempt < max_retries - 1:
+                            time.sleep(2 ** attempt)
+                            continue
+            
+                # Check if we got a successful response
+                if not response or response.status_code != 200:
+                    error_info = global_error_handler.handle_error(
+                        error=last_error or Exception("Vision API request failed"),
+                        module="vision",
+                        function="describe_screen",
+                        category=ErrorCategory.API_ERROR,
+                        context={"max_retries": max_retries, "analysis_type": analysis_type}
+                    )
+                    raise Exception(f"Vision API unavailable: {error_info.user_message}")
+                
+                # Parse response with error handling
+                try:
+                    response_data = response.json()
+                except json.JSONDecodeError as e:
+                    error_info = global_error_handler.handle_error(
+                        error=e,
                         module="vision",
                         function="describe_screen",
                         category=ErrorCategory.PROCESSING_ERROR,
-                        context={"content": content[:500]}
+                        context={"response_text": response.text[:500]}
                     )
-                    raise Exception(f"Invalid vision model response format: {error_info.user_message}")
+                    raise Exception(f"Invalid JSON response: {error_info.user_message}")
+                
+                # Validate response structure
+                if "choices" not in response_data or not response_data["choices"]:
+                    error_info = global_error_handler.handle_error(
+                        error=Exception("Invalid API response format"),
+                        module="vision",
+                        function="describe_screen",
+                        category=ErrorCategory.VALIDATION_ERROR,
+                        context={"response_data": str(response_data)[:500]}
+                    )
+                    raise Exception(f"Invalid response format: {error_info.user_message}")
+                
+                content = response_data["choices"][0]["message"]["content"]
             
-            # Validate screen analysis structure
-            if not isinstance(screen_analysis, dict):
-                error_info = global_error_handler.handle_error(
-                    error=Exception("Screen analysis is not a dictionary"),
-                    module="vision",
-                    function="describe_screen",
-                    category=ErrorCategory.VALIDATION_ERROR,
-                    context={"analysis_type": type(screen_analysis).__name__}
-                )
-                raise Exception(f"Invalid analysis format: {error_info.user_message}")
-            
-            # Add metadata if not present
-            if "metadata" not in screen_analysis:
-                screen_analysis["metadata"] = {}
-            
-            screen_analysis["metadata"].update({
-                "timestamp": time.time(),
-                "screen_resolution": [width, height],
-                "analysis_type": analysis_type,
-                "api_response_time": response.elapsed.total_seconds() if response else 0
-            })
-            
-            # Log results
-            if analysis_type == "form":
-                form_count = len(screen_analysis.get('forms', []))
-                total_fields = sum(len(form.get('fields', [])) for form in screen_analysis.get('forms', []))
-                logger.info(f"Form analysis completed: {form_count} forms, {total_fields} fields found")
-            else:
-                element_count = len(screen_analysis.get('elements', []))
-                logger.info(f"Screen analysis completed: {element_count} elements found")
-            
-            return screen_analysis
+                # Parse JSON response from model with error handling and fallback
+                screen_analysis = None
+                try:
+                    screen_analysis = json.loads(content)
+                    logger.info("Successfully parsed JSON response from vision model")
+                except json.JSONDecodeError:
+                    # Try to extract JSON from response if it's wrapped in text
+                    import re
+                    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                    if json_match:
+                        try:
+                            screen_analysis = json.loads(json_match.group())
+                            logger.info("Successfully extracted JSON from wrapped response")
+                        except json.JSONDecodeError:
+                            # JSON extraction failed, create fallback structure
+                            screen_analysis = self._create_fallback_response(content, analysis_type)
+                            logger.warning("JSON parsing failed, created fallback response from plain text")
+                    else:
+                        # No JSON found, create fallback structure from plain text
+                        screen_analysis = self._create_fallback_response(content, analysis_type)
+                        logger.warning("No JSON found in response, created fallback response from plain text")
+                
+                # Validate screen analysis structure
+                if not isinstance(screen_analysis, dict):
+                    error_info = global_error_handler.handle_error(
+                        error=Exception("Screen analysis is not a dictionary"),
+                        module="vision",
+                        function="describe_screen",
+                        category=ErrorCategory.VALIDATION_ERROR,
+                        context={"analysis_type": type(screen_analysis).__name__}
+                    )
+                    raise Exception(f"Invalid analysis format: {error_info.user_message}")
+                
+                # Add metadata if not present
+                if "metadata" not in screen_analysis:
+                    screen_analysis["metadata"] = {}
+                
+                screen_analysis["metadata"].update({
+                    "timestamp": time.time(),
+                    "screen_resolution": [width, height],
+                    "analysis_type": analysis_type,
+                    "api_response_time": response.elapsed.total_seconds() if response else 0
+                })
+                
+                # Log results
+                if analysis_type == "form":
+                    form_count = len(screen_analysis.get('forms', []))
+                    total_fields = sum(len(form.get('fields', [])) for form in screen_analysis.get('forms', []))
+                    logger.info(f"Form analysis completed: {form_count} forms, {total_fields} fields found")
+                else:
+                    element_count = len(screen_analysis.get('elements', []))
+                    logger.info(f"Screen analysis completed: {element_count} elements found")
+                
+                return screen_analysis
             
             except Exception as e:
                 # Re-raise with additional context if not already handled
@@ -493,6 +499,109 @@ class VisionModule:
         except Exception as e:
             logger.error(f"Form analysis failed: {e}")
             raise Exception(f"Form analysis failed: {e}")
+    
+    def _create_fallback_response(self, content: str, analysis_type: str) -> Dict:
+        """
+        Create a fallback structured response when the model returns plain text instead of JSON.
+        
+        Args:
+            content: Plain text response from the vision model
+            analysis_type: Type of analysis requested
+            
+        Returns:
+            Dictionary with structured response format
+        """
+        try:
+            # Clean up the content
+            cleaned_content = content.strip()
+            
+            # Create appropriate fallback structure based on analysis type
+            if analysis_type == "form":
+                return {
+                    "forms": [],
+                    "form_errors": [],
+                    "submit_buttons": [],
+                    "metadata": {
+                        "has_forms": False,
+                        "form_count": 0,
+                        "total_fields": 0,
+                        "timestamp": time.time(),
+                        "screen_resolution": self.get_screen_resolution(),
+                        "fallback_response": True,
+                        "original_content": cleaned_content[:500]
+                    }
+                }
+            elif analysis_type == "detailed":
+                return {
+                    "elements": [],
+                    "text_blocks": [
+                        {
+                            "content": cleaned_content,
+                            "coordinates": [0, 0, 0, 0]
+                        }
+                    ],
+                    "metadata": {
+                        "timestamp": time.time(),
+                        "screen_resolution": self.get_screen_resolution(),
+                        "fallback_response": True,
+                        "original_content": cleaned_content[:500]
+                    }
+                }
+            else:  # simple (default)
+                # Try to extract key information from the plain text
+                description = cleaned_content
+                
+                # Simple keyword extraction for main elements
+                main_elements = []
+                keywords = ["button", "menu", "text", "image", "link", "window", "dialog", "field", "form"]
+                for keyword in keywords:
+                    if keyword.lower() in cleaned_content.lower():
+                        main_elements.append(keyword)
+                
+                return {
+                    "description": description,
+                    "main_elements": main_elements if main_elements else ["screen content"],
+                    "metadata": {
+                        "timestamp": time.time(),
+                        "screen_resolution": self.get_screen_resolution(),
+                        "fallback_response": True,
+                        "original_content": cleaned_content[:500]
+                    }
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to create fallback response: {e}")
+            # Return minimal safe response
+            return {
+                "description": "Screen analysis completed",
+                "main_elements": ["screen content"],
+                "metadata": {
+                    "timestamp": time.time(),
+                    "screen_resolution": [1920, 1080],
+                    "fallback_response": True,
+                    "error": str(e)
+                }
+            }
+    
+    def get_screen_resolution(self, monitor_number: int = 1) -> List[int]:
+        """
+        Get the resolution of the specified monitor.
+        
+        Args:
+            monitor_number: Monitor to get resolution for (1 for primary)
+            
+        Returns:
+            List of [width, height]
+        """
+        try:
+            monitor = self.sct.monitors[monitor_number]
+            width = monitor["width"]
+            height = monitor["height"]
+            logger.debug(f"Monitor {monitor_number} resolution: {width}x{height}")
+            return [width, height]
+        except Exception as e:
+            logger.error(f"Failed to get screen resolution: {e}")
+            return [1920, 1080]  # Default fallback
     
     def classify_form_field(self, field_data: Dict) -> Dict:
         """

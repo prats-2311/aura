@@ -165,7 +165,7 @@ class Orchestrator:
                 try:
                     if not self.module_availability.get('vision', False):
                         return None
-                    return self.vision_module.describe_screen()
+                    return self.vision_module.describe_screen(analysis_type="simple")
                 except Exception as e:
                     logger.error(f"Parallel screen analysis failed: {e}")
                     return None
@@ -623,7 +623,14 @@ class Orchestrator:
                 r'where\s+(?:is|are)\s+(.+)\?',
                 r'how\s+(?:do|can)\s+(?:i|you)\s+(.+)\?',
                 r'tell\s+me\s+about\s+(.+)',
-                r'explain\s+(.+)'
+                r'explain\s+(.+)',
+                r'what\'?s\s+on\s+(?:my\s+)?screen\??'
+            ],
+            'detailed_question': [
+                r'tell\s+me\s+what\'?s\s+on\s+(?:my\s+)?screen\s+in\s+detail',
+                r'describe\s+(?:my\s+)?screen\s+in\s+detail',
+                r'give\s+me\s+a\s+detailed\s+(?:description|analysis)\s+of\s+(?:my\s+)?screen',
+                r'analyze\s+(?:my\s+)?screen\s+(?:in\s+)?detail'
             ],
             'form_fill': [
                 r'fill\s+(?:out\s+)?(?:the\s+)?form',
@@ -1108,8 +1115,8 @@ class Orchestrator:
             logger.info(f"[{execution_id}] Command validated and normalized: '{normalized_command}'")
             
             # Check if this is a question and route to answer_question method
-            if validation_result.command_type == "question":
-                logger.info(f"[{execution_id}] Detected question, routing to information extraction mode")
+            if validation_result.command_type in ["question", "detailed_question"]:
+                logger.info(f"[{execution_id}] Detected {validation_result.command_type}, routing to information extraction mode")
                 return self._route_to_question_answering(command, execution_context)
             
             # Provide initial feedback
@@ -1211,8 +1218,8 @@ class Orchestrator:
             try:
                 logger.debug(f"[{execution_id}] Screen perception attempt {attempt + 1}")
                 
-                # Capture and analyze screen
-                screen_context = self.vision_module.describe_screen()
+                # Capture and analyze screen using simple analysis for GUI commands
+                screen_context = self.vision_module.describe_screen(analysis_type="simple")
                 
                 # Validate screen context
                 if not screen_context or "elements" not in screen_context:
@@ -1542,9 +1549,12 @@ class Orchestrator:
             # Provide thinking feedback
             self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
             
+            # Determine analysis type based on question
+            analysis_type = self._determine_analysis_type_for_question(question)
+            
             # Capture and analyze screen for information extraction
-            logger.info(f"[{execution_id}] Analyzing screen for information extraction")
-            screen_context = self._analyze_screen_for_information(execution_id)
+            logger.info(f"[{execution_id}] Analyzing screen for information extraction (type: {analysis_type})")
+            screen_context = self._analyze_screen_for_information(execution_id, analysis_type)
             
             # Create a specialized reasoning prompt for Q&A with enhanced context
             qa_command = self._create_qa_reasoning_prompt(question, screen_context)
@@ -1658,19 +1668,52 @@ class Orchestrator:
             
             return self._format_execution_result(execution_context)
 
-    def _analyze_screen_for_information(self, execution_id: str) -> Dict[str, Any]:
+    def _determine_analysis_type_for_question(self, question: str) -> str:
+        """
+        Determine the appropriate analysis type based on the question.
+        
+        Args:
+            question: User's question
+            
+        Returns:
+            Analysis type: "simple", "detailed", or "form"
+        """
+        question_lower = question.lower()
+        
+        # Check for detailed analysis keywords
+        detailed_keywords = [
+            "in detail", "detailed", "analyze", "comprehensive", "everything",
+            "all elements", "complete", "thorough", "full analysis"
+        ]
+        
+        # Check for form-related keywords
+        form_keywords = [
+            "form", "input", "field", "submit", "button", "checkbox", 
+            "dropdown", "select", "radio", "textarea"
+        ]
+        
+        if any(keyword in question_lower for keyword in detailed_keywords):
+            return "detailed"
+        elif any(keyword in question_lower for keyword in form_keywords):
+            return "form"
+        else:
+            return "simple"
+    
+    def _analyze_screen_for_information(self, execution_id: str, analysis_type: str = "simple") -> Dict[str, Any]:
         """
         Analyze screen content specifically for information extraction.
         
         Args:
             execution_id: Current execution ID for logging
+            analysis_type: Type of analysis ("simple", "detailed", or "form")
             
         Returns:
             Enhanced screen context with information extraction focus
         """
         try:
-            # Capture screen with standard vision module
-            screen_context = self.vision_module.describe_screen()
+            # Capture screen with appropriate analysis type
+            logger.info(f"[{execution_id}] Using {analysis_type} analysis for screen capture")
+            screen_context = self.vision_module.describe_screen(analysis_type=analysis_type)
             
             # Enhance context for information extraction
             if "elements" in screen_context:

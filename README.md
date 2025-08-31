@@ -52,7 +52,7 @@ AURA follows a modular architecture with clear separation of concerns:
 
 ## Technology Stack
 
-- **Local Vision**: LM Studio with multimodal models (Gemma-3-4b)
+- **Local Vision**: LM Studio with automatic model detection (works with any loaded model)
 - **Cloud Reasoning**: Ollama Cloud or OpenAI API
 - **Wake Word**: Picovoice Porcupine
 - **Speech Recognition**: OpenAI Whisper
@@ -74,8 +74,9 @@ AURA follows a modular architecture with clear separation of concerns:
 
 1. **LM Studio**: Download and install from [lmstudio.ai](https://lmstudio.ai)
 
-   - Load a multimodal model (e.g., google/gemma-3-4b)
+   - Load **any model** you prefer (multimodal models recommended for vision tasks)
    - Start the local server on port 1234
+   - AURA will automatically detect and use whatever model you have loaded
 
 2. **Cloud Reasoning Service**: Choose one:
 
@@ -153,18 +154,179 @@ python main.py --performance-dashboard
 
 # Start in debug mode
 python main.py --debug
-
-# Say the wake word: "Computer"
-# Then give a command: "Click on the search button"
 ```
 
-### Example Commands
+#### Voice Interaction Flow
 
-- **Navigation**: "Click on the File menu"
-- **Text Input**: "Type 'Hello World' in the text box"
-- **Form Filling**: "Fill out this contact form with my information"
-- **Information**: "What does this error message say?"
-- **Web Browsing**: "Search for Python tutorials"
+1. **Start AURA**: Run the application using one of the commands above
+2. **Wake Word Detection**: AURA continuously listens for the wake word **"Computer"**
+3. **Command Input**: After wake word detection, speak your command clearly
+4. **Processing**: AURA will:
+   - Capture and analyze your screen
+   - Process your voice command
+   - Plan the appropriate actions
+   - Execute the command
+   - Provide audio feedback
+5. **Ready for Next Command**: AURA returns to listening for the wake word
+
+#### Example Interaction
+
+```
+You: "Computer"
+AURA: [Confirmation sound - ready for command]
+
+You: "Click on the File menu"
+AURA: [Processing sound] "I'll click on the File menu for you"
+[Executes the click action]
+AURA: [Success sound] "Done!"
+
+[Returns to listening for wake word]
+```
+
+### Available Commands After Wake Word
+
+After saying the wake word **"Computer"**, you can use any of the following command types:
+
+#### 🖱️ **Click Commands**
+
+- **"Click on [element]"** - Click on buttons, links, menus, etc.
+  - Examples: "Click on the File menu", "Click the Submit button", "Press the OK button"
+- **"Press [element]"** - Alternative to click
+  - Examples: "Press the Enter key", "Press the Save button"
+- **"Tap [element]"** - Touch-style interaction
+  - Examples: "Tap on the search icon", "Tap the close button"
+
+#### ⌨️ **Text Input Commands**
+
+- **"Type '[text]'"** - Enter text into input fields
+  - Examples: "Type 'Hello World'", "Type 'john@example.com'"
+- **"Enter '[text]'"** - Alternative to type
+  - Examples: "Enter 'password123'", "Enter 'My Name'"
+- **"Input '[text]'"** - Another typing alternative
+  - Examples: "Input 'Search query'", "Input 'Username'"
+- **"Write '[text]'"** - Write text naturally
+  - Examples: "Write 'Dear Sir or Madam'", "Write 'Thank you'"
+
+#### 📜 **Scroll Commands**
+
+- **"Scroll [direction]"** - Navigate through content
+  - Examples: "Scroll down", "Scroll up", "Scroll left", "Scroll right"
+- **"Scroll [direction] [number]"** - Scroll specific amount
+  - Examples: "Scroll down 5", "Scroll up 3"
+- **"Page [direction]"** - Page-based navigation
+  - Examples: "Page down", "Page up"
+
+#### ❓ **Question Commands**
+
+**Simple Questions (Fast Response)**:
+
+- **"What's on my screen?"** - Quick overview of screen content
+- **"What is/are [subject]?"** - Get basic information about screen content
+  - Examples: "What is this error message?", "What are the menu options?"
+- **"Where is/are [element]?"** - Locate elements on screen
+  - Examples: "Where is the save button?", "Where are the settings?"
+- **"How do/can I [action]?"** - Get help with tasks
+  - Examples: "How do I save this file?", "How can I change the font?"
+
+**Detailed Questions (Comprehensive Analysis)**:
+
+- **"Tell me what's on my screen in detail"** - Comprehensive screen analysis with coordinates
+- **"Describe my screen in detail"** - Detailed element-by-element breakdown
+- **"Give me a detailed analysis of my screen"** - Full structural analysis
+- **"Analyze my screen in detail"** - Complete screen examination
+
+**General Information**:
+
+- **"Tell me about [subject]"** - Get information about specific elements
+  - Examples: "Tell me about this dialog box", "Tell me about the current page"
+- **"Explain [subject]"** - Get explanations
+  - Examples: "Explain this error", "Explain the menu options"
+
+#### 📝 **Form Filling Commands**
+
+- **"Fill out the form"** - Automatically complete forms with your information
+- **"Complete the form"** - Alternative form filling command
+- **"Submit the form"** - Fill and submit forms
+
+### Command Examples by Category
+
+#### **Navigation & Interaction**
+
+```
+"Computer, click on the File menu"
+"Computer, press the OK button"
+"Computer, tap on the search icon"
+"Computer, scroll down to see more options"
+"Computer, page down"
+```
+
+#### **Text Entry**
+
+```
+"Computer, type 'Hello World' in the text box"
+"Computer, enter 'john.doe@email.com' in the email field"
+"Computer, write 'Thank you for your time'"
+"Computer, input 'password123'"
+```
+
+#### **Information Gathering**
+
+**Quick Questions**:
+
+```
+"Computer, what's on my screen?"
+"Computer, what is this error message?"
+"Computer, where is the save button?"
+"Computer, how do I change the settings?"
+```
+
+**Detailed Analysis**:
+
+```
+"Computer, tell me what's on my screen in detail"
+"Computer, describe my screen in detail"
+"Computer, give me a detailed analysis of my screen"
+"Computer, analyze my screen in detail"
+```
+
+**Specific Information**:
+
+```
+"Computer, tell me about this dialog box"
+"Computer, explain what this button does"
+```
+
+#### **Form Automation**
+
+```
+"Computer, fill out this contact form"
+"Computer, complete the registration form"
+"Computer, submit the form with my information"
+```
+
+### Command Tips
+
+- **Be Specific**: Use clear, descriptive terms for elements you want to interact with
+- **Use Quotes**: Always put text to be typed in quotes: "Type 'your text here'"
+- **Natural Language**: Commands support natural variations - "click", "press", and "tap" all work for clicking
+- **Context Aware**: AURA understands your screen context and can find elements even with partial descriptions
+- **Error Recovery**: If a command fails, AURA will provide helpful feedback and suggestions
+
+### Performance Optimization
+
+**Fast Commands (Recommended for most use cases)**:
+
+- Simple questions like "What's on my screen?" use lightweight analysis (~2-5 seconds)
+- GUI commands (click, type, scroll) use optimized screen capture for speed
+- Form filling uses targeted form analysis
+
+**Detailed Commands (Use when you need comprehensive information)**:
+
+- Detailed questions like "Tell me what's on my screen in detail" provide complete analysis (~10-30 seconds)
+- Include precise coordinates and comprehensive element descriptions
+- Best for troubleshooting or when you need exact positioning information
+
+**Tip**: Start with simple commands for faster responses, then use detailed commands when you need more information.
 
 ### Configuration Options
 
@@ -307,17 +469,44 @@ black modules/ *.py
 - Verify sound files exist in `assets/sounds/`
 - Ensure external services are running
 
+**"Cannot connect to LM Studio" or "No model detected"**
+
+This is the most common issue. Follow these steps:
+
+1. **Start LM Studio**: Make sure the LM Studio application is running
+2. **Load a Model**: In LM Studio, go to "My Models" and click "Load" on any model
+3. **Start the Server**: Go to "Local Server" tab and click "Start Server" (port 1234)
+4. **Test Connection**: Run `python check_lmstudio.py` to verify everything is working
+5. **Run AURA**: Once LM Studio is ready, AURA will automatically detect and use your model
+
 **"Vision model not responding"**
 
-- Confirm LM Studio is running on port 1234
-- Check that a multimodal model is loaded
-- Verify network connectivity
+- For vision tasks, use a multimodal model (LLaVA, Moondream, etc.)
+- Text-only models will attempt vision tasks but may not work well
+- Run `python test_dynamic_model.py` to test model detection
 
 **"Wake word not detected"**
 
 - Test microphone access and permissions
 - Verify Porcupine API key is valid
 - Check audio input levels
+- Speak clearly and at normal volume
+- Ensure minimal background noise
+
+**"Command not understood"**
+
+- Speak clearly and at a steady pace
+- Use the exact command patterns listed above
+- Put text to be typed in quotes
+- Try rephrasing using alternative command words
+- Check microphone quality and positioning
+
+**"AURA responds but doesn't execute command"**
+
+- Verify screen elements are visible and accessible
+- Check if the target element has a clear, descriptive label
+- Try using more specific descriptions
+- Ensure the application window is in focus
 
 **"GUI automation not working"**
 
