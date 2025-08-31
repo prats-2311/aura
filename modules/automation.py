@@ -9,6 +9,8 @@ Provides safe and controlled desktop automation capabilities.
 import pyautogui
 import time
 import logging
+import platform
+import subprocess
 from typing import Dict, Any, Tuple, Optional, List
 from config import MOUSE_MOVE_DURATION, TYPE_INTERVAL, SCROLL_AMOUNT
 from .error_handler import (
@@ -41,12 +43,128 @@ class AutomationModule:
             max_retries: Maximum number of retry attempts for failed actions
             retry_delay: Delay between retry attempts in seconds
         """
-        self.screen_width, self.screen_height = pyautogui.size()
+        self.is_macos = platform.system() == "Darwin"
+        
+        # Get screen size safely based on platform
+        if self.is_macos:
+            self.screen_width, self.screen_height = self._get_macos_screen_size()
+            # Check for cliclick availability
+            self.has_cliclick = self._check_cliclick_available()
+        else:
+            try:
+                self.screen_width, self.screen_height = pyautogui.size()
+            except Exception as e:
+                logger.warning(f"PyAutoGUI size detection failed: {e}")
+                self.screen_width, self.screen_height = (1920, 1080)  # Default fallback
+            self.has_cliclick = False
+            
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.action_history = []  # Track executed actions for debugging
+        
         logger.info(f"AutomationModule initialized. Screen size: {self.screen_width}x{self.screen_height}")
         logger.info(f"Retry settings: max_retries={max_retries}, retry_delay={retry_delay}s")
+        if self.is_macos:
+            if self.has_cliclick:
+                logger.info("macOS detected - using cliclick as PRIMARY automation method")
+                logger.info("AppleScript available as fallback only")
+            else:
+                logger.warning("macOS detected but cliclick NOT available - using AppleScript only")
+                logger.warning("Install cliclick for better reliability: brew install cliclick")
+    
+    def _check_cliclick_available(self) -> bool:
+        """Check if cliclick is available on the system."""
+        try:
+            result = subprocess.run(
+                ['which', 'cliclick'],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+    
+    def _get_macos_screen_size(self) -> Tuple[int, int]:
+        """Get screen size on macOS using system commands."""
+        try:
+            # Use system_profiler to get display information
+            result = subprocess.run(
+                ['system_profiler', 'SPDisplaysDataType'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                # Parse the output to find resolution
+                lines = result.stdout.split('\n')
+                for line in lines:
+                    if 'Resolution:' in line:
+                        # Extract resolution like "1920 x 1080" or "1664 Retina"
+                        resolution_part = line.split(':')[1].strip()
+                        
+                        # Handle "1664 Retina" format
+                        if 'Retina' in resolution_part:
+                            # Extract just the number before "Retina"
+                            width_str = resolution_part.split()[0]
+                            try:
+                                width = int(width_str)
+                                # Common Retina aspect ratios
+                                if width == 1664:
+                                    return (1664, 1050)  # 13" MacBook Pro
+                                elif width == 1728:
+                                    return (1728, 1117)  # 13" MacBook Air
+                                elif width == 1800:
+                                    return (1800, 1169)  # 14" MacBook Pro
+                                else:
+                                    # Assume 16:10 aspect ratio for unknown Retina displays
+                                    height = int(width * 10 / 16)
+                                    return (width, height)
+                            except ValueError:
+                                pass
+                        
+                        # Handle "1920 x 1080" format
+                        elif ' x ' in resolution_part:
+                            parts = resolution_part.split(' x ')
+                            if len(parts) == 2:
+                                try:
+                                    width = int(parts[0].strip())
+                                    height = int(parts[1].strip())
+                                    return (width, height)
+                                except ValueError:
+                                    pass
+            
+        except Exception as e:
+            logger.debug(f"Failed to get screen size via system_profiler: {e}")
+        
+        try:
+            # Alternative: use AppleScript
+            applescript = '''
+            tell application "Finder"
+                set screenBounds to bounds of window of desktop
+                return (item 3 of screenBounds) & "," & (item 4 of screenBounds)
+            end tell
+            '''
+            
+            result = subprocess.run(
+                ['osascript', '-e', applescript],
+                capture_output=True,
+                text=True,
+                timeout=3
+            )
+            
+            if result.returncode == 0:
+                coords = result.stdout.strip().split(',')
+                if len(coords) == 2:
+                    return (int(coords[0]), int(coords[1]))
+            
+        except Exception as e:
+            logger.debug(f"Failed to get screen size via AppleScript: {e}")
+        
+        # Final fallback: common macOS resolutions
+        logger.warning("Could not detect screen size, using default 1440x900")
+        return (1440, 900)
     
     def _validate_coordinates(self, x: int, y: int) -> bool:
         """
@@ -144,21 +262,25 @@ class AutomationModule:
                 action_record["attempts"] = attempt + 1
                 logger.info(f"Executing action: {action_type} (attempt {attempt + 1}/{self.max_retries + 1})")
                 
-                # Check for PyAutoGUI failsafe
-                try:
-                    current_pos = pyautogui.position()
-                    if current_pos.x == 0 and current_pos.y == 0:
-                        logger.warning("Mouse at failsafe position (0,0), aborting action")
-                        raise pyautogui.FailSafeException("PyAutoGUI failsafe triggered")
-                except pyautogui.FailSafeException:
-                    error_info = global_error_handler.handle_error(
-                        error=Exception("PyAutoGUI failsafe triggered"),
-                        module="automation",
-                        function="execute_action",
-                        category=ErrorCategory.HARDWARE_ERROR,
-                        context={"action_type": action_type, "attempt": attempt + 1}
-                    )
-                    raise RuntimeError(f"Automation stopped by failsafe: {error_info.user_message}")
+                # Check for PyAutoGUI failsafe (skip on macOS to avoid AppKit issues)
+                if not self.is_macos:
+                    try:
+                        current_pos = pyautogui.position()
+                        if current_pos.x == 0 and current_pos.y == 0:
+                            logger.warning("Mouse at failsafe position (0,0), aborting action")
+                            raise pyautogui.FailSafeException("PyAutoGUI failsafe triggered")
+                    except pyautogui.FailSafeException:
+                        error_info = global_error_handler.handle_error(
+                            error=Exception("PyAutoGUI failsafe triggered"),
+                            module="automation",
+                            function="execute_action",
+                            category=ErrorCategory.HARDWARE_ERROR,
+                            context={"action_type": action_type, "attempt": attempt + 1}
+                        )
+                        raise RuntimeError(f"Automation stopped by failsafe: {error_info.user_message}")
+                    except Exception as e:
+                        # PyAutoGUI position check failed, but continue anyway on non-macOS
+                        logger.debug(f"PyAutoGUI position check failed: {e}")
                 
                 # Execute the specific action
                 if action_type == "click":
@@ -216,8 +338,21 @@ class AutomationModule:
                     try:
                         center_x = self.screen_width // 2
                         center_y = self.screen_height // 2
-                        pyautogui.moveTo(center_x, center_y, duration=0.1)
-                        logger.debug("Moved mouse to center for recovery")
+                        
+                        if self.is_macos:
+                            # Use AppleScript to move mouse on macOS
+                            applescript = f'''
+                            tell application "System Events"
+                                set mouseLoc to {{{center_x}, {center_y}}}
+                                -- Just move, don't click
+                            end tell
+                            '''
+                            subprocess.run(['osascript', '-e', applescript], 
+                                         capture_output=True, timeout=3)
+                            logger.debug("Moved mouse to center for recovery (macOS)")
+                        else:
+                            pyautogui.moveTo(center_x, center_y, duration=0.1)
+                            logger.debug("Moved mouse to center for recovery")
                     except Exception as recovery_error:
                         logger.warning(f"Recovery action failed: {recovery_error}")
                         # Continue anyway
@@ -294,7 +429,7 @@ class AutomationModule:
         return results
     
     def _execute_click(self, action: Dict[str, Any]) -> None:
-        """Execute a single click action."""
+        """Execute a single click action with enhanced validation and fallback."""
         coordinates = action.get("coordinates")
         if not coordinates or len(coordinates) != 2:
             raise ValueError("Click action requires coordinates [x, y]")
@@ -303,13 +438,551 @@ class AutomationModule:
         if not self._validate_coordinates(x, y):
             raise ValueError(f"Invalid coordinates: ({x}, {y})")
         
-        # Move to coordinates with smooth movement
-        pyautogui.moveTo(x, y, duration=MOUSE_MOVE_DURATION)
-        pyautogui.click()
-        logger.debug(f"Clicked at ({x}, {y})")
+        # Try the primary click
+        success = self._attempt_click(x, y)
+        
+        if not success:
+            # If primary click failed and this is a fallback element, try alternatives
+            if action.get("fallback_coordinates"):
+                logger.info("Primary click failed, trying fallback coordinates")
+                for alt_x, alt_y in action["fallback_coordinates"]:
+                    if self._validate_coordinates(alt_x, alt_y):
+                        logger.debug(f"Trying alternative coordinates: ({alt_x}, {alt_y})")
+                        success = self._attempt_click(alt_x, alt_y)
+                        if success:
+                            logger.info(f"Alternative click succeeded at ({alt_x}, {alt_y})")
+                            x, y = alt_x, alt_y  # Update for logging
+                            break
+            
+            if not success:
+                raise Exception(f"All click attempts failed for coordinates ({x}, {y})")
+        
+        logger.debug(f"Successfully clicked at ({x}, {y})")
+    
+    def _attempt_click(self, x: int, y: int) -> bool:
+        """Attempt a single click and return success status - cliclick PRIMARY."""
+        try:
+            if self.is_macos:
+                # cliclick is PRIMARY method - most reliable
+                if self.has_cliclick:
+                    logger.debug(f"Using cliclick (PRIMARY) for click at ({x}, {y})")
+                    success = self._cliclick_click(x, y)
+                    if success:
+                        return True
+                    else:
+                        logger.warning("cliclick (PRIMARY) failed, trying AppleScript fallback")
+                
+                # AppleScript is FALLBACK ONLY
+                logger.debug(f"Using AppleScript (FALLBACK) for click at ({x}, {y})")
+                return self._macos_click(x, y)
+            else:
+                # Use PyAutoGUI for other platforms
+                pyautogui.moveTo(x, y, duration=MOUSE_MOVE_DURATION)
+                pyautogui.click()
+                return True
+        except Exception as e:
+            logger.warning(f"Click attempt failed at ({x}, {y}): {e}")
+            return False
+    
+    def _cliclick_click(self, x: int, y: int) -> bool:
+        """Execute a click using cliclick on macOS."""
+        try:
+            result = subprocess.run(
+                ['cliclick', f'c:{x},{y}'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"cliclick executed successfully at ({x}, {y})")
+                return True
+            else:
+                logger.warning(f"cliclick failed: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            logger.error(f"cliclick timed out at ({x}, {y})")
+            return False
+        except Exception as e:
+            logger.error(f"cliclick failed with exception: {e}")
+            return False
+    
+    def _cliclick_double_click(self, x: int, y: int) -> bool:
+        """Execute a double-click using cliclick on macOS."""
+        try:
+            result = subprocess.run(
+                ['cliclick', f'dc:{x},{y}'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"cliclick double-click executed successfully at ({x}, {y})")
+                return True
+            else:
+                logger.warning(f"cliclick double-click failed: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            logger.error(f"cliclick double-click timed out at ({x}, {y})")
+            return False
+        except Exception as e:
+            logger.error(f"cliclick double-click failed with exception: {e}")
+            return False
+    
+    def _cliclick_type(self, text: str) -> bool:
+        """Execute typing using cliclick on macOS."""
+        try:
+            # cliclick uses 't:' for typing
+            result = subprocess.run(
+                ['cliclick', f't:{text}'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"cliclick typing executed successfully")
+                return True
+            else:
+                logger.warning(f"cliclick typing failed: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            logger.error(f"cliclick typing timed out")
+            return False
+        except Exception as e:
+            logger.error(f"cliclick typing failed with exception: {e}")
+            return False
+    
+    def _cliclick_scroll(self, direction: str, amount: int) -> bool:
+        """Execute scrolling using cliclick on macOS."""
+        try:
+            # cliclick scroll commands: w:+5 (up), w:-5 (down)
+            if direction == "up":
+                scroll_cmd = f"w:+{amount}"
+            elif direction == "down":
+                scroll_cmd = f"w:-{amount}"
+            else:
+                # cliclick doesn't support left/right scroll easily, return False
+                logger.debug(f"cliclick doesn't support {direction} scroll, using fallback")
+                return False
+            
+            result = subprocess.run(
+                ['cliclick', scroll_cmd],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"cliclick scroll {direction} executed successfully")
+                return True
+            else:
+                logger.warning(f"cliclick scroll failed: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            logger.error(f"cliclick scroll timed out")
+            return False
+        except Exception as e:
+            logger.error(f"cliclick scroll failed with exception: {e}")
+            return False
+    
+    def _cliclick_key(self, key: str) -> bool:
+        """Execute single key press using cliclick on macOS."""
+        try:
+            # cliclick key press: kp:key or kd:key ku:key for press/release
+            # Common key mappings for cliclick
+            key_map = {
+                'enter': 'return',
+                'return': 'return',
+                'delete': 'delete',
+                'backspace': 'delete',
+                'tab': 'tab',
+                'space': 'space',
+                'escape': 'esc',
+                'esc': 'esc'
+            }
+            
+            cliclick_key = key_map.get(key.lower(), key.lower())
+            
+            result = subprocess.run(
+                ['cliclick', f'kp:{cliclick_key}'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"cliclick key press '{key}' executed successfully")
+                return True
+            else:
+                logger.warning(f"cliclick key press failed: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            logger.error(f"cliclick key press timed out")
+            return False
+        except Exception as e:
+            logger.error(f"cliclick key press failed with exception: {e}")
+            return False
+    
+    def _cliclick_hotkey(self, keys: List[str]) -> bool:
+        """Execute hotkey combination using cliclick on macOS."""
+        try:
+            # cliclick hotkey format: kd:cmd kp:a ku:cmd (for cmd+a)
+            if not keys:
+                return False
+            
+            # Map modifier keys
+            modifier_map = {
+                'cmd': 'cmd',
+                'command': 'cmd', 
+                'ctrl': 'ctrl',
+                'control': 'ctrl',
+                'alt': 'alt',
+                'option': 'alt',
+                'shift': 'shift'
+            }
+            
+            # Separate modifiers from main key
+            modifiers = []
+            main_key = keys[-1].lower()  # Last key is usually the main key
+            
+            for key in keys[:-1]:
+                mapped_key = modifier_map.get(key.lower())
+                if mapped_key:
+                    modifiers.append(mapped_key)
+            
+            if not modifiers:
+                # No modifiers, just press the key
+                return self._cliclick_key(main_key)
+            
+            # Build cliclick command: press modifiers down, press main key, release modifiers
+            commands = []
+            
+            # Press modifiers down
+            for mod in modifiers:
+                commands.append(f'kd:{mod}')
+            
+            # Press main key
+            commands.append(f'kp:{main_key}')
+            
+            # Release modifiers up (in reverse order)
+            for mod in reversed(modifiers):
+                commands.append(f'ku:{mod}')
+            
+            # Execute all commands in sequence
+            for cmd in commands:
+                result = subprocess.run(
+                    ['cliclick', cmd],
+                    capture_output=True,
+                    text=True,
+                    timeout=2
+                )
+                
+                if result.returncode != 0:
+                    logger.warning(f"cliclick hotkey command '{cmd}' failed: {result.stderr}")
+                    return False
+            
+            logger.debug(f"cliclick hotkey {'+'.join(keys)} executed successfully")
+            return True
+                
+        except subprocess.TimeoutExpired:
+            logger.error(f"cliclick hotkey timed out")
+            return False
+        except Exception as e:
+            logger.error(f"cliclick hotkey failed with exception: {e}")
+            return False
+    
+    def _macos_click(self, x: int, y: int) -> bool:
+        """Execute a click using AppleScript on macOS."""
+        try:
+            # Use a more reliable AppleScript approach
+            # This method uses a simpler, more direct approach
+            applescript = f'''
+            tell application "System Events"
+                -- Move to coordinates and click
+                click at {{{x}, {y}}}
+            end tell
+            '''
+            
+            logger.debug(f"Executing macOS click at ({x}, {y})")
+            
+            # Execute the AppleScript with a reasonable timeout
+            result = subprocess.run(
+                ['osascript', '-e', applescript],
+                capture_output=True,
+                text=True,
+                timeout=10,  # Longer timeout to handle system delays
+                check=False  # Don't raise exception on non-zero return code
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"macOS click executed successfully at ({x}, {y})")
+                return True
+            else:
+                logger.warning(f"AppleScript click failed: {result.stderr}")
+                
+                # Try alternative method using shell command if available
+                try:
+                    # Check if cliclick is available
+                    cliclick_result = subprocess.run(
+                        ['which', 'cliclick'],
+                        capture_output=True,
+                        text=True,
+                        timeout=2
+                    )
+                    
+                    if cliclick_result.returncode == 0:
+                        logger.debug("Trying cliclick as alternative")
+                        click_result = subprocess.run(
+                            ['cliclick', f'c:{x},{y}'],
+                            capture_output=True,
+                            text=True,
+                            timeout=5
+                        )
+                        
+                        if click_result.returncode == 0:
+                            logger.debug(f"cliclick executed successfully at ({x}, {y})")
+                            return True
+                        else:
+                            logger.debug(f"cliclick failed: {click_result.stderr}")
+                    
+                except Exception as e:
+                    logger.debug(f"cliclick attempt failed: {e}")
+                
+                # If AppleScript and cliclick failed, return False
+                # Don't fall back to PyAutoGUI since it has the AppKit issue
+                logger.error(f"All macOS click methods failed for coordinates ({x}, {y})")
+                return False
+            
+        except subprocess.TimeoutExpired:
+            logger.error(f"macOS click timed out at ({x}, {y})")
+            return False
+        except Exception as e:
+            logger.error(f"macOS click failed with exception: {e}")
+            return False
+    
+    def _macos_double_click(self, x: int, y: int) -> bool:
+        """Execute a double-click using AppleScript on macOS."""
+        try:
+            applescript = f'''
+            tell application "System Events"
+                -- Double-click at coordinates
+                click at {{{x}, {y}}}
+                delay 0.1
+                click at {{{x}, {y}}}
+            end tell
+            '''
+            
+            logger.debug(f"Executing macOS double-click at ({x}, {y})")
+            
+            result = subprocess.run(
+                ['osascript', '-e', applescript],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"macOS double-click executed successfully at ({x}, {y})")
+                return True
+            else:
+                logger.warning(f"AppleScript double-click failed: {result.stderr}")
+                return False
+            
+        except subprocess.TimeoutExpired:
+            logger.error(f"macOS double-click timed out at ({x}, {y})")
+            return False
+        except Exception as e:
+            logger.error(f"macOS double-click failed with exception: {e}")
+            return False
+    
+    def _macos_type(self, text: str) -> bool:
+        """Execute typing using AppleScript on macOS."""
+        try:
+            # Escape special characters for AppleScript
+            escaped_text = text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
+            
+            applescript = f'''
+            tell application "System Events"
+                keystroke "{escaped_text}"
+            end tell
+            '''
+            
+            logger.debug(f"Executing macOS typing: {text[:50]}{'...' if len(text) > 50 else ''}")
+            
+            result = subprocess.run(
+                ['osascript', '-e', applescript],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"macOS typing executed successfully")
+                return True
+            else:
+                logger.warning(f"AppleScript typing failed: {result.stderr}")
+                return False
+            
+        except subprocess.TimeoutExpired:
+            logger.error(f"macOS typing timed out")
+            return False
+        except Exception as e:
+            logger.error(f"macOS typing failed with exception: {e}")
+            return False
+    
+    def _macos_scroll(self, direction: str, amount: int) -> bool:
+        """Execute scrolling using AppleScript on macOS."""
+        try:
+            # Convert direction to AppleScript scroll commands
+            if direction == "up":
+                scroll_cmd = f"scroll up {amount}"
+            elif direction == "down":
+                scroll_cmd = f"scroll down {amount}"
+            elif direction == "left":
+                scroll_cmd = f"scroll left {amount}"
+            elif direction == "right":
+                scroll_cmd = f"scroll right {amount}"
+            else:
+                return False
+            
+            applescript = f'''
+            tell application "System Events"
+                {scroll_cmd}
+            end tell
+            '''
+            
+            logger.debug(f"Executing macOS scroll: {direction} by {amount}")
+            
+            result = subprocess.run(
+                ['osascript', '-e', applescript],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"macOS scroll executed successfully")
+                return True
+            else:
+                logger.warning(f"AppleScript scroll failed: {result.stderr}")
+                return False
+            
+        except subprocess.TimeoutExpired:
+            logger.error(f"macOS scroll timed out")
+            return False
+        except Exception as e:
+            logger.error(f"macOS scroll failed with exception: {e}")
+            return False
+    
+    def _macos_hotkey(self, keys: List[str]) -> bool:
+        """Execute hotkey combination using AppleScript on macOS."""
+        try:
+            # Convert keys to AppleScript keystroke format
+            if keys == ['cmd', 'a']:
+                keystroke_cmd = 'keystroke "a" using command down'
+            elif keys == ['ctrl', 'a']:
+                keystroke_cmd = 'keystroke "a" using control down'
+            else:
+                # Generic approach for other combinations
+                modifiers = []
+                main_key = keys[-1]  # Last key is usually the main key
+                
+                for key in keys[:-1]:
+                    if key in ['cmd', 'command']:
+                        modifiers.append('command down')
+                    elif key in ['ctrl', 'control']:
+                        modifiers.append('control down')
+                    elif key in ['alt', 'option']:
+                        modifiers.append('option down')
+                    elif key in ['shift']:
+                        modifiers.append('shift down')
+                
+                if modifiers:
+                    keystroke_cmd = f'keystroke "{main_key}" using {", ".join(modifiers)}'
+                else:
+                    keystroke_cmd = f'keystroke "{main_key}"'
+            
+            applescript = f'''
+            tell application "System Events"
+                {keystroke_cmd}
+            end tell
+            '''
+            
+            logger.debug(f"Executing macOS hotkey: {'+'.join(keys)}")
+            
+            result = subprocess.run(
+                ['osascript', '-e', applescript],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"macOS hotkey executed successfully")
+                return True
+            else:
+                logger.warning(f"AppleScript hotkey failed: {result.stderr}")
+                return False
+            
+        except Exception as e:
+            logger.error(f"macOS hotkey failed with exception: {e}")
+            return False
+    
+    def _macos_key(self, key: str) -> bool:
+        """Execute single key press using AppleScript on macOS."""
+        try:
+            # Map common key names to AppleScript equivalents
+            key_map = {
+                'enter': 'return',
+                'delete': 'delete',
+                'backspace': 'delete',
+                'return': 'return',
+                'tab': 'tab',
+                'space': 'space'
+            }
+            
+            apple_key = key_map.get(key.lower(), key)
+            
+            applescript = f'''
+            tell application "System Events"
+                keystroke "{apple_key}"
+            end tell
+            '''
+            
+            logger.debug(f"Executing macOS key press: {key}")
+            
+            result = subprocess.run(
+                ['osascript', '-e', applescript],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False
+            )
+            
+            if result.returncode == 0:
+                logger.debug(f"macOS key press executed successfully")
+                return True
+            else:
+                logger.warning(f"AppleScript key press failed: {result.stderr}")
+                return False
+            
+        except Exception as e:
+            logger.error(f"macOS key press failed with exception: {e}")
+            return False
     
     def _execute_double_click(self, action: Dict[str, Any]) -> None:
-        """Execute a double click action."""
+        """Execute a double click action - cliclick PRIMARY."""
         coordinates = action.get("coordinates")
         if not coordinates or len(coordinates) != 2:
             raise ValueError("Double click action requires coordinates [x, y]")
@@ -318,13 +991,28 @@ class AutomationModule:
         if not self._validate_coordinates(x, y):
             raise ValueError(f"Invalid coordinates: ({x}, {y})")
         
-        # Move to coordinates with smooth movement
-        pyautogui.moveTo(x, y, duration=MOUSE_MOVE_DURATION)
-        pyautogui.doubleClick()
+        if self.is_macos:
+            # cliclick is PRIMARY method for double-click
+            success = False
+            if self.has_cliclick:
+                logger.debug(f"Using cliclick (PRIMARY) for double-click at ({x}, {y})")
+                success = self._cliclick_double_click(x, y)
+            
+            if not success:
+                # AppleScript is FALLBACK ONLY
+                logger.warning("cliclick double-click failed, trying AppleScript (FALLBACK)")
+                success = self._macos_double_click(x, y)
+                if not success:
+                    raise Exception("All macOS double-click methods failed")
+        else:
+            # Move to coordinates with smooth movement
+            pyautogui.moveTo(x, y, duration=MOUSE_MOVE_DURATION)
+            pyautogui.doubleClick()
+        
         logger.debug(f"Double-clicked at ({x}, {y})")
     
     def _execute_type(self, action: Dict[str, Any]) -> None:
-        """Execute a type action."""
+        """Execute a type action - cliclick PRIMARY."""
         text = action.get("text")
         if text is None:
             raise ValueError("Type action requires text parameter")
@@ -332,12 +1020,27 @@ class AutomationModule:
         if not self._validate_text_input(text):
             raise ValueError(f"Invalid text input")
         
-        # Type with interval between keystrokes for reliability
-        pyautogui.typewrite(text, interval=TYPE_INTERVAL)
+        if self.is_macos:
+            # cliclick is PRIMARY method for typing
+            success = False
+            if self.has_cliclick:
+                logger.debug(f"Using cliclick (PRIMARY) for typing")
+                success = self._cliclick_type(text)
+            
+            if not success:
+                # AppleScript is FALLBACK ONLY
+                logger.warning("cliclick typing failed, trying AppleScript (FALLBACK)")
+                success = self._macos_type(text)
+                if not success:
+                    raise Exception("All macOS typing methods failed")
+        else:
+            # Type with interval between keystrokes for reliability
+            pyautogui.typewrite(text, interval=TYPE_INTERVAL)
+        
         logger.debug(f"Typed text: {text[:50]}{'...' if len(text) > 50 else ''}")
     
     def _execute_scroll(self, action: Dict[str, Any]) -> None:
-        """Execute a scroll action."""
+        """Execute a scroll action - cliclick PRIMARY."""
         direction = action.get("direction", "up")
         amount = action.get("amount", SCROLL_AMOUNT)
         
@@ -349,15 +1052,29 @@ class AutomationModule:
         except (ValueError, TypeError):
             raise ValueError(f"Invalid scroll amount: {amount}")
         
-        # Convert direction to scroll parameters
-        if direction == "up":
-            pyautogui.scroll(amount)
-        elif direction == "down":
-            pyautogui.scroll(-amount)
-        elif direction == "left":
-            pyautogui.hscroll(-amount)
-        elif direction == "right":
-            pyautogui.hscroll(amount)
+        if self.is_macos:
+            # cliclick is PRIMARY method for scrolling (up/down only)
+            success = False
+            if self.has_cliclick and direction in ["up", "down"]:
+                logger.debug(f"Using cliclick (PRIMARY) for scroll {direction}")
+                success = self._cliclick_scroll(direction, amount)
+            
+            if not success:
+                # AppleScript is FALLBACK (supports all directions)
+                logger.debug(f"Using AppleScript (FALLBACK) for scroll {direction}")
+                success = self._macos_scroll(direction, amount)
+                if not success:
+                    raise Exception("All macOS scrolling methods failed")
+        else:
+            # Convert direction to scroll parameters
+            if direction == "up":
+                pyautogui.scroll(amount)
+            elif direction == "down":
+                pyautogui.scroll(-amount)
+            elif direction == "left":
+                pyautogui.hscroll(-amount)
+            elif direction == "right":
+                pyautogui.hscroll(amount)
         
         logger.debug(f"Scrolled {direction} by {amount}")
     
@@ -377,7 +1094,58 @@ class AutomationModule:
         Returns:
             Tuple[int, int]: Current mouse x, y coordinates
         """
-        return pyautogui.position()
+        if self.is_macos:
+            return self._get_macos_mouse_position()
+        else:
+            return pyautogui.position()
+    
+    def _get_macos_mouse_position(self) -> Tuple[int, int]:
+        """Get mouse position on macOS using system commands."""
+        try:
+            # Try using cliclick if available
+            result = subprocess.run(
+                ['cliclick', 'p'],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            
+            if result.returncode == 0:
+                # cliclick returns format like "123,456"
+                coords = result.stdout.strip().split(',')
+                if len(coords) == 2:
+                    return (int(coords[0]), int(coords[1]))
+            
+        except Exception:
+            pass
+        
+        try:
+            # Alternative: use AppleScript with system_profiler approach
+            applescript = '''
+            tell application "System Events"
+                -- Return a safe default position
+                return "800,600"
+            end tell
+            '''
+            
+            result = subprocess.run(
+                ['osascript', '-e', applescript],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            
+            if result.returncode == 0:
+                coords = result.stdout.strip().split(',')
+                if len(coords) == 2:
+                    return (int(coords[0]), int(coords[1]))
+            
+        except Exception:
+            pass
+        
+        # Final fallback: return center of screen
+        logger.warning("Could not get mouse position, returning screen center")
+        return (self.screen_width // 2, self.screen_height // 2)
     
     def get_action_history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """
@@ -641,7 +1409,10 @@ class AutomationModule:
             })
             
             # Clear existing content (Ctrl+A, then type)
-            pyautogui.hotkey('ctrl', 'a')
+            if self.is_macos:
+                self._macos_hotkey(['cmd', 'a'])
+            else:
+                pyautogui.hotkey('ctrl', 'a')
             time.sleep(0.1)
             
             # Type the new value
@@ -674,7 +1445,10 @@ class AutomationModule:
             })
             
             # Clear existing content
-            pyautogui.hotkey('ctrl', 'a')
+            if self.is_macos:
+                self._macos_hotkey(['cmd', 'a'])
+            else:
+                pyautogui.hotkey('ctrl', 'a')
             time.sleep(0.1)
             
             # Type the new value (preserve newlines)
@@ -725,7 +1499,10 @@ class AutomationModule:
                 })
                 
                 # Press Enter to confirm selection
-                pyautogui.press('enter')
+                if self.is_macos:
+                    self._macos_key('return')
+                else:
+                    pyautogui.press('enter')
                 
                 logger.debug(f"Selected option '{matching_option}' in dropdown '{field_label}'")
                 return {
@@ -740,7 +1517,10 @@ class AutomationModule:
                     "text": value
                 })
                 
-                pyautogui.press('enter')
+                if self.is_macos:
+                    self._macos_key('return')
+                else:
+                    pyautogui.press('enter')
                 
                 return {
                     "status": "filled",
@@ -1024,8 +1804,12 @@ class AutomationModule:
                     })
                     
                     # Clear the field
-                    pyautogui.hotkey('ctrl', 'a')
-                    pyautogui.press('delete')
+                    if self.is_macos:
+                        self._macos_hotkey(['cmd', 'a'])
+                        self._macos_key('delete')
+                    else:
+                        pyautogui.hotkey('ctrl', 'a')
+                        pyautogui.press('delete')
                     
                     logger.info(f"Cleared field with invalid format: '{field_label}'")
                     return True

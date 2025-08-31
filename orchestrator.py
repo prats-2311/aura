@@ -168,7 +168,8 @@ class Orchestrator:
                     return self.vision_module.describe_screen(analysis_type="simple")
                 except Exception as e:
                     logger.error(f"Parallel screen analysis failed: {e}")
-                    return None
+                    # Return fallback context when vision fails
+                    return self._create_fallback_screen_context(command)
             
             def preprocess_command():
                 """Preprocess command in parallel."""
@@ -1222,10 +1223,17 @@ class Orchestrator:
                 screen_context = self.vision_module.describe_screen(analysis_type="simple")
                 
                 # Validate screen context
-                if not screen_context or "elements" not in screen_context:
+                if not screen_context or not screen_context.get("description"):
                     raise OrchestratorError("Invalid screen analysis result")
                 
-                logger.info(f"[{execution_id}] Screen perception successful: {len(screen_context.get('elements', []))} elements found")
+                # Count elements from different possible keys
+                element_count = 0
+                if "elements" in screen_context:
+                    element_count = len(screen_context.get("elements", []))
+                elif "main_elements" in screen_context:
+                    element_count = len(screen_context.get("main_elements", []))
+                
+                logger.info(f"[{execution_id}] Screen perception successful: {element_count} elements found")
                 return screen_context
                 
             except Exception as e:
@@ -2349,3 +2357,81 @@ Focus on being helpful while being honest about what information is actually vis
             
         except Exception as e:
             logger.error(f"Error during Orchestrator cleanup: {e}")
+    
+    def _create_fallback_screen_context(self, command: str) -> Dict[str, Any]:
+        """
+        Create fallback screen context when vision analysis fails.
+        Uses predefined coordinates for common UI elements.
+        
+        Args:
+            command: The user command to analyze
+            
+        Returns:
+            Fallback screen context with estimated element locations
+        """
+        from config import FALLBACK_COORDINATES
+        
+        logger.info("Creating fallback screen context due to vision failure")
+        
+        # Extract potential button/element names from command
+        command_lower = command.lower()
+        fallback_elements = []
+        
+        # Check for known UI elements in the command
+        for element_name, coordinates_list in FALLBACK_COORDINATES.items():
+            if element_name in command_lower:
+                # Create multiple element entries for different coordinate options
+                for i, (x, y) in enumerate(coordinates_list):
+                    element = {
+                        "type": "button",
+                        "text": element_name.title(),
+                        "coordinates": [x, y, x + 100, y + 30],  # Estimated button size
+                        "confidence": 0.7 - (i * 0.1),  # Decreasing confidence for alternatives
+                        "clickable": True,
+                        "fallback": True,
+                        "source": "fallback_coordinates"
+                    }
+                    fallback_elements.append(element)
+                
+                logger.info(f"Added {len(coordinates_list)} fallback coordinates for '{element_name}'")
+                break
+        
+        # If no specific element found, create generic clickable areas
+        if not fallback_elements:
+            logger.info("No specific element found, creating generic clickable areas")
+            generic_areas = [
+                (400, 300, "Center area"),
+                (363, 360, "Common button area"),
+                (500, 400, "Right center area"),
+                (300, 400, "Left center area")
+            ]
+            
+            for x, y, description in generic_areas:
+                element = {
+                    "type": "clickable_area",
+                    "text": description,
+                    "coordinates": [x, y, x + 100, y + 30],
+                    "confidence": 0.5,
+                    "clickable": True,
+                    "fallback": True,
+                    "source": "generic_fallback"
+                }
+                fallback_elements.append(element)
+        
+        # Create fallback context structure
+        fallback_context = {
+            "elements": fallback_elements,
+            "text_blocks": [],
+            "screen_info": {
+                "width": 1440,  # Default screen width
+                "height": 900,  # Default screen height
+                "source": "fallback",
+                "timestamp": time.time()
+            },
+            "analysis_type": "fallback",
+            "fallback_reason": "vision_analysis_failed",
+            "total_elements": len(fallback_elements)
+        }
+        
+        logger.info(f"Created fallback context with {len(fallback_elements)} elements")
+        return fallback_context

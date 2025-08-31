@@ -9,6 +9,12 @@ Environment Setup (Prerequisites):
 1. Create Conda environment: conda create --name aura python=3.11 -y
 2. Activate environment: conda activate aura
 3. Install dependencies: pip install -r requirements.txt
+4. Install cliclick (macOS): brew install cliclick
+
+Automation Method Priority (macOS):
+1. PRIMARY: cliclick - Most reliable, fast, consistent
+2. FALLBACK: AppleScript - Backup method only
+3. PyAutoGUI is avoided on macOS due to AppKit compatibility issues
 """
 
 import os
@@ -55,11 +61,13 @@ BACKEND_URL = f"http://localhost:{BACKEND_PORT}"
 # The generic prompt to get a description of the screen from the vision model
 # Simple prompt for basic screen description (faster processing)
 VISION_PROMPT_SIMPLE = """
-Describe what you see in this screenshot. What text, buttons, and elements are visible?
+Look at this screenshot and describe what you see. Focus on buttons, text, and interactive elements.
+
+List any buttons you can see with their exact text. Be specific about button labels.
 
 {
     "description": "what you see on screen",
-    "main_elements": ["list of visible elements"]
+    "main_elements": ["button: Sign In", "button: Continue with GitHub", "text: Welcome back"]
 }
 """
 
@@ -207,7 +215,20 @@ TYPE_INTERVAL = 0.05        # Seconds between keystrokes
 SCROLL_AMOUNT = 100         # Default scroll amount in pixels
 
 # API timeout settings
-VISION_API_TIMEOUT = 120    # Seconds - Increased for vision models (was 30)
+VISION_API_TIMEOUT = 180    # Seconds - Increased for vision models (was 120)
+
+# Fallback coordinates for common UI elements when vision fails
+FALLBACK_COORDINATES = {
+    "sign in": [(363, 360), (400, 350), (350, 370), (380, 360), (363, 340)],
+    "login": [(363, 360), (400, 350), (350, 370), (380, 360), (363, 340)],
+    "sign up": [(500, 360), (520, 350), (480, 370)],
+    "submit": [(400, 400), (350, 400), (450, 400), (400, 380), (400, 420)],
+    "continue": [(400, 400), (350, 400), (450, 400)],
+    "next": [(450, 400), (400, 400), (500, 400)],
+    "ok": [(400, 300), (350, 300), (450, 300)],
+    "cancel": [(300, 400), (250, 400), (350, 400)],
+    "close": [(600, 100), (650, 100), (550, 100)]
+}
 REASONING_API_TIMEOUT = 60  # Seconds
 AUDIO_API_TIMEOUT = 30      # Seconds
 
