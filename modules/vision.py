@@ -25,6 +25,12 @@ from config import (
     SCREENSHOT_QUALITY,
     MAX_SCREENSHOT_SIZE
 )
+from .error_handler import (
+    global_error_handler,
+    with_error_handling,
+    ErrorCategory,
+    ErrorSeverity
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +48,12 @@ class VisionModule:
         self.sct = mss.mss()
         logger.info("VisionModule initialized")
     
+    @with_error_handling(
+        category=ErrorCategory.HARDWARE_ERROR,
+        severity=ErrorSeverity.HIGH,
+        max_retries=2,
+        user_message="I'm having trouble capturing your screen. Please check your display settings."
+    )
     def capture_screen_as_base64(self, monitor_number: int = 1) -> str:
         """
         Capture a screenshot and encode it as base64 for API transmission.
@@ -53,39 +65,110 @@ class VisionModule:
             Base64 encoded screenshot string
             
         Raises:
-            Exception: If screen capture fails
+            Exception: If screen capture fails after retries
         """
         try:
+            # Validate monitor number
+            if monitor_number < 1 or monitor_number >= len(self.sct.monitors):
+                raise ValueError(f"Invalid monitor number: {monitor_number}. Available monitors: 1-{len(self.sct.monitors)-1}")
+            
             # Get monitor information
             monitor = self.sct.monitors[monitor_number]
             logger.debug(f"Capturing screen from monitor {monitor_number}: {monitor}")
             
-            # Capture screenshot
-            screenshot = self.sct.grab(monitor)
+            # Validate monitor dimensions
+            if monitor['width'] <= 0 or monitor['height'] <= 0:
+                raise ValueError(f"Invalid monitor dimensions: {monitor['width']}x{monitor['height']}")
             
-            # Convert to PIL Image
-            img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+            # Capture screenshot with error handling
+            try:
+                screenshot = self.sct.grab(monitor)
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="vision",
+                    function="capture_screen_as_base64",
+                    category=ErrorCategory.HARDWARE_ERROR,
+                    context={"monitor_number": monitor_number, "monitor": monitor}
+                )
+                raise Exception(f"Screen capture failed: {error_info.user_message}")
+            
+            # Validate screenshot
+            if not screenshot or screenshot.size[0] <= 0 or screenshot.size[1] <= 0:
+                raise ValueError("Invalid screenshot captured")
+            
+            # Convert to PIL Image with error handling
+            try:
+                img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="vision",
+                    function="capture_screen_as_base64",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"screenshot_size": screenshot.size}
+                )
+                raise Exception(f"Image conversion failed: {error_info.user_message}")
             
             # Resize if too large
+            original_size = (img.width, img.height)
             if img.width > MAX_SCREENSHOT_SIZE or img.height > MAX_SCREENSHOT_SIZE:
-                # Calculate new size maintaining aspect ratio
-                ratio = min(MAX_SCREENSHOT_SIZE / img.width, MAX_SCREENSHOT_SIZE / img.height)
-                new_size = (int(img.width * ratio), int(img.height * ratio))
-                img = img.resize(new_size, Image.Resampling.LANCZOS)
-                logger.debug(f"Resized screenshot from {screenshot.size} to {new_size}")
+                try:
+                    # Calculate new size maintaining aspect ratio
+                    ratio = min(MAX_SCREENSHOT_SIZE / img.width, MAX_SCREENSHOT_SIZE / img.height)
+                    new_size = (int(img.width * ratio), int(img.height * ratio))
+                    
+                    # Validate new size
+                    if new_size[0] <= 0 or new_size[1] <= 0:
+                        raise ValueError(f"Invalid resize dimensions: {new_size}")
+                    
+                    img = img.resize(new_size, Image.Resampling.LANCZOS)
+                    logger.debug(f"Resized screenshot from {original_size} to {new_size}")
+                except Exception as e:
+                    logger.warning(f"Failed to resize image: {e}. Using original size.")
+                    # Continue with original size if resize fails
             
-            # Convert to base64
-            buffer = io.BytesIO()
-            img.save(buffer, format="JPEG", quality=SCREENSHOT_QUALITY)
-            img_bytes = buffer.getvalue()
-            base64_string = base64.b64encode(img_bytes).decode('utf-8')
-            
-            logger.info(f"Screenshot captured and encoded: {len(base64_string)} characters")
-            return base64_string
+            # Convert to base64 with error handling
+            try:
+                buffer = io.BytesIO()
+                img.save(buffer, format="JPEG", quality=SCREENSHOT_QUALITY)
+                img_bytes = buffer.getvalue()
+                
+                # Validate image data
+                if len(img_bytes) == 0:
+                    raise ValueError("Empty image data generated")
+                
+                base64_string = base64.b64encode(img_bytes).decode('utf-8')
+                
+                # Validate base64 string
+                if not base64_string:
+                    raise ValueError("Empty base64 string generated")
+                
+                logger.info(f"Screenshot captured and encoded: {len(base64_string)} characters")
+                return base64_string
+                
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="vision",
+                    function="capture_screen_as_base64",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"image_size": (img.width, img.height)}
+                )
+                raise Exception(f"Base64 encoding failed: {error_info.user_message}")
             
         except Exception as e:
-            logger.error(f"Failed to capture screen: {e}")
-            raise Exception(f"Screen capture failed: {e}")
+            # Re-raise with additional context if not already handled
+            if "Screen capture failed" not in str(e):
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="vision",
+                    function="capture_screen_as_base64",
+                    category=ErrorCategory.HARDWARE_ERROR,
+                    context={"monitor_number": monitor_number}
+                )
+                raise Exception(f"Screen capture failed: {error_info.user_message}")
+            raise
     
     def get_screen_resolution(self, monitor_number: int = 1) -> Tuple[int, int]:
         """
@@ -107,6 +190,13 @@ class VisionModule:
             logger.error(f"Failed to get screen resolution: {e}")
             return 1920, 1080  # Default fallback
     
+    @with_error_handling(
+        category=ErrorCategory.API_ERROR,
+        severity=ErrorSeverity.MEDIUM,
+        max_retries=3,
+        retry_delay=2.0,
+        user_message="I'm having trouble analyzing your screen. Please try again."
+    )
     def describe_screen(self, analysis_type: str = "general") -> Dict:
         """
         Capture screen and get structured description from vision model.
@@ -118,19 +208,42 @@ class VisionModule:
             Dictionary containing structured screen analysis
             
         Raises:
-            Exception: If screen analysis fails
+            Exception: If screen analysis fails after retries
         """
         try:
+            # Validate analysis type
+            valid_types = ["general", "form"]
+            if analysis_type not in valid_types:
+                raise ValueError(f"Invalid analysis type: {analysis_type}. Must be one of {valid_types}")
+            
             logger.info(f"Starting screen analysis (type: {analysis_type})")
             
-            # Capture screenshot
-            screenshot_b64 = self.capture_screen_as_base64()
+            # Capture screenshot with error handling
+            try:
+                screenshot_b64 = self.capture_screen_as_base64()
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="vision",
+                    function="describe_screen",
+                    category=ErrorCategory.HARDWARE_ERROR,
+                    context={"analysis_type": analysis_type}
+                )
+                raise Exception(f"Screenshot capture failed: {error_info.user_message}")
             
             # Get screen resolution for metadata
             width, height = self.get_screen_resolution()
             
             # Select appropriate prompt based on analysis type
             prompt = FORM_VISION_PROMPT if analysis_type == "form" else VISION_PROMPT
+            
+            # Validate configuration
+            if not VISION_API_BASE:
+                raise ValueError("Vision API base URL not configured")
+            if not VISION_MODEL:
+                raise ValueError("Vision model not configured")
+            if not prompt:
+                raise ValueError(f"Prompt not configured for analysis type: {analysis_type}")
             
             # Prepare API request
             headers = {
@@ -160,11 +273,15 @@ class VisionModule:
                 "temperature": 0.1
             }
             
-            # Make API request with retry logic
-            max_retries = 2
-            for attempt in range(max_retries + 1):
+            # Make API request with comprehensive error handling
+            response = None
+            last_error = None
+            
+            max_retries = 3
+            for attempt in range(max_retries):
                 try:
                     logger.debug(f"Sending request to vision API (attempt {attempt + 1})")
+                    
                     response = requests.post(
                         f"{VISION_API_BASE}/chat/completions",
                         headers=headers,
@@ -172,36 +289,91 @@ class VisionModule:
                         timeout=VISION_API_TIMEOUT
                     )
                     
+                    # Check response status
                     if response.status_code == 200:
                         break
+                    elif response.status_code == 429:
+                        # Rate limited
+                        wait_time = min(5 * (attempt + 1), 30)
+                        logger.warning(f"Rate limited, waiting {wait_time}s before retry")
+                        time.sleep(wait_time)
+                        continue
+                    elif response.status_code >= 500:
+                        # Server error, retry
+                        logger.warning(f"Server error {response.status_code}, retrying...")
+                        time.sleep(2 ** attempt)
+                        continue
                     else:
-                        logger.warning(f"API request failed with status {response.status_code}: {response.text}")
-                        if attempt == max_retries:
-                            raise Exception(f"API request failed: {response.status_code} - {response.text}")
+                        # Client error, don't retry
+                        error_info = global_error_handler.handle_error(
+                            error=Exception(f"API error: {response.status_code} - {response.text}"),
+                            module="vision",
+                            function="describe_screen",
+                            category=ErrorCategory.API_ERROR,
+                            context={"status_code": response.status_code, "response": response.text[:500]}
+                        )
+                        raise Exception(f"Vision API error: {error_info.user_message}")
                         
-                except requests.exceptions.Timeout:
+                except requests.exceptions.Timeout as e:
+                    last_error = e
                     logger.warning(f"API request timed out (attempt {attempt + 1})")
-                    if attempt == max_retries:
-                        raise Exception("Vision API timeout after retries")
+                    if attempt < max_retries - 1:
+                        time.sleep(2 ** attempt)
+                        continue
                         
-                except requests.exceptions.ConnectionError:
+                except requests.exceptions.ConnectionError as e:
+                    last_error = e
                     logger.warning(f"Connection error to vision API (attempt {attempt + 1})")
-                    if attempt == max_retries:
-                        raise Exception("Cannot connect to vision API")
-                
-                # Wait before retry
-                if attempt < max_retries:
-                    time.sleep(1)
+                    if attempt < max_retries - 1:
+                        time.sleep(2 ** attempt)
+                        continue
+                        
+                except requests.exceptions.RequestException as e:
+                    last_error = e
+                    logger.warning(f"Request error (attempt {attempt + 1}): {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(2 ** attempt)
+                        continue
             
-            # Parse response
-            response_data = response.json()
+            # Check if we got a successful response
+            if not response or response.status_code != 200:
+                error_info = global_error_handler.handle_error(
+                    error=last_error or Exception("Vision API request failed"),
+                    module="vision",
+                    function="describe_screen",
+                    category=ErrorCategory.API_ERROR,
+                    context={"max_retries": max_retries, "analysis_type": analysis_type}
+                )
+                raise Exception(f"Vision API unavailable: {error_info.user_message}")
             
+            # Parse response with error handling
+            try:
+                response_data = response.json()
+            except json.JSONDecodeError as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="vision",
+                    function="describe_screen",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"response_text": response.text[:500]}
+                )
+                raise Exception(f"Invalid JSON response: {error_info.user_message}")
+            
+            # Validate response structure
             if "choices" not in response_data or not response_data["choices"]:
-                raise Exception("Invalid API response format")
+                error_info = global_error_handler.handle_error(
+                    error=Exception("Invalid API response format"),
+                    module="vision",
+                    function="describe_screen",
+                    category=ErrorCategory.VALIDATION_ERROR,
+                    context={"response_data": str(response_data)[:500]}
+                )
+                raise Exception(f"Invalid response format: {error_info.user_message}")
             
             content = response_data["choices"][0]["message"]["content"]
             
-            # Parse JSON response from model
+            # Parse JSON response from model with error handling
+            screen_analysis = None
             try:
                 screen_analysis = json.loads(content)
             except json.JSONDecodeError:
@@ -209,9 +381,37 @@ class VisionModule:
                 import re
                 json_match = re.search(r'\{.*\}', content, re.DOTALL)
                 if json_match:
-                    screen_analysis = json.loads(json_match.group())
+                    try:
+                        screen_analysis = json.loads(json_match.group())
+                    except json.JSONDecodeError as e:
+                        error_info = global_error_handler.handle_error(
+                            error=e,
+                            module="vision",
+                            function="describe_screen",
+                            category=ErrorCategory.PROCESSING_ERROR,
+                            context={"content": content[:500]}
+                        )
+                        raise Exception(f"Could not parse vision model response: {error_info.user_message}")
                 else:
-                    raise Exception("Could not parse JSON from vision model response")
+                    error_info = global_error_handler.handle_error(
+                        error=Exception("No JSON found in response"),
+                        module="vision",
+                        function="describe_screen",
+                        category=ErrorCategory.PROCESSING_ERROR,
+                        context={"content": content[:500]}
+                    )
+                    raise Exception(f"Invalid vision model response format: {error_info.user_message}")
+            
+            # Validate screen analysis structure
+            if not isinstance(screen_analysis, dict):
+                error_info = global_error_handler.handle_error(
+                    error=Exception("Screen analysis is not a dictionary"),
+                    module="vision",
+                    function="describe_screen",
+                    category=ErrorCategory.VALIDATION_ERROR,
+                    context={"analysis_type": type(screen_analysis).__name__}
+                )
+                raise Exception(f"Invalid analysis format: {error_info.user_message}")
             
             # Add metadata if not present
             if "metadata" not in screen_analysis:
@@ -220,9 +420,11 @@ class VisionModule:
             screen_analysis["metadata"].update({
                 "timestamp": time.time(),
                 "screen_resolution": [width, height],
-                "analysis_type": analysis_type
+                "analysis_type": analysis_type,
+                "api_response_time": response.elapsed.total_seconds() if response else 0
             })
             
+            # Log results
             if analysis_type == "form":
                 form_count = len(screen_analysis.get('forms', []))
                 total_fields = sum(len(form.get('fields', [])) for form in screen_analysis.get('forms', []))
@@ -234,8 +436,17 @@ class VisionModule:
             return screen_analysis
             
         except Exception as e:
-            logger.error(f"Screen analysis failed: {e}")
-            raise Exception(f"Screen analysis failed: {e}")
+            # Re-raise with additional context if not already handled
+            if "Screen analysis failed" not in str(e):
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="vision",
+                    function="describe_screen",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"analysis_type": analysis_type}
+                )
+                raise Exception(f"Screen analysis failed: {error_info.user_message}")
+            raise
     
     def analyze_forms(self) -> Dict:
         """

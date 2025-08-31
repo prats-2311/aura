@@ -16,6 +16,12 @@ import pygame
 from enum import Enum
 
 from config import SOUNDS, TTS_VOLUME
+from .error_handler import (
+    global_error_handler,
+    with_error_handling,
+    ErrorCategory,
+    ErrorSeverity
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,24 +75,52 @@ class FeedbackModule:
         logger.info("FeedbackModule initialized successfully")
     
     def _initialize_pygame(self) -> None:
-        """Initialize pygame mixer for audio playback."""
+        """Initialize pygame mixer for audio playback with error handling."""
         try:
             logger.info("Initializing pygame mixer for sound effects...")
             
-            # Initialize pygame mixer
-            pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
-            pygame.mixer.init()
+            # Initialize pygame mixer with error handling
+            try:
+                pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
+                pygame.mixer.init()
+            except pygame.error as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="feedback",
+                    function="_initialize_pygame",
+                    category=ErrorCategory.HARDWARE_ERROR,
+                    severity=ErrorSeverity.HIGH,
+                    user_message="Failed to initialize audio system for sound effects."
+                )
+                raise Exception(f"Pygame mixer initialization failed: {error_info.user_message}")
             
-            # Set volume
-            pygame.mixer.music.set_volume(TTS_VOLUME)
+            # Set volume with validation
+            try:
+                if not 0.0 <= TTS_VOLUME <= 1.0:
+                    logger.warning(f"Invalid TTS volume {TTS_VOLUME}, using default 0.7")
+                    volume = 0.7
+                else:
+                    volume = TTS_VOLUME
+                
+                pygame.mixer.music.set_volume(volume)
+                logger.debug(f"Set pygame mixer volume to {volume}")
+            except Exception as e:
+                logger.warning(f"Failed to set volume: {e}, continuing with default")
             
             self.is_initialized = True
             logger.info("Pygame mixer initialized successfully")
             
         except Exception as e:
-            logger.error(f"Failed to initialize pygame mixer: {e}")
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="feedback",
+                function="_initialize_pygame",
+                category=ErrorCategory.HARDWARE_ERROR,
+                severity=ErrorSeverity.HIGH
+            )
+            logger.error(f"Failed to initialize pygame mixer: {error_info.message}")
             self.is_initialized = False
-            raise
+            raise Exception(f"Audio system initialization failed: {error_info.user_message}")
     
     def _load_sound_files(self) -> None:
         """Load and cache sound files for faster playback."""
@@ -230,37 +264,86 @@ class FeedbackModule:
         except Exception as e:
             logger.error(f"Error playing TTS message: {e}")
     
+    @with_error_handling(
+        category=ErrorCategory.HARDWARE_ERROR,
+        severity=ErrorSeverity.LOW,
+        max_retries=1,
+        user_message="Having trouble playing sound effects."
+    )
     def play(self, sound_name: str, priority: FeedbackPriority = FeedbackPriority.NORMAL) -> None:
         """
-        Play a sound effect with specified priority.
+        Play a sound effect with specified priority and error handling.
         
         Args:
             sound_name: Name of the sound to play (success, failure, thinking)
             priority: Priority level for the feedback
         """
         if not self.is_initialized:
-            logger.warning("FeedbackModule not initialized, cannot play sound")
+            error_info = global_error_handler.handle_error(
+                error=Exception("FeedbackModule not initialized"),
+                module="feedback",
+                function="play",
+                category=ErrorCategory.CONFIGURATION_ERROR,
+                context={"sound_name": sound_name, "priority": priority.name}
+            )
+            logger.warning(f"Cannot play sound: {error_info.message}")
             return
         
         try:
+            # Validate inputs
+            if not sound_name or not isinstance(sound_name, str):
+                raise ValueError("Sound name must be a non-empty string")
+            
+            if not isinstance(priority, FeedbackPriority):
+                raise ValueError("Priority must be a FeedbackPriority enum value")
+            
             # Validate sound name
             if sound_name not in SOUNDS:
-                logger.warning(f"Unknown sound name: {sound_name}")
+                error_info = global_error_handler.handle_error(
+                    error=Exception(f"Unknown sound name: {sound_name}"),
+                    module="feedback",
+                    function="play",
+                    category=ErrorCategory.VALIDATION_ERROR,
+                    context={"sound_name": sound_name, "available_sounds": list(SOUNDS.keys())}
+                )
+                logger.warning(f"Unknown sound name: {error_info.message}")
                 return
             
             # Create feedback item
             feedback_item = {
                 "type": FeedbackType.SOUND,
-                "sound_name": sound_name
+                "sound_name": sound_name,
+                "timestamp": time.time()
             }
             
             # Add to queue with priority
-            self._add_to_queue(feedback_item, priority)
-            
-            logger.debug(f"Queued sound effect: {sound_name} with priority {priority.name}")
+            try:
+                self._add_to_queue(feedback_item, priority)
+                logger.debug(f"Queued sound effect: {sound_name} with priority {priority.name}")
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="feedback",
+                    function="play",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"sound_name": sound_name, "priority": priority.name}
+                )
+                logger.error(f"Failed to queue sound effect: {error_info.message}")
+                # Try to play directly as fallback
+                try:
+                    self._play_sound_effect(feedback_item)
+                except Exception as fallback_error:
+                    logger.error(f"Fallback sound playback also failed: {fallback_error}")
             
         except Exception as e:
-            logger.error(f"Error queuing sound effect: {e}")
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="feedback",
+                function="play",
+                category=ErrorCategory.PROCESSING_ERROR,
+                context={"sound_name": sound_name, "priority": priority.name}
+            )
+            logger.error(f"Error playing sound effect: {error_info.message}")
     
     def speak(self, message: str, priority: FeedbackPriority = FeedbackPriority.NORMAL) -> None:
         """

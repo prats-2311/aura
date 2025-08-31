@@ -9,6 +9,7 @@ Processes user commands and screen context to generate structured action plans.
 import json
 import logging
 import requests
+import time
 from typing import Dict, Any, Optional
 from config import (
     REASONING_API_BASE,
@@ -16,6 +17,12 @@ from config import (
     REASONING_MODEL,
     REASONING_META_PROMPT,
     REASONING_API_TIMEOUT
+)
+from .error_handler import (
+    global_error_handler,
+    with_error_handling,
+    ErrorCategory,
+    ErrorSeverity
 )
 
 # Configure logging
@@ -43,6 +50,14 @@ class ReasoningModule:
         
         logger.info(f"ReasoningModule initialized with model: {self.model}")
     
+    @with_error_handling(
+        category=ErrorCategory.API_ERROR,
+        severity=ErrorSeverity.MEDIUM,
+        max_retries=3,
+        retry_delay=2.0,
+        user_message="I'm having trouble processing your request. Please try again.",
+        fallback_return=None
+    )
     def get_action_plan(self, user_command: str, screen_context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate an action plan based on user command and screen context.
@@ -55,26 +70,83 @@ class ReasoningModule:
             dict: Structured action plan with steps and metadata
             
         Raises:
-            Exception: If API communication fails or response is invalid
+            Exception: If API communication fails or response is invalid after retries
         """
         try:
-            logger.info(f"Generating action plan for command: '{user_command}'")
+            # Input validation
+            if not user_command or not user_command.strip():
+                raise ValueError("User command cannot be empty")
+            
+            if not isinstance(screen_context, dict):
+                raise ValueError("Screen context must be a dictionary")
+            
+            # Validate command length
+            if len(user_command) > 1000:
+                raise ValueError("User command too long (maximum 1000 characters)")
+            
+            logger.info(f"Generating action plan for command: '{user_command[:100]}...'")
             
             # Prepare the prompt with user command and screen context
-            prompt = self._build_prompt(user_command, screen_context)
+            try:
+                prompt = self._build_prompt(user_command, screen_context)
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="reasoning",
+                    function="get_action_plan",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"command_length": len(user_command), "context_keys": list(screen_context.keys())}
+                )
+                raise Exception(f"Prompt building failed: {error_info.user_message}")
             
             # Make API request to cloud LLM
-            response = self._make_api_request(prompt)
+            try:
+                response = self._make_api_request(prompt)
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="reasoning",
+                    function="get_action_plan",
+                    category=ErrorCategory.API_ERROR,
+                    context={"prompt_length": len(prompt)}
+                )
+                # Return fallback response for API errors
+                return self._get_fallback_response(str(e))
             
             # Parse and validate the response
-            action_plan = self._parse_response(response)
+            try:
+                action_plan = self._parse_response(response)
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="reasoning",
+                    function="get_action_plan",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"response_type": type(response).__name__}
+                )
+                # Return fallback response for parsing errors
+                return self._get_fallback_response(str(e))
+            
+            # Final validation of action plan
+            try:
+                self._validate_action_plan(action_plan)
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="reasoning",
+                    function="get_action_plan",
+                    category=ErrorCategory.VALIDATION_ERROR,
+                    context={"plan_keys": list(action_plan.keys()) if isinstance(action_plan, dict) else "not_dict"}
+                )
+                # Return fallback response for validation errors
+                return self._get_fallback_response(str(e))
             
             logger.info(f"Generated action plan with {len(action_plan.get('plan', []))} steps")
             return action_plan
             
         except Exception as e:
+            # Final fallback - always return a valid response
             logger.error(f"Failed to generate action plan: {str(e)}")
-            # Return fallback response
             return self._get_fallback_response(str(e))
     
     def _build_prompt(self, user_command: str, screen_context: Dict[str, Any]) -> str:
@@ -103,7 +175,7 @@ Please analyze the user's command and the current screen state, then provide a d
     
     def _make_api_request(self, prompt: str) -> Dict[str, Any]:
         """
-        Make API request to the cloud reasoning model.
+        Make API request to the cloud reasoning model with comprehensive error handling.
         
         Args:
             prompt (str): The complete prompt to send
@@ -112,8 +184,22 @@ Please analyze the user's command and the current screen state, then provide a d
             dict: Raw API response
             
         Raises:
-            requests.RequestException: If API request fails
+            Exception: If API request fails after retries
         """
+        # Validate configuration
+        if not self.api_base:
+            raise ValueError("Reasoning API base URL not configured")
+        if not self.api_key or self.api_key == "your_ollama_cloud_api_key_here":
+            raise ValueError("Reasoning API key not configured")
+        if not self.model:
+            raise ValueError("Reasoning model not configured")
+        
+        # Validate prompt
+        if not prompt or not prompt.strip():
+            raise ValueError("Prompt cannot be empty")
+        if len(prompt) > 50000:  # Reasonable limit
+            raise ValueError("Prompt too long (maximum 50000 characters)")
+        
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
@@ -134,25 +220,146 @@ Please analyze the user's command and the current screen state, then provide a d
         
         logger.debug(f"Making API request to {self.api_base}/chat/completions")
         
-        try:
-            response = requests.post(
-                f"{self.api_base}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            
-            return response.json()
-            
-        except requests.exceptions.Timeout:
-            raise Exception(f"API request timed out after {self.timeout} seconds")
-        except requests.exceptions.ConnectionError:
-            raise Exception("Failed to connect to reasoning API")
-        except requests.exceptions.HTTPError as e:
-            raise Exception(f"API request failed with status {response.status_code}: {response.text}")
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"API request failed: {str(e)}")
+        # Implement retry logic with exponential backoff
+        max_retries = 3
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                start_time = time.time()
+                
+                response = requests.post(
+                    f"{self.api_base}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout
+                )
+                
+                response_time = time.time() - start_time
+                logger.debug(f"API request completed in {response_time:.2f}s")
+                
+                # Handle different HTTP status codes
+                if response.status_code == 200:
+                    try:
+                        return response.json()
+                    except json.JSONDecodeError as e:
+                        error_info = global_error_handler.handle_error(
+                            error=e,
+                            module="reasoning",
+                            function="_make_api_request",
+                            category=ErrorCategory.PROCESSING_ERROR,
+                            context={"response_text": response.text[:500]}
+                        )
+                        raise Exception(f"Invalid JSON response: {error_info.user_message}")
+                
+                elif response.status_code == 401:
+                    error_info = global_error_handler.handle_error(
+                        error=Exception("Authentication failed"),
+                        module="reasoning",
+                        function="_make_api_request",
+                        category=ErrorCategory.CONFIGURATION_ERROR,
+                        context={"status_code": response.status_code}
+                    )
+                    raise Exception(f"API authentication failed: {error_info.user_message}")
+                
+                elif response.status_code == 429:
+                    # Rate limited - wait and retry
+                    wait_time = min(5 * (2 ** attempt), 60)  # Exponential backoff, max 60s
+                    logger.warning(f"Rate limited, waiting {wait_time}s before retry (attempt {attempt + 1})")
+                    if attempt < max_retries - 1:
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        error_info = global_error_handler.handle_error(
+                            error=Exception("Rate limit exceeded"),
+                            module="reasoning",
+                            function="_make_api_request",
+                            category=ErrorCategory.API_ERROR,
+                            context={"status_code": response.status_code, "attempts": attempt + 1}
+                        )
+                        raise Exception(f"API rate limit exceeded: {error_info.user_message}")
+                
+                elif response.status_code >= 500:
+                    # Server error - retry
+                    wait_time = min(2 ** attempt, 30)  # Exponential backoff, max 30s
+                    logger.warning(f"Server error {response.status_code}, waiting {wait_time}s before retry")
+                    if attempt < max_retries - 1:
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        error_info = global_error_handler.handle_error(
+                            error=Exception(f"Server error: {response.status_code}"),
+                            module="reasoning",
+                            function="_make_api_request",
+                            category=ErrorCategory.API_ERROR,
+                            context={"status_code": response.status_code, "response": response.text[:500]}
+                        )
+                        raise Exception(f"API server error: {error_info.user_message}")
+                
+                else:
+                    # Client error - don't retry
+                    error_info = global_error_handler.handle_error(
+                        error=Exception(f"HTTP {response.status_code}: {response.text}"),
+                        module="reasoning",
+                        function="_make_api_request",
+                        category=ErrorCategory.API_ERROR,
+                        context={"status_code": response.status_code, "response": response.text[:500]}
+                    )
+                    raise Exception(f"API request failed: {error_info.user_message}")
+                
+            except requests.exceptions.Timeout as e:
+                last_error = e
+                logger.warning(f"API request timed out (attempt {attempt + 1})")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+                
+            except requests.exceptions.ConnectionError as e:
+                last_error = e
+                logger.warning(f"Connection error to reasoning API (attempt {attempt + 1})")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+                
+            except requests.exceptions.RequestException as e:
+                last_error = e
+                logger.warning(f"Request error (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+        
+        # All retries failed
+        if last_error:
+            if isinstance(last_error, requests.exceptions.Timeout):
+                error_info = global_error_handler.handle_error(
+                    error=last_error,
+                    module="reasoning",
+                    function="_make_api_request",
+                    category=ErrorCategory.TIMEOUT_ERROR,
+                    context={"timeout": self.timeout, "attempts": max_retries}
+                )
+                raise Exception(f"API timeout after {max_retries} attempts: {error_info.user_message}")
+            elif isinstance(last_error, requests.exceptions.ConnectionError):
+                error_info = global_error_handler.handle_error(
+                    error=last_error,
+                    module="reasoning",
+                    function="_make_api_request",
+                    category=ErrorCategory.NETWORK_ERROR,
+                    context={"api_base": self.api_base, "attempts": max_retries}
+                )
+                raise Exception(f"Cannot connect to reasoning API: {error_info.user_message}")
+            else:
+                error_info = global_error_handler.handle_error(
+                    error=last_error,
+                    module="reasoning",
+                    function="_make_api_request",
+                    category=ErrorCategory.API_ERROR,
+                    context={"attempts": max_retries}
+                )
+                raise Exception(f"API request failed: {error_info.user_message}")
+        
+        # Should not reach here
+        raise Exception("API request failed for unknown reason")
     
     def _parse_response(self, api_response: Dict[str, Any]) -> Dict[str, Any]:
         """

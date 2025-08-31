@@ -11,6 +11,12 @@ import time
 import logging
 from typing import Dict, Any, Tuple, Optional, List
 from config import MOUSE_MOVE_DURATION, TYPE_INTERVAL, SCROLL_AMOUNT
+from .error_handler import (
+    global_error_handler,
+    with_error_handling,
+    ErrorCategory,
+    ErrorSeverity
+)
 
 # Configure PyAutoGUI safety settings
 pyautogui.FAILSAFE = True  # Move mouse to corner to abort
@@ -79,9 +85,15 @@ class AutomationModule:
             return False
         return True
     
+    @with_error_handling(
+        category=ErrorCategory.HARDWARE_ERROR,
+        severity=ErrorSeverity.MEDIUM,
+        max_retries=0,  # We handle retries internally
+        user_message="I'm having trouble controlling your computer. Please check if the application is responding."
+    )
     def execute_action(self, action: Dict[str, Any]) -> None:
         """
-        Execute a single GUI action with retry logic and error recovery.
+        Execute a single GUI action with comprehensive error handling and retry logic.
         
         Args:
             action: Dictionary containing action type and parameters
@@ -98,23 +110,57 @@ class AutomationModule:
             ValueError: If action format is invalid
             RuntimeError: If action execution fails after all retries
         """
+        # Validate action structure
+        if not isinstance(action, dict):
+            raise ValueError("Action must be a dictionary")
+        
         action_type = action.get("action")
         if not action_type:
             raise ValueError("Action type is required")
         
+        # Validate action type
+        valid_actions = {"click", "double_click", "type", "scroll"}
+        if action_type not in valid_actions:
+            raise ValueError(f"Unsupported action type: {action_type}. Valid types: {valid_actions}")
+        
+        # Pre-validate action parameters
+        is_valid, error_msg = self.validate_action_format(action)
+        if not is_valid:
+            raise ValueError(f"Invalid action format: {error_msg}")
+        
         # Record action attempt
-        self.action_history.append({
+        action_record = {
             "action": action.copy(),
             "timestamp": time.time(),
-            "status": "attempting"
-        })
+            "status": "attempting",
+            "attempts": 0
+        }
+        self.action_history.append(action_record)
         
         last_exception = None
         
         for attempt in range(self.max_retries + 1):
             try:
+                action_record["attempts"] = attempt + 1
                 logger.info(f"Executing action: {action_type} (attempt {attempt + 1}/{self.max_retries + 1})")
                 
+                # Check for PyAutoGUI failsafe
+                try:
+                    current_pos = pyautogui.position()
+                    if current_pos.x == 0 and current_pos.y == 0:
+                        logger.warning("Mouse at failsafe position (0,0), aborting action")
+                        raise pyautogui.FailSafeException("PyAutoGUI failsafe triggered")
+                except pyautogui.FailSafeException:
+                    error_info = global_error_handler.handle_error(
+                        error=Exception("PyAutoGUI failsafe triggered"),
+                        module="automation",
+                        function="execute_action",
+                        category=ErrorCategory.HARDWARE_ERROR,
+                        context={"action_type": action_type, "attempt": attempt + 1}
+                    )
+                    raise RuntimeError(f"Automation stopped by failsafe: {error_info.user_message}")
+                
+                # Execute the specific action
                 if action_type == "click":
                     self._execute_click(action)
                 elif action_type == "double_click":
@@ -123,32 +169,79 @@ class AutomationModule:
                     self._execute_type(action)
                 elif action_type == "scroll":
                     self._execute_scroll(action)
-                else:
-                    raise ValueError(f"Unsupported action type: {action_type}")
                 
                 # Success - update history and return
-                self.action_history[-1]["status"] = "success"
+                action_record["status"] = "success"
+                action_record["completion_time"] = time.time()
                 logger.info(f"Successfully executed action: {action_type}")
                 return
                 
+            except pyautogui.FailSafeException as e:
+                # Don't retry failsafe exceptions
+                last_exception = e
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="automation",
+                    function="execute_action",
+                    category=ErrorCategory.HARDWARE_ERROR,
+                    context={"action_type": action_type, "attempt": attempt + 1}
+                )
+                action_record["status"] = "failed"
+                action_record["error"] = str(e)
+                raise RuntimeError(f"Automation failsafe triggered: {error_info.user_message}")
+                
             except Exception as e:
                 last_exception = e
-                logger.warning(f"Action {action_type} failed on attempt {attempt + 1}: {str(e)}")
+                
+                # Log the error with context
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="automation",
+                    function="execute_action",
+                    category=ErrorCategory.HARDWARE_ERROR,
+                    context={
+                        "action_type": action_type,
+                        "attempt": attempt + 1,
+                        "action_params": {k: v for k, v in action.items() if k != "text"}  # Don't log sensitive text
+                    }
+                )
+                
+                logger.warning(f"Action {action_type} failed on attempt {attempt + 1}: {error_info.message}")
                 
                 if attempt < self.max_retries:
                     logger.info(f"Retrying in {self.retry_delay} seconds...")
                     time.sleep(self.retry_delay)
+                    
                     # Try to recover by moving mouse to center of screen
                     try:
-                        pyautogui.moveTo(self.screen_width // 2, self.screen_height // 2, duration=0.1)
-                    except Exception:
-                        pass  # Ignore recovery failures
+                        center_x = self.screen_width // 2
+                        center_y = self.screen_height // 2
+                        pyautogui.moveTo(center_x, center_y, duration=0.1)
+                        logger.debug("Moved mouse to center for recovery")
+                    except Exception as recovery_error:
+                        logger.warning(f"Recovery action failed: {recovery_error}")
+                        # Continue anyway
         
         # All retries failed
-        self.action_history[-1]["status"] = "failed"
-        self.action_history[-1]["error"] = str(last_exception)
-        logger.error(f"Action {action_type} failed after {self.max_retries + 1} attempts: {str(last_exception)}")
-        raise RuntimeError(f"Action execution failed after {self.max_retries + 1} attempts: {str(last_exception)}")
+        action_record["status"] = "failed"
+        action_record["error"] = str(last_exception)
+        action_record["completion_time"] = time.time()
+        
+        # Log final failure
+        final_error_info = global_error_handler.handle_error(
+            error=last_exception or Exception("Unknown error"),
+            module="automation",
+            function="execute_action",
+            category=ErrorCategory.HARDWARE_ERROR,
+            context={
+                "action_type": action_type,
+                "total_attempts": self.max_retries + 1,
+                "final_error": str(last_exception)
+            }
+        )
+        
+        logger.error(f"Action {action_type} failed after {self.max_retries + 1} attempts: {final_error_info.message}")
+        raise RuntimeError(f"Action execution failed after {self.max_retries + 1} attempts: {final_error_info.user_message}")
     
     def execute_action_sequence(self, actions: List[Dict[str, Any]], stop_on_error: bool = False) -> Dict[str, Any]:
         """

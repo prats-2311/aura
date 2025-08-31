@@ -32,6 +32,12 @@ from config import (
     PORCUPINE_API_KEY,
     WAKE_WORD
 )
+from .error_handler import (
+    global_error_handler,
+    with_error_handling,
+    ErrorCategory,
+    ErrorSeverity
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,15 +70,23 @@ class AudioModule:
         logger.info("AudioModule initialized successfully")
     
     def _initialize_whisper(self) -> None:
-        """Initialize the Whisper model for speech-to-text."""
+        """Initialize the Whisper model for speech-to-text with error handling."""
         try:
             logger.info("Loading Whisper model...")
             # Use base model for good balance of speed and accuracy
             self.whisper_model = whisper.load_model("base")
             logger.info("Whisper model loaded successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize Whisper model: {e}")
-            raise
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="audio",
+                function="_initialize_whisper",
+                category=ErrorCategory.CONFIGURATION_ERROR,
+                severity=ErrorSeverity.CRITICAL,
+                user_message="Failed to load speech recognition model. Please check your installation."
+            )
+            logger.error(f"Failed to initialize Whisper model: {error_info.message}")
+            raise Exception(f"Whisper initialization failed: {error_info.user_message}")
     
     def _initialize_tts(self) -> None:
         """Initialize the text-to-speech engine."""
@@ -122,9 +136,15 @@ class AudioModule:
             logger.warning("Wake word detection will not be available")
             self.porcupine = None
     
+    @with_error_handling(
+        category=ErrorCategory.HARDWARE_ERROR,
+        severity=ErrorSeverity.MEDIUM,
+        max_retries=2,
+        user_message="I'm having trouble hearing you. Please check your microphone and try again."
+    )
     def speech_to_text(self, duration: float = 5.0, silence_threshold: float = 0.01) -> str:
         """
-        Convert speech to text using Whisper.
+        Convert speech to text using Whisper with comprehensive error handling.
         
         Args:
             duration: Maximum recording duration in seconds
@@ -134,50 +154,185 @@ class AudioModule:
             Transcribed text from speech
             
         Raises:
-            RuntimeError: If speech recognition fails
+            RuntimeError: If speech recognition fails after retries
         """
         try:
+            # Validate parameters
+            if duration <= 0 or duration > 60:
+                raise ValueError("Duration must be between 0 and 60 seconds")
+            if not 0.0 <= silence_threshold <= 1.0:
+                raise ValueError("Silence threshold must be between 0.0 and 1.0")
+            
+            # Check if Whisper model is loaded
+            if not self.whisper_model:
+                error_info = global_error_handler.handle_error(
+                    error=Exception("Whisper model not initialized"),
+                    module="audio",
+                    function="speech_to_text",
+                    category=ErrorCategory.CONFIGURATION_ERROR,
+                    context={"duration": duration, "silence_threshold": silence_threshold}
+                )
+                raise RuntimeError(f"Speech recognition not available: {error_info.user_message}")
+            
             logger.info(f"Starting speech recording for {duration} seconds...")
             
-            # Record audio
-            audio_data = self._record_audio(duration, silence_threshold)
+            # Record audio with error handling
+            try:
+                audio_data = self._record_audio(duration, silence_threshold)
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="audio",
+                    function="speech_to_text",
+                    category=ErrorCategory.HARDWARE_ERROR,
+                    context={"duration": duration, "silence_threshold": silence_threshold}
+                )
+                raise RuntimeError(f"Audio recording failed: {error_info.user_message}")
             
             if audio_data is None or len(audio_data) == 0:
                 logger.warning("No audio data recorded")
                 return ""
             
-            # Save audio to temporary file for Whisper
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-                temp_path = temp_file.name
-                
-                # Convert numpy array to audio file
-                audio_segment = AudioSegment(
-                    audio_data.tobytes(),
-                    frame_rate=AUDIO_SAMPLE_RATE,
-                    sample_width=audio_data.dtype.itemsize,
-                    channels=1
-                )
-                audio_segment.export(temp_path, format="wav")
+            # Validate audio data
+            if len(audio_data) < AUDIO_SAMPLE_RATE * 0.1:  # Less than 0.1 seconds
+                logger.warning("Audio recording too short for transcription")
+                return ""
             
+            # Save audio to temporary file for Whisper
+            temp_path = None
             try:
-                # Transcribe using Whisper
-                logger.info("Transcribing audio with Whisper...")
-                result = self.whisper_model.transcribe(temp_path)
-                text = result["text"].strip()
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+                    temp_path = temp_file.name
                 
-                logger.info(f"Transcription result: '{text}'")
-                return text
+                # Convert numpy array to audio file with error handling
+                try:
+                    audio_segment = AudioSegment(
+                        audio_data.tobytes(),
+                        frame_rate=AUDIO_SAMPLE_RATE,
+                        sample_width=audio_data.dtype.itemsize,
+                        channels=1
+                    )
+                    audio_segment.export(temp_path, format="wav")
+                except Exception as e:
+                    error_info = global_error_handler.handle_error(
+                        error=e,
+                        module="audio",
+                        function="speech_to_text",
+                        category=ErrorCategory.PROCESSING_ERROR,
+                        context={"audio_length": len(audio_data), "sample_rate": AUDIO_SAMPLE_RATE}
+                    )
+                    raise RuntimeError(f"Audio processing failed: {error_info.user_message}")
+                
+                # Transcribe using Whisper with timeout
+                try:
+                    logger.info("Transcribing audio with Whisper...")
+                    
+                    # Use threading to implement timeout for Whisper
+                    result_queue = queue.Queue()
+                    error_queue = queue.Queue()
+                    
+                    def transcribe_worker():
+                        try:
+                            result = self.whisper_model.transcribe(temp_path)
+                            result_queue.put(result)
+                        except Exception as e:
+                            error_queue.put(e)
+                    
+                    transcribe_thread = threading.Thread(target=transcribe_worker, daemon=True)
+                    transcribe_thread.start()
+                    
+                    # Wait for result with timeout
+                    transcribe_thread.join(timeout=AUDIO_API_TIMEOUT)
+                    
+                    if transcribe_thread.is_alive():
+                        error_info = global_error_handler.handle_error(
+                            error=Exception("Whisper transcription timeout"),
+                            module="audio",
+                            function="speech_to_text",
+                            category=ErrorCategory.TIMEOUT_ERROR,
+                            context={"timeout": AUDIO_API_TIMEOUT}
+                        )
+                        raise RuntimeError(f"Speech recognition timed out: {error_info.user_message}")
+                    
+                    # Check for errors
+                    if not error_queue.empty():
+                        transcribe_error = error_queue.get()
+                        error_info = global_error_handler.handle_error(
+                            error=transcribe_error,
+                            module="audio",
+                            function="speech_to_text",
+                            category=ErrorCategory.PROCESSING_ERROR,
+                            context={"temp_file": temp_path}
+                        )
+                        raise RuntimeError(f"Speech transcription failed: {error_info.user_message}")
+                    
+                    # Get result
+                    if result_queue.empty():
+                        error_info = global_error_handler.handle_error(
+                            error=Exception("No transcription result"),
+                            module="audio",
+                            function="speech_to_text",
+                            category=ErrorCategory.PROCESSING_ERROR
+                        )
+                        raise RuntimeError(f"No transcription result: {error_info.user_message}")
+                    
+                    result = result_queue.get()
+                    
+                    # Validate result
+                    if not isinstance(result, dict) or "text" not in result:
+                        error_info = global_error_handler.handle_error(
+                            error=Exception("Invalid transcription result format"),
+                            module="audio",
+                            function="speech_to_text",
+                            category=ErrorCategory.PROCESSING_ERROR,
+                            context={"result_type": type(result).__name__}
+                        )
+                        raise RuntimeError(f"Invalid transcription result: {error_info.user_message}")
+                    
+                    text = result["text"].strip()
+                    
+                    # Log confidence if available
+                    if "segments" in result and result["segments"]:
+                        avg_confidence = sum(seg.get("avg_logprob", 0) for seg in result["segments"]) / len(result["segments"])
+                        logger.debug(f"Average transcription confidence: {avg_confidence:.3f}")
+                    
+                    logger.info(f"Transcription result: '{text}'")
+                    return text
+                    
+                except Exception as e:
+                    if "Speech recognition" in str(e) or "Speech transcription" in str(e):
+                        raise  # Re-raise already handled errors
+                    
+                    error_info = global_error_handler.handle_error(
+                        error=e,
+                        module="audio",
+                        function="speech_to_text",
+                        category=ErrorCategory.PROCESSING_ERROR,
+                        context={"temp_file": temp_path}
+                    )
+                    raise RuntimeError(f"Speech transcription failed: {error_info.user_message}")
                 
             finally:
                 # Clean up temporary file
-                try:
-                    os.unlink(temp_path)
-                except OSError:
-                    pass
+                if temp_path:
+                    try:
+                        os.unlink(temp_path)
+                        logger.debug(f"Cleaned up temporary file: {temp_path}")
+                    except OSError as e:
+                        logger.warning(f"Failed to clean up temporary file {temp_path}: {e}")
                     
         except Exception as e:
-            logger.error(f"Speech-to-text conversion failed: {e}")
-            raise RuntimeError(f"Speech recognition failed: {e}")
+            # Re-raise with additional context if not already handled
+            if "Speech recognition failed" not in str(e):
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="audio",
+                    function="speech_to_text",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"duration": duration, "silence_threshold": silence_threshold}
+                )
+                raise RuntimeError(f"Speech recognition failed: {error_info.user_message}")
+            raise
     
     def _record_audio(self, duration: float, silence_threshold: float) -> Optional[np.ndarray]:
         """

@@ -22,6 +22,13 @@ from modules.reasoning import ReasoningModule
 from modules.automation import AutomationModule
 from modules.audio import AudioModule
 from modules.feedback import FeedbackModule, FeedbackPriority
+from modules.error_handler import (
+    global_error_handler,
+    with_error_handling,
+    ErrorCategory,
+    ErrorSeverity,
+    ErrorInfo
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,9 +111,13 @@ class Orchestrator:
         self.progress_callbacks = []
         self.progress_lock = threading.Lock()
         
-        # Error handling
+        # Error handling and recovery
         self.max_retries = 2
         self.retry_delay = 1.0
+        self.error_recovery_enabled = True
+        self.graceful_degradation_enabled = True
+        self.system_health_status = {}
+        self.module_availability = {}
         
         # Parallel processing
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=3)
@@ -115,10 +126,394 @@ class Orchestrator:
         # Command validation patterns
         self._init_validation_patterns()
         
-        # Initialize modules
+        # Initialize modules with error handling
         self._initialize_modules()
         
+        # Initialize system health monitoring
+        self._initialize_system_health()
+        
         logger.info("Orchestrator initialized successfully")
+    
+    def _initialize_system_health(self) -> None:
+        """Initialize system health monitoring."""
+        try:
+            self.system_health_status = {
+                'overall_health': 'healthy',
+                'last_health_check': time.time(),
+                'module_health': {
+                    'vision': 'healthy' if self.module_availability.get('vision', False) else 'unavailable',
+                    'reasoning': 'healthy' if self.module_availability.get('reasoning', False) else 'unavailable',
+                    'automation': 'healthy' if self.module_availability.get('automation', False) else 'unavailable',
+                    'audio': 'healthy' if self.module_availability.get('audio', False) else 'unavailable',
+                    'feedback': 'healthy' if self.module_availability.get('feedback', False) else 'unavailable'
+                },
+                'error_rates': {
+                    'vision': 0.0,
+                    'reasoning': 0.0,
+                    'automation': 0.0,
+                    'audio': 0.0,
+                    'feedback': 0.0
+                },
+                'recovery_attempts': {
+                    'vision': 0,
+                    'reasoning': 0,
+                    'automation': 0,
+                    'audio': 0,
+                    'feedback': 0
+                }
+            }
+            
+            logger.info("System health monitoring initialized")
+            
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_initialize_system_health",
+                category=ErrorCategory.CONFIGURATION_ERROR,
+                severity=ErrorSeverity.MEDIUM
+            )
+            logger.warning(f"System health monitoring initialization failed: {error_info.message}")
+    
+    def get_system_health(self) -> Dict[str, Any]:
+        """
+        Get current system health status.
+        
+        Returns:
+            Dictionary containing system health information
+        """
+        try:
+            # Update health check timestamp
+            self.system_health_status['last_health_check'] = time.time()
+            
+            # Get error statistics from global error handler
+            error_stats = global_error_handler.get_error_statistics()
+            
+            # Calculate overall health score
+            available_modules = sum(1 for available in self.module_availability.values() if available)
+            total_modules = len(self.module_availability)
+            availability_score = available_modules / total_modules
+            
+            # Factor in error rates
+            total_errors = error_stats.get('total_errors', 0)
+            error_rate = error_stats.get('error_rate', 0)
+            
+            # Calculate health score (0-100)
+            health_score = max(0, min(100, (availability_score * 70) + max(0, (30 - error_rate))))
+            
+            # Determine overall health status
+            if health_score >= 80:
+                overall_health = 'healthy'
+            elif health_score >= 60:
+                overall_health = 'degraded'
+            elif health_score >= 40:
+                overall_health = 'unhealthy'
+            else:
+                overall_health = 'critical'
+            
+            self.system_health_status['overall_health'] = overall_health
+            self.system_health_status['health_score'] = health_score
+            self.system_health_status['error_statistics'] = error_stats
+            
+            return self.system_health_status.copy()
+            
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="get_system_health",
+                category=ErrorCategory.PROCESSING_ERROR,
+                severity=ErrorSeverity.LOW
+            )
+            logger.warning(f"Failed to get system health: {error_info.message}")
+            
+            return {
+                'overall_health': 'unknown',
+                'health_score': 0,
+                'error': error_info.user_message,
+                'last_health_check': time.time()
+            }
+    
+    def attempt_system_recovery(self, failed_module: str = None) -> Dict[str, Any]:
+        """
+        Attempt to recover from system errors.
+        
+        Args:
+            failed_module: Specific module to attempt recovery for (None for system-wide)
+            
+        Returns:
+            Dictionary containing recovery results
+        """
+        recovery_results = {
+            'recovery_attempted': True,
+            'recovery_successful': False,
+            'recovered_modules': [],
+            'failed_modules': [],
+            'errors': [],
+            'timestamp': time.time()
+        }
+        
+        try:
+            logger.info(f"Attempting system recovery{f' for module: {failed_module}' if failed_module else ''}")
+            
+            modules_to_recover = [failed_module] if failed_module else list(self.module_availability.keys())
+            
+            for module_name in modules_to_recover:
+                if not self.module_availability.get(module_name, False):
+                    try:
+                        logger.info(f"Attempting to recover {module_name} module")
+                        
+                        # Increment recovery attempt counter
+                        self.system_health_status['recovery_attempts'][module_name] += 1
+                        
+                        # Attempt module recovery based on type
+                        recovery_success = self._recover_module(module_name)
+                        
+                        if recovery_success:
+                            self.module_availability[module_name] = True
+                            self.system_health_status['module_health'][module_name] = 'healthy'
+                            recovery_results['recovered_modules'].append(module_name)
+                            logger.info(f"Successfully recovered {module_name} module")
+                        else:
+                            recovery_results['failed_modules'].append(module_name)
+                            logger.warning(f"Failed to recover {module_name} module")
+                            
+                    except Exception as e:
+                        error_info = global_error_handler.handle_error(
+                            error=e,
+                            module="orchestrator",
+                            function="attempt_system_recovery",
+                            category=ErrorCategory.PROCESSING_ERROR,
+                            context={"module": module_name}
+                        )
+                        recovery_results['failed_modules'].append(module_name)
+                        recovery_results['errors'].append(f"{module_name}: {error_info.user_message}")
+                        logger.error(f"Recovery failed for {module_name}: {error_info.message}")
+            
+            # Determine overall recovery success
+            recovery_results['recovery_successful'] = len(recovery_results['recovered_modules']) > 0
+            
+            # Update system health after recovery attempt
+            self._update_system_health_after_recovery(recovery_results)
+            
+            logger.info(f"System recovery completed. Recovered: {len(recovery_results['recovered_modules'])}, "
+                       f"Failed: {len(recovery_results['failed_modules'])}")
+            
+            return recovery_results
+            
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="attempt_system_recovery",
+                category=ErrorCategory.PROCESSING_ERROR,
+                severity=ErrorSeverity.HIGH
+            )
+            
+            recovery_results['recovery_successful'] = False
+            recovery_results['errors'].append(f"Recovery system failure: {error_info.user_message}")
+            logger.error(f"System recovery failed: {error_info.message}")
+            
+            return recovery_results
+    
+    def _recover_module(self, module_name: str) -> bool:
+        """
+        Attempt to recover a specific module.
+        
+        Args:
+            module_name: Name of the module to recover
+            
+        Returns:
+            True if recovery was successful, False otherwise
+        """
+        try:
+            logger.debug(f"Attempting recovery for {module_name} module")
+            
+            if module_name == 'vision':
+                # Attempt to reinitialize vision module
+                self.vision_module = VisionModule()
+                return True
+                
+            elif module_name == 'reasoning':
+                # Attempt to reinitialize reasoning module
+                self.reasoning_module = ReasoningModule()
+                return True
+                
+            elif module_name == 'automation':
+                # Attempt to reinitialize automation module
+                self.automation_module = AutomationModule()
+                return True
+                
+            elif module_name == 'audio':
+                # Attempt to reinitialize audio module
+                self.audio_module = AudioModule()
+                return True
+                
+            elif module_name == 'feedback':
+                # Attempt to reinitialize feedback module
+                self.feedback_module = FeedbackModule(audio_module=self.audio_module)
+                return True
+                
+            else:
+                logger.warning(f"Unknown module for recovery: {module_name}")
+                return False
+                
+        except Exception as e:
+            logger.warning(f"Module recovery failed for {module_name}: {e}")
+            return False
+    
+    def _update_system_health_after_recovery(self, recovery_results: Dict[str, Any]) -> None:
+        """
+        Update system health status after recovery attempt.
+        
+        Args:
+            recovery_results: Results from recovery attempt
+        """
+        try:
+            # Update module health status
+            for module in recovery_results['recovered_modules']:
+                self.system_health_status['module_health'][module] = 'healthy'
+            
+            for module in recovery_results['failed_modules']:
+                self.system_health_status['module_health'][module] = 'failed'
+            
+            # Recalculate overall health
+            healthy_modules = sum(1 for status in self.system_health_status['module_health'].values() 
+                                if status == 'healthy')
+            total_modules = len(self.system_health_status['module_health'])
+            
+            if healthy_modules == total_modules:
+                self.system_health_status['overall_health'] = 'healthy'
+            elif healthy_modules >= total_modules * 0.8:
+                self.system_health_status['overall_health'] = 'degraded'
+            elif healthy_modules >= total_modules * 0.5:
+                self.system_health_status['overall_health'] = 'unhealthy'
+            else:
+                self.system_health_status['overall_health'] = 'critical'
+            
+            self.system_health_status['last_recovery_attempt'] = time.time()
+            
+        except Exception as e:
+            logger.warning(f"Failed to update system health after recovery: {e}")
+    
+    def handle_module_error(self, module_name: str, error: Exception, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        Handle errors from specific modules with recovery attempts.
+        
+        Args:
+            module_name: Name of the module that encountered the error
+            error: The error that occurred
+            context: Additional context about the error
+            
+        Returns:
+            Dictionary containing error handling results
+        """
+        try:
+            # Log the module error
+            error_info = global_error_handler.handle_error(
+                error=error,
+                module=module_name,
+                function="module_operation",
+                context=context or {}
+            )
+            
+            # Update module health status
+            self.system_health_status['module_health'][module_name] = 'error'
+            self.module_availability[module_name] = False
+            
+            # Determine if recovery should be attempted
+            should_attempt_recovery = (
+                self.error_recovery_enabled and
+                error_info.recoverable and
+                self.system_health_status['recovery_attempts'][module_name] < 3  # Max 3 recovery attempts
+            )
+            
+            handling_result = {
+                'error_handled': True,
+                'error_info': {
+                    'error_id': error_info.error_id,
+                    'category': error_info.category.value,
+                    'severity': error_info.severity.value,
+                    'user_message': error_info.user_message
+                },
+                'recovery_attempted': False,
+                'recovery_successful': False,
+                'graceful_degradation': False
+            }
+            
+            if should_attempt_recovery:
+                logger.info(f"Attempting recovery for {module_name} after error: {error_info.message}")
+                recovery_result = self.attempt_system_recovery(module_name)
+                
+                handling_result['recovery_attempted'] = True
+                handling_result['recovery_successful'] = recovery_result['recovery_successful']
+                
+                if not recovery_result['recovery_successful'] and self.graceful_degradation_enabled:
+                    # Attempt graceful degradation
+                    degradation_result = self._attempt_graceful_degradation(module_name, error_info)
+                    handling_result['graceful_degradation'] = degradation_result
+            
+            elif self.graceful_degradation_enabled:
+                # Skip recovery, attempt graceful degradation
+                degradation_result = self._attempt_graceful_degradation(module_name, error_info)
+                handling_result['graceful_degradation'] = degradation_result
+            
+            return handling_result
+            
+        except Exception as e:
+            logger.error(f"Failed to handle module error for {module_name}: {e}")
+            return {
+                'error_handled': False,
+                'error': str(e),
+                'recovery_attempted': False,
+                'recovery_successful': False,
+                'graceful_degradation': False
+            }
+    
+    def _attempt_graceful_degradation(self, failed_module: str, error_info: ErrorInfo) -> bool:
+        """
+        Attempt graceful degradation when a module fails.
+        
+        Args:
+            failed_module: Name of the failed module
+            error_info: Information about the error
+            
+        Returns:
+            True if graceful degradation was successful, False otherwise
+        """
+        try:
+            logger.info(f"Attempting graceful degradation for {failed_module} module")
+            
+            if failed_module == 'vision':
+                # Vision module failure - can't perform GUI automation
+                logger.warning("Vision module unavailable. GUI automation commands will be disabled.")
+                return True
+                
+            elif failed_module == 'reasoning':
+                # Reasoning module failure - use fallback responses
+                logger.warning("Reasoning module unavailable. Using fallback command processing.")
+                return True
+                
+            elif failed_module == 'automation':
+                # Automation module failure - can still answer questions
+                logger.warning("Automation module unavailable. GUI actions will be disabled.")
+                return True
+                
+            elif failed_module == 'audio':
+                # Audio module failure - use text-based feedback only
+                logger.warning("Audio module unavailable. Voice features will be disabled.")
+                return True
+                
+            elif failed_module == 'feedback':
+                # Feedback module failure - use basic logging for feedback
+                logger.warning("Feedback module unavailable. Audio feedback will be disabled.")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Graceful degradation failed for {failed_module}: {e}")
+            return False
     
     def _init_validation_patterns(self) -> None:
         """Initialize command validation patterns."""
@@ -162,22 +557,147 @@ class Orchestrator:
         ]
     
     def _initialize_modules(self) -> None:
-        """Initialize all required modules with error handling."""
+        """Initialize all required modules with comprehensive error handling."""
+        logger.info("Initializing AURA modules...")
+        
+        # Track module initialization status
+        module_init_status = {
+            'vision': False,
+            'reasoning': False,
+            'automation': False,
+            'audio': False,
+            'feedback': False
+        }
+        
+        initialization_errors = []
+        
+        # Initialize Vision Module
         try:
-            logger.info("Initializing AURA modules...")
-            
-            # Initialize modules in dependency order
+            logger.info("Initializing Vision Module...")
             self.vision_module = VisionModule()
-            self.reasoning_module = ReasoningModule()
-            self.automation_module = AutomationModule()
-            self.audio_module = AudioModule()
-            self.feedback_module = FeedbackModule(audio_module=self.audio_module)
-            
-            logger.info("All modules initialized successfully")
-            
+            module_init_status['vision'] = True
+            logger.info("Vision Module initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize modules: {e}")
-            raise OrchestratorError(f"Module initialization failed: {e}")
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_initialize_modules",
+                category=ErrorCategory.CONFIGURATION_ERROR,
+                severity=ErrorSeverity.HIGH,
+                context={"module": "vision"}
+            )
+            initialization_errors.append(f"Vision Module: {error_info.user_message}")
+            logger.error(f"Vision Module initialization failed: {error_info.message}")
+        
+        # Initialize Reasoning Module
+        try:
+            logger.info("Initializing Reasoning Module...")
+            self.reasoning_module = ReasoningModule()
+            module_init_status['reasoning'] = True
+            logger.info("Reasoning Module initialized successfully")
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_initialize_modules",
+                category=ErrorCategory.CONFIGURATION_ERROR,
+                severity=ErrorSeverity.HIGH,
+                context={"module": "reasoning"}
+            )
+            initialization_errors.append(f"Reasoning Module: {error_info.user_message}")
+            logger.error(f"Reasoning Module initialization failed: {error_info.message}")
+        
+        # Initialize Automation Module
+        try:
+            logger.info("Initializing Automation Module...")
+            self.automation_module = AutomationModule()
+            module_init_status['automation'] = True
+            logger.info("Automation Module initialized successfully")
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_initialize_modules",
+                category=ErrorCategory.HARDWARE_ERROR,
+                severity=ErrorSeverity.HIGH,
+                context={"module": "automation"}
+            )
+            initialization_errors.append(f"Automation Module: {error_info.user_message}")
+            logger.error(f"Automation Module initialization failed: {error_info.message}")
+        
+        # Initialize Audio Module
+        try:
+            logger.info("Initializing Audio Module...")
+            self.audio_module = AudioModule()
+            module_init_status['audio'] = True
+            logger.info("Audio Module initialized successfully")
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_initialize_modules",
+                category=ErrorCategory.HARDWARE_ERROR,
+                severity=ErrorSeverity.MEDIUM,
+                context={"module": "audio"}
+            )
+            initialization_errors.append(f"Audio Module: {error_info.user_message}")
+            logger.warning(f"Audio Module initialization failed: {error_info.message}")
+        
+        # Initialize Feedback Module (depends on Audio Module)
+        try:
+            logger.info("Initializing Feedback Module...")
+            self.feedback_module = FeedbackModule(audio_module=self.audio_module)
+            module_init_status['feedback'] = True
+            logger.info("Feedback Module initialized successfully")
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_initialize_modules",
+                category=ErrorCategory.HARDWARE_ERROR,
+                severity=ErrorSeverity.MEDIUM,
+                context={"module": "feedback"}
+            )
+            initialization_errors.append(f"Feedback Module: {error_info.user_message}")
+            logger.warning(f"Feedback Module initialization failed: {error_info.message}")
+        
+        # Store module availability for graceful degradation
+        self.module_availability = module_init_status.copy()
+        
+        # Check if critical modules are available
+        critical_modules = ['vision', 'reasoning', 'automation']
+        critical_failures = [module for module in critical_modules if not module_init_status[module]]
+        
+        if critical_failures:
+            error_msg = f"Critical modules failed to initialize: {', '.join(critical_failures)}"
+            if initialization_errors:
+                error_msg += f". Errors: {'; '.join(initialization_errors)}"
+            
+            error_info = global_error_handler.handle_error(
+                error=Exception(error_msg),
+                module="orchestrator",
+                function="_initialize_modules",
+                category=ErrorCategory.CONFIGURATION_ERROR,
+                severity=ErrorSeverity.CRITICAL,
+                context={"failed_modules": critical_failures, "all_errors": initialization_errors}
+            )
+            
+            raise OrchestratorError(f"Critical module initialization failed: {error_info.user_message}")
+        
+        # Log warnings for non-critical module failures
+        non_critical_failures = [module for module in ['audio', 'feedback'] if not module_init_status[module]]
+        if non_critical_failures:
+            logger.warning(f"Non-critical modules failed to initialize: {', '.join(non_critical_failures)}. "
+                          f"System will operate with reduced functionality.")
+        
+        # Log successful initialization
+        successful_modules = [module for module, status in module_init_status.items() if status]
+        logger.info(f"Successfully initialized modules: {', '.join(successful_modules)}")
+        
+        if initialization_errors:
+            logger.warning(f"Module initialization completed with {len(initialization_errors)} errors")
+        else:
+            logger.info("All modules initialized successfully")
     
     def validate_command(self, command: str) -> CommandValidationResult:
         """
@@ -367,9 +887,16 @@ class Orchestrator:
         with self.progress_lock:
             return self.current_progress
     
+    @with_error_handling(
+        category=ErrorCategory.PROCESSING_ERROR,
+        severity=ErrorSeverity.MEDIUM,
+        max_retries=1,
+        retry_delay=2.0,
+        user_message="I encountered an error while processing your command. Let me try again."
+    )
     def execute_command(self, command: str) -> Dict[str, Any]:
         """
-        Execute a user command using the perception-reasoning-action loop with validation and parallel processing.
+        Execute a user command using the perception-reasoning-action loop with comprehensive error handling.
         
         Args:
             command: Natural language command from user
@@ -378,14 +905,71 @@ class Orchestrator:
             Dictionary containing execution results and metadata
             
         Raises:
-            OrchestratorError: If command execution fails
+            OrchestratorError: If command execution fails after retries
         """
+        # Input validation
         if not command or not command.strip():
-            raise ValueError("Command cannot be empty")
+            error_info = global_error_handler.handle_error(
+                error=ValueError("Command cannot be empty"),
+                module="orchestrator",
+                function="execute_command",
+                category=ErrorCategory.VALIDATION_ERROR,
+                severity=ErrorSeverity.LOW
+            )
+            raise ValueError(f"Invalid command: {error_info.user_message}")
+        
+        # Check system health before execution
+        system_health = self.get_system_health()
+        if system_health['overall_health'] == 'critical':
+            error_info = global_error_handler.handle_error(
+                error=Exception("System health is critical"),
+                module="orchestrator",
+                function="execute_command",
+                category=ErrorCategory.RESOURCE_ERROR,
+                severity=ErrorSeverity.HIGH,
+                context={"system_health": system_health}
+            )
+            
+            # Attempt system recovery before failing
+            if self.error_recovery_enabled:
+                logger.warning("System health critical, attempting recovery before command execution")
+                recovery_result = self.attempt_system_recovery()
+                
+                if not recovery_result['recovery_successful']:
+                    raise OrchestratorError(f"System unavailable: {error_info.user_message}")
+            else:
+                raise OrchestratorError(f"System unavailable: {error_info.user_message}")
         
         # Ensure only one command executes at a time
         with self.execution_lock:
-            return self._execute_command_internal(command.strip())
+            try:
+                return self._execute_command_internal(command.strip())
+            except Exception as e:
+                # Handle execution errors with potential recovery
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="orchestrator",
+                    function="execute_command",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"command": command[:100]}  # Limit context size
+                )
+                
+                # Attempt recovery if enabled and error is recoverable
+                if self.error_recovery_enabled and error_info.recoverable:
+                    logger.warning(f"Command execution failed, attempting recovery: {error_info.message}")
+                    recovery_result = self.attempt_system_recovery()
+                    
+                    if recovery_result['recovery_successful']:
+                        logger.info("Recovery successful, retrying command execution")
+                        # Retry once after successful recovery
+                        try:
+                            return self._execute_command_internal(command.strip())
+                        except Exception as retry_error:
+                            logger.error(f"Command execution failed even after recovery: {retry_error}")
+                            raise OrchestratorError(f"Command execution failed: {error_info.user_message}")
+                
+                # Re-raise with user-friendly message
+                raise OrchestratorError(f"Command execution failed: {error_info.user_message}")
     
     def _execute_command_internal(self, command: str) -> Dict[str, Any]:
         """Internal command execution with validation, parallel processing, and comprehensive error handling."""
