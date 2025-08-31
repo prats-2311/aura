@@ -57,9 +57,9 @@
     - Write integration tests for complete action sequences
     - _Requirements: 5.2, 5.3, 5.4, 5.5, 5.6_
 
-- [ ] 5. Implement audio module foundation
+- [x] 5. Implement audio module foundation
 
-  - [ ] 5.1 Create speech-to-text functionality
+  - [x] 5.1 Create speech-to-text functionality
 
     - Implement AudioModule class with Whisper integration
     - Add speech_to_text method for voice command capture
@@ -67,7 +67,7 @@
     - Write unit tests with sample audio files
     - _Requirements: 3.1, 3.2, 3.4_
 
-  - [ ] 5.2 Create text-to-speech functionality
+  - [x] 5.2 Create text-to-speech functionality
     - Add text_to_speech method using system TTS or Piper
     - Implement audio output validation and error handling
     - Add volume and speed controls for TTS output
