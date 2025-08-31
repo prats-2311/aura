@@ -26,7 +26,7 @@ VISION_API_BASE = "http://localhost:1234/v1"
 
 # Cloud endpoint for reasoning model (Ollama Cloud or OpenAI)
 REASONING_API_BASE = "https://api.ollama.ai/v1"  # Example URL from a turbo plan
-REASONING_API_KEY = os.getenv("REASONING_API_KEY", "your_ollama_cloud_api_key_here")
+REASONING_API_KEY = os.getenv("REASONING_API_KEY", "4a1181add3774859831c5d5bde617ddc.8jshsyAYcMNquYAN7dxYb7kM")
 
 # Alternative OpenAI configuration (uncomment to use)
 # REASONING_API_BASE = "https://api.openai.com/v1"
@@ -41,7 +41,7 @@ REASONING_MODEL = "gpt-oss:latest"  # The model name in your Ollama cloud servic
 
 # -- Wake Word Configuration --
 # Get your key from Picovoice Console (https://console.picovoice.ai/)
-PORCUPINE_API_KEY = os.getenv("PORCUPINE_API_KEY", "your_porcupine_api_key_here")
+PORCUPINE_API_KEY = os.getenv("PORCUPINE_API_KEY", "8PD/iIOXWp/WlP5Sjehe0dcGl1uW3LNSLfDxEyOVveRvXkKLgfjhcQ==")
 WAKE_WORD = "computer"  # Options: "computer", "jarvis", "aura", etc.
 
 # -- Web Interface Configuration (for future use) --
@@ -170,9 +170,10 @@ def print_setup_instructions():
     print("   conda activate aura")
     print("\n3. Install dependencies:")
     print("   pip install -r requirements.txt")
-    print("\n4. Set API keys:")
-    print("   export REASONING_API_KEY='your_api_key_here'")
-    print("   export PORCUPINE_API_KEY='your_porcupine_key_here'")
+    print("\n4. API keys are already configured in config.py")
+    print("   To override, set environment variables:")
+    print("   export REASONING_API_KEY='your_custom_api_key_here'")
+    print("   export PORCUPINE_API_KEY='your_custom_porcupine_key_here'")
     print("\n5. Run AURA:")
     print("   python main.py")
     print("\n" + "="*60)

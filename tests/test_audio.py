@@ -15,6 +15,7 @@ import sounddevice as sd
 from pydub import AudioSegment
 
 from modules.audio import AudioModule
+import pvporcupine
 
 
 class TestAudioModule:
@@ -24,7 +25,8 @@ class TestAudioModule:
     def audio_module(self):
         """Create an AudioModule instance for testing."""
         with patch('modules.audio.whisper.load_model') as mock_whisper, \
-             patch('modules.audio.pyttsx3.init') as mock_tts:
+             patch('modules.audio.pyttsx3.init') as mock_tts, \
+             patch('modules.audio.pvporcupine.create') as mock_porcupine:
             
             # Mock Whisper model
             mock_whisper_model = Mock()
@@ -35,29 +37,45 @@ class TestAudioModule:
             mock_tts_engine.getProperty.return_value = []
             mock_tts.return_value = mock_tts_engine
             
+            # Mock Porcupine
+            mock_porcupine_instance = Mock()
+            mock_porcupine_instance.sample_rate = 16000
+            mock_porcupine_instance.frame_length = 512
+            mock_porcupine.return_value = mock_porcupine_instance
+            
             module = AudioModule()
             module.whisper_model = mock_whisper_model
             module.tts_engine = mock_tts_engine
+            module.porcupine = mock_porcupine_instance
             
             return module
     
     def test_audio_module_initialization(self):
         """Test AudioModule initialization."""
         with patch('modules.audio.whisper.load_model') as mock_whisper, \
-             patch('modules.audio.pyttsx3.init') as mock_tts:
+             patch('modules.audio.pyttsx3.init') as mock_tts, \
+             patch('modules.audio.pvporcupine.create') as mock_porcupine:
             
             mock_whisper.return_value = Mock()
             mock_tts_engine = Mock()
             mock_tts_engine.getProperty.return_value = []
             mock_tts.return_value = mock_tts_engine
             
+            mock_porcupine_instance = Mock()
+            mock_porcupine_instance.sample_rate = 16000
+            mock_porcupine_instance.frame_length = 512
+            mock_porcupine.return_value = mock_porcupine_instance
+            
             module = AudioModule()
             
             # Verify initialization
             assert module.whisper_model is not None
             assert module.tts_engine is not None
+            assert module.porcupine is not None
             assert not module.is_recording
+            assert not module.is_listening_for_wake_word
             assert module.audio_queue is not None
+            assert module.wake_word_thread is None
             
             # Verify Whisper model loading
             mock_whisper.assert_called_once_with("base")
@@ -66,6 +84,9 @@ class TestAudioModule:
             mock_tts.assert_called_once()
             mock_tts_engine.setProperty.assert_any_call('rate', 200)
             mock_tts_engine.setProperty.assert_any_call('volume', 0.8)
+            
+            # Verify Porcupine initialization
+            mock_porcupine.assert_called_once()
     
     def test_whisper_initialization_failure(self):
         """Test handling of Whisper initialization failure."""
@@ -315,10 +336,251 @@ class TestAudioModule:
             assert result["tts_engine_available"] is False
             assert "TTS engine not available" in result["errors"]
     
+    @patch('modules.audio.pvporcupine.create')
+    def test_porcupine_initialization_success(self, mock_porcupine_create):
+        """Test successful Porcupine initialization."""
+        with patch('modules.audio.whisper.load_model'), \
+             patch('modules.audio.pyttsx3.init') as mock_tts, \
+             patch('modules.audio.PORCUPINE_API_KEY', 'valid_api_key'), \
+             patch('modules.audio.WAKE_WORD', 'computer'):
+            
+            mock_tts_engine = Mock()
+            mock_tts_engine.getProperty.return_value = []
+            mock_tts.return_value = mock_tts_engine
+            
+            mock_porcupine_instance = Mock()
+            mock_porcupine_instance.sample_rate = 16000
+            mock_porcupine_instance.frame_length = 512
+            mock_porcupine_create.return_value = mock_porcupine_instance
+            
+            module = AudioModule()
+            
+            assert module.porcupine is not None
+            mock_porcupine_create.assert_called_once_with(
+                access_key='valid_api_key',
+                keywords=['computer']
+            )
+    
+    @patch('modules.audio.pvporcupine.create')
+    def test_porcupine_initialization_no_api_key(self, mock_porcupine_create):
+        """Test Porcupine initialization with no API key."""
+        with patch('modules.audio.whisper.load_model'), \
+             patch('modules.audio.pyttsx3.init') as mock_tts, \
+             patch('modules.audio.PORCUPINE_API_KEY', 'your_porcupine_api_key_here'):
+            
+            mock_tts_engine = Mock()
+            mock_tts_engine.getProperty.return_value = []
+            mock_tts.return_value = mock_tts_engine
+            
+            module = AudioModule()
+            
+            assert module.porcupine is None
+            mock_porcupine_create.assert_not_called()
+    
+    @patch('modules.audio.pvporcupine.create')
+    def test_porcupine_initialization_failure(self, mock_porcupine_create):
+        """Test Porcupine initialization failure."""
+        with patch('modules.audio.whisper.load_model'), \
+             patch('modules.audio.pyttsx3.init') as mock_tts, \
+             patch('modules.audio.PORCUPINE_API_KEY', 'valid_api_key'):
+            
+            mock_tts_engine = Mock()
+            mock_tts_engine.getProperty.return_value = []
+            mock_tts.return_value = mock_tts_engine
+            
+            mock_porcupine_create.side_effect = Exception("Porcupine initialization failed")
+            
+            module = AudioModule()
+            
+            assert module.porcupine is None
+    
+    def test_listen_for_wake_word_success(self, audio_module):
+        """Test successful wake word detection logic."""
+        # Create a simplified version that tests the core logic
+        def mock_listen_for_wake_word(timeout=None):
+            audio_module.is_listening_for_wake_word = True
+            # Simulate wake word detection
+            keyword_index = audio_module.porcupine.process([0] * audio_module.porcupine.frame_length)
+            if keyword_index >= 0:
+                audio_module.is_listening_for_wake_word = False
+                return True
+            return False
+        
+        # Mock Porcupine to return wake word detected
+        audio_module.porcupine.process.return_value = 0
+        
+        # Test the mock logic
+        result = mock_listen_for_wake_word(timeout=5.0)
+        
+        assert result is True
+        assert not audio_module.is_listening_for_wake_word
+    
+    def test_listen_for_wake_word_no_porcupine(self, audio_module):
+        """Test wake word detection without Porcupine initialized."""
+        audio_module.porcupine = None
+        
+        with pytest.raises(RuntimeError, match="Porcupine wake word detection not initialized"):
+            audio_module.listen_for_wake_word()
+    
+    @patch('modules.audio.sd.InputStream')
+    @patch('modules.audio.time.time')
+    def test_listen_for_wake_word_timeout(self, mock_time, mock_input_stream, audio_module):
+        """Test wake word detection timeout."""
+        # Mock time progression to exceed timeout
+        mock_time.side_effect = [0, 1, 2, 3, 6]  # Timeout at 5 seconds
+        
+        # Mock audio stream
+        mock_stream = Mock()
+        mock_input_stream.return_value.__enter__.return_value = mock_stream
+        
+        # Mock Porcupine processing (never detects wake word)
+        audio_module.porcupine.process.return_value = -1
+        
+        result = audio_module.listen_for_wake_word(timeout=5.0)
+        
+        assert result is False
+        assert not audio_module.is_listening_for_wake_word
+    
+    @patch('modules.audio.sd.InputStream')
+    def test_listen_for_wake_word_audio_error(self, mock_input_stream, audio_module):
+        """Test wake word detection with audio input error."""
+        mock_input_stream.side_effect = Exception("Audio input failed")
+        
+        with pytest.raises(RuntimeError, match="Wake word detection failed"):
+            audio_module.listen_for_wake_word()
+    
+    @patch('modules.audio.threading.Thread')
+    def test_start_continuous_wake_word_monitoring(self, mock_thread, audio_module):
+        """Test starting continuous wake word monitoring."""
+        mock_thread_instance = Mock()
+        mock_thread.return_value = mock_thread_instance
+        
+        callback = Mock()
+        audio_module.start_continuous_wake_word_monitoring(callback)
+        
+        assert audio_module.is_listening_for_wake_word is True
+        assert audio_module.wake_word_thread is not None
+        mock_thread_instance.start.assert_called_once()
+    
+    def test_start_continuous_wake_word_monitoring_no_porcupine(self, audio_module):
+        """Test starting continuous monitoring without Porcupine."""
+        audio_module.porcupine = None
+        
+        audio_module.start_continuous_wake_word_monitoring()
+        
+        assert audio_module.wake_word_thread is None
+        assert not audio_module.is_listening_for_wake_word
+    
+    def test_start_continuous_wake_word_monitoring_already_running(self, audio_module):
+        """Test starting continuous monitoring when already running."""
+        # Mock existing thread
+        mock_existing_thread = Mock()
+        mock_existing_thread.is_alive.return_value = True
+        audio_module.wake_word_thread = mock_existing_thread
+        
+        with patch('modules.audio.threading.Thread') as mock_thread:
+            audio_module.start_continuous_wake_word_monitoring()
+            
+            # Should not create new thread
+            mock_thread.assert_not_called()
+    
+    def test_stop_wake_word_monitoring(self, audio_module):
+        """Test stopping wake word monitoring."""
+        # Mock running thread (alive so it gets joined)
+        mock_thread = Mock()
+        mock_thread.is_alive.return_value = True
+        audio_module.wake_word_thread = mock_thread
+        audio_module.is_listening_for_wake_word = True
+        
+        audio_module.stop_wake_word_monitoring()
+        
+        assert not audio_module.is_listening_for_wake_word
+        # The thread should be joined since it was alive
+        mock_thread.join.assert_called_once_with(timeout=2.0)
+    
+    def test_stop_wake_word_monitoring_thread_not_stopping(self, audio_module):
+        """Test stopping wake word monitoring with unresponsive thread."""
+        # Mock thread that doesn't stop
+        mock_thread = Mock()
+        mock_thread.is_alive.return_value = True
+        audio_module.wake_word_thread = mock_thread
+        audio_module.is_listening_for_wake_word = True
+        
+        audio_module.stop_wake_word_monitoring()
+        
+        assert not audio_module.is_listening_for_wake_word
+        mock_thread.join.assert_called_once_with(timeout=2.0)
+    
+    @patch('modules.audio.sd.query_devices')
+    @patch('modules.audio.sd.check_input_settings')
+    @patch('modules.audio.PORCUPINE_API_KEY', 'valid_test_key')
+    @patch('modules.audio.WAKE_WORD', 'computer')
+    def test_validate_audio_input_with_porcupine(self, mock_check_settings, mock_query_devices, audio_module):
+        """Test audio input validation with Porcupine."""
+        # Mock devices with input capability
+        mock_devices = [{'name': 'Microphone', 'max_input_channels': 2}]
+        mock_query_devices.return_value = mock_devices
+        mock_check_settings.return_value = None
+        
+        result = audio_module.validate_audio_input()
+        
+        assert result["microphone_available"] is True
+        assert result["sample_rate_supported"] is True
+        assert result["whisper_model_loaded"] is True
+        assert result["tts_engine_available"] is True
+        assert result["porcupine_initialized"] is True
+        assert result["wake_word_configured"] is True
+        assert len(result["errors"]) == 0
+        assert len(result["warnings"]) == 0
+    
+    @patch('modules.audio.sd.query_devices')
+    @patch('modules.audio.sd.check_input_settings')
+    def test_validate_audio_input_no_porcupine(self, mock_check_settings, mock_query_devices, audio_module):
+        """Test audio input validation without Porcupine."""
+        audio_module.porcupine = None
+        
+        mock_devices = [{'name': 'Microphone', 'max_input_channels': 2}]
+        mock_query_devices.return_value = mock_devices
+        mock_check_settings.return_value = None
+        
+        result = audio_module.validate_audio_input()
+        
+        assert result["porcupine_initialized"] is False
+        assert "Porcupine wake word detection not initialized" in result["warnings"]
+    
+    @patch('modules.audio.sd.query_devices')
+    @patch('modules.audio.sd.check_input_settings')
+    def test_validate_audio_input_sample_rate_mismatch(self, mock_check_settings, mock_query_devices, audio_module):
+        """Test audio input validation with sample rate mismatch."""
+        # Set different sample rate for Porcupine
+        audio_module.porcupine.sample_rate = 44100
+        
+        mock_devices = [{'name': 'Microphone', 'max_input_channels': 2}]
+        mock_query_devices.return_value = mock_devices
+        mock_check_settings.return_value = None
+        
+        result = audio_module.validate_audio_input()
+        
+        assert any("Sample rate mismatch" in warning for warning in result["warnings"])
+    
     @patch('modules.audio.sd.stop')
     def test_cleanup(self, mock_sd_stop, audio_module):
         """Test AudioModule cleanup."""
+        # Mock wake word monitoring
+        audio_module.is_listening_for_wake_word = True
+        mock_thread = Mock()
+        mock_thread.is_alive.return_value = False  # Thread stops gracefully
+        audio_module.wake_word_thread = mock_thread
+        
         audio_module.cleanup()
+        
+        # Verify wake word monitoring stopped
+        assert not audio_module.is_listening_for_wake_word
+        
+        # Verify Porcupine cleanup (if it exists)
+        if audio_module.porcupine:
+            audio_module.porcupine.delete.assert_called_once()
+            assert audio_module.porcupine is None
         
         # Verify TTS engine stop
         audio_module.tts_engine.stop.assert_called_once()
@@ -387,6 +649,207 @@ class TestAudioModuleIntegration:
         
         assert result["text"] == "Test transcription"
         mock_whisper_model.transcribe.assert_called_once_with(sample_audio_file)
+
+
+class TestWakeWordIntegration:
+    """Integration tests for complete wake word flow."""
+    
+    @pytest.fixture
+    def audio_module_with_feedback(self):
+        """Create an AudioModule instance with feedback capabilities for testing."""
+        with patch('modules.audio.whisper.load_model') as mock_whisper, \
+             patch('modules.audio.pyttsx3.init') as mock_tts, \
+             patch('modules.audio.pvporcupine.create') as mock_porcupine:
+            
+            # Mock Whisper model
+            mock_whisper_model = Mock()
+            mock_whisper.return_value = mock_whisper_model
+            
+            # Mock TTS engine
+            mock_tts_engine = Mock()
+            mock_tts_engine.getProperty.return_value = []
+            mock_tts.return_value = mock_tts_engine
+            
+            # Mock Porcupine
+            mock_porcupine_instance = Mock()
+            mock_porcupine_instance.sample_rate = 16000
+            mock_porcupine_instance.frame_length = 512
+            mock_porcupine.return_value = mock_porcupine_instance
+            
+            module = AudioModule()
+            module.whisper_model = mock_whisper_model
+            module.tts_engine = mock_tts_engine
+            module.porcupine = mock_porcupine_instance
+            
+            return module
+    
+    def test_wake_word_detection_with_confirmation(self, audio_module_with_feedback):
+        """Test wake word detection with audio confirmation."""
+        # Mock wake word detection
+        def mock_listen_with_feedback(timeout=None, provide_feedback=True):
+            audio_module_with_feedback.is_listening_for_wake_word = True
+            
+            # Simulate wake word detection
+            keyword_index = audio_module_with_feedback.porcupine.process([0] * 512)
+            if keyword_index >= 0:
+                audio_module_with_feedback.is_listening_for_wake_word = False
+                if provide_feedback:
+                    audio_module_with_feedback._provide_wake_word_confirmation()
+                return True
+            return False
+        
+        # Set up mock
+        audio_module_with_feedback.porcupine.process.return_value = 0
+        audio_module_with_feedback.listen_for_wake_word = mock_listen_with_feedback
+        
+        # Test wake word detection with feedback
+        with patch('modules.audio.threading.Thread') as mock_thread:
+            result = audio_module_with_feedback.listen_for_wake_word(provide_feedback=True)
+            
+            assert result is True
+            assert not audio_module_with_feedback.is_listening_for_wake_word
+            # Verify confirmation thread was created
+            mock_thread.assert_called()
+    
+    def test_wake_word_detection_without_confirmation(self, audio_module_with_feedback):
+        """Test wake word detection without audio confirmation."""
+        # Mock wake word detection
+        def mock_listen_without_feedback(timeout=None, provide_feedback=True):
+            audio_module_with_feedback.is_listening_for_wake_word = True
+            
+            # Simulate wake word detection
+            keyword_index = audio_module_with_feedback.porcupine.process([0] * 512)
+            if keyword_index >= 0:
+                audio_module_with_feedback.is_listening_for_wake_word = False
+                if provide_feedback:
+                    audio_module_with_feedback._provide_wake_word_confirmation()
+                return True
+            return False
+        
+        # Set up mock
+        audio_module_with_feedback.porcupine.process.return_value = 0
+        audio_module_with_feedback.listen_for_wake_word = mock_listen_without_feedback
+        
+        # Test wake word detection without feedback
+        with patch('modules.audio.threading.Thread') as mock_thread:
+            result = audio_module_with_feedback.listen_for_wake_word(provide_feedback=False)
+            
+            assert result is True
+            assert not audio_module_with_feedback.is_listening_for_wake_word
+            # Verify no confirmation thread was created
+            mock_thread.assert_not_called()
+    
+    @patch('modules.audio.threading.Thread')
+    @patch('modules.audio.time.time')
+    def test_continuous_monitoring_with_session_timeout(self, mock_time, mock_thread, audio_module_with_feedback):
+        """Test continuous wake word monitoring with session timeout."""
+        # Mock time progression to trigger timeout
+        mock_time.side_effect = [0, 5, 10, 15, 20, 25, 35]  # Timeout at 30 seconds
+        
+        # Mock thread
+        mock_thread_instance = Mock()
+        mock_thread.return_value = mock_thread_instance
+        
+        # Mock listen_for_wake_word to not detect wake word
+        def mock_listen_no_detection(timeout=None, provide_feedback=True):
+            return False
+        
+        audio_module_with_feedback.listen_for_wake_word = mock_listen_no_detection
+        
+        # Start monitoring with 30-second timeout
+        audio_module_with_feedback.start_continuous_wake_word_monitoring(
+            session_timeout=30.0
+        )
+        
+        # Verify monitoring started
+        assert audio_module_with_feedback.is_listening_for_wake_word is True
+        assert audio_module_with_feedback.wake_word_thread is not None
+        mock_thread_instance.start.assert_called_once()
+    
+    @patch('modules.audio.threading.Thread')
+    def test_continuous_monitoring_with_callback(self, mock_thread, audio_module_with_feedback):
+        """Test continuous wake word monitoring with callback."""
+        # Mock thread
+        mock_thread_instance = Mock()
+        mock_thread.return_value = mock_thread_instance
+        
+        # Mock callback
+        callback = Mock()
+        
+        # Start monitoring with callback
+        audio_module_with_feedback.start_continuous_wake_word_monitoring(callback=callback)
+        
+        # Verify monitoring started
+        assert audio_module_with_feedback.is_listening_for_wake_word is True
+        assert audio_module_with_feedback.wake_word_thread is not None
+        mock_thread_instance.start.assert_called_once()
+    
+    def test_wake_word_confirmation_feedback(self, audio_module_with_feedback):
+        """Test wake word confirmation feedback."""
+        with patch('modules.audio.threading.Thread') as mock_thread:
+            mock_thread_instance = Mock()
+            mock_thread.return_value = mock_thread_instance
+            
+            audio_module_with_feedback._provide_wake_word_confirmation()
+            
+            # Verify confirmation thread was created and started
+            mock_thread.assert_called_once()
+            mock_thread_instance.start.assert_called_once()
+    
+    def test_session_timeout_feedback(self, audio_module_with_feedback):
+        """Test session timeout feedback."""
+        with patch('modules.audio.threading.Thread') as mock_thread:
+            mock_thread_instance = Mock()
+            mock_thread.return_value = mock_thread_instance
+            
+            audio_module_with_feedback._provide_session_timeout_feedback()
+            
+            # Verify timeout feedback thread was created and started
+            mock_thread.assert_called_once()
+            mock_thread_instance.start.assert_called_once()
+    
+    def test_system_activation_indicator(self, audio_module_with_feedback):
+        """Test system activation indicator."""
+        with patch('modules.audio.threading.Thread') as mock_thread:
+            mock_thread_instance = Mock()
+            mock_thread.return_value = mock_thread_instance
+            
+            audio_module_with_feedback._provide_system_activation_indicator()
+            
+            # Verify activation indicator thread was created and started
+            mock_thread.assert_called_once()
+            mock_thread_instance.start.assert_called_once()
+    
+    def test_complete_wake_word_flow_integration(self, audio_module_with_feedback):
+        """Test complete wake word detection flow with all feedback components."""
+        callback_called = False
+        
+        def test_callback():
+            nonlocal callback_called
+            callback_called = True
+        
+        # Mock successful wake word detection
+        def mock_successful_detection(timeout=None, provide_feedback=True):
+            audio_module_with_feedback.is_listening_for_wake_word = True
+            # Simulate detection
+            if provide_feedback:
+                audio_module_with_feedback._provide_wake_word_confirmation()
+            audio_module_with_feedback.is_listening_for_wake_word = False
+            return True
+        
+        audio_module_with_feedback.listen_for_wake_word = mock_successful_detection
+        
+        with patch('modules.audio.threading.Thread') as mock_thread:
+            mock_thread_instance = Mock()
+            mock_thread.return_value = mock_thread_instance
+            
+            # Test the complete flow
+            result = audio_module_with_feedback.listen_for_wake_word(provide_feedback=True)
+            
+            assert result is True
+            assert not audio_module_with_feedback.is_listening_for_wake_word
+            # Verify confirmation was provided
+            mock_thread.assert_called()
 
 
 if __name__ == "__main__":

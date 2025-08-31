@@ -107,13 +107,14 @@ pip install -r requirements.txt
 # Copy and edit configuration
 cp config.py config_local.py  # Optional: create local config
 
-# Set environment variables
-export REASONING_API_KEY="your_api_key_here"
-export PORCUPINE_API_KEY="your_porcupine_key_here"
+# API keys are already configured in config.py
+# If you need to override them, you can set environment variables:
+# export REASONING_API_KEY="your_custom_api_key_here"
+# export PORCUPINE_API_KEY="your_custom_porcupine_key_here"
 
-# Or create .env file
-echo "REASONING_API_KEY=your_api_key_here" > .env
-echo "PORCUPINE_API_KEY=your_porcupine_key_here" >> .env
+# Or create .env file to override defaults:
+# echo "REASONING_API_KEY=your_custom_api_key_here" > .env
+# echo "PORCUPINE_API_KEY=your_custom_porcupine_key_here" >> .env
 ```
 
 ### 4. Validate Setup

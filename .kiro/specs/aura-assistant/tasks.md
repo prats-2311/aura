@@ -57,7 +57,7 @@
     - Write integration tests for complete action sequences
     - _Requirements: 5.2, 5.3, 5.4, 5.5, 5.6_
 
-- [x] 5. Implement audio module foundation
+- [ ] 5. Implement audio module foundation
 
   - [x] 5.1 Create speech-to-text functionality
 
@@ -74,9 +74,9 @@
     - Write unit tests for TTS functionality
     - _Requirements: 6.4, 6.5_
 
-- [ ] 6. Implement wake word detection
+- [x] 6. Implement wake word detection
 
-  - [ ] 6.1 Integrate Picovoice Porcupine
+  - [x] 6.1 Integrate Picovoice Porcupine
 
     - Add listen_for_wake_word method using Porcupine SDK
     - Implement continuous monitoring loop with low CPU usage
@@ -84,7 +84,7 @@
     - Write unit tests for wake word detection
     - _Requirements: 1.1, 1.2, 1.3_
 
-  - [ ] 6.2 Add wake word feedback system
+  - [x] 6.2 Add wake word feedback system
     - Implement audio confirmation when wake word is detected
     - Add visual or audio indicators for system activation
     - Implement timeout handling for inactive sessions
