@@ -76,6 +76,19 @@ class TestHybridOrchestration:
             'enabled': True,
             'app_name': 'TestApp'
         }
+        mocks['accessibility'].find_element_with_vision_preparation.return_value = {
+            'coordinates': [100, 200, 150, 50],
+            'center_point': [175, 225],
+            'role': 'AXButton',
+            'title': 'Sign In',
+            'enabled': True,
+            'app_name': 'TestApp'
+        }
+        mocks['accessibility'].get_accessibility_status.return_value = {
+            'api_initialized': True,
+            'degraded_mode': False,
+            'can_attempt_recovery': False
+        }
         mocks['accessibility'].is_accessibility_enabled.return_value = True
         
         return mocks
@@ -180,13 +193,13 @@ class TestFastPathRouting(TestHybridOrchestration):
         assert 'execution_time' in result
         
         # Verify accessibility module was called
-        mock_modules['accessibility'].find_element.assert_called()
+        mock_modules['accessibility'].find_element_with_vision_preparation.assert_called()
         mock_modules['automation'].execute_fast_path_action.assert_called()
     
     def test_fast_path_execution_element_not_found(self, orchestrator, mock_modules, sample_gui_command):
         """Test fast path execution when element is not found."""
         # Setup element not found scenario
-        mock_modules['accessibility'].find_element.return_value = None
+        mock_modules['accessibility'].find_element_with_vision_preparation.return_value = None
         
         # Test fast path execution
         command_info = {'command_type': 'gui_interaction', 'confidence': 0.9}
@@ -199,7 +212,7 @@ class TestFastPathRouting(TestHybridOrchestration):
         assert 'failure_reason' in result
         
         # Verify accessibility module was called but automation was not
-        mock_modules['accessibility'].find_element.assert_called()
+        mock_modules['accessibility'].find_element_with_vision_preparation.assert_called()
         mock_modules['automation'].execute_fast_path_action.assert_not_called()
     
     def test_fast_path_execution_disabled(self, orchestrator, mock_modules, sample_gui_command):
@@ -218,12 +231,12 @@ class TestFastPathRouting(TestHybridOrchestration):
         assert result['failure_reason'] == 'fast_path_disabled'
         
         # Verify accessibility module was not called
-        mock_modules['accessibility'].find_element.assert_not_called()
+        mock_modules['accessibility'].find_element_with_vision_preparation.assert_not_called()
     
     def test_fast_path_execution_accessibility_error(self, orchestrator, mock_modules, sample_gui_command):
         """Test fast path execution when accessibility module raises error."""
         # Setup accessibility error
-        mock_modules['accessibility'].find_element.side_effect = Exception("Accessibility API error")
+        mock_modules['accessibility'].find_element_with_vision_preparation.side_effect = Exception("Accessibility API error")
         
         # Test fast path execution
         command_info = {'command_type': 'gui_interaction', 'confidence': 0.9}
@@ -237,7 +250,7 @@ class TestFastPathRouting(TestHybridOrchestration):
         assert result['failure_reason'] == 'execution_error'
         
         # Verify accessibility module was called
-        mock_modules['accessibility'].find_element.assert_called()
+        mock_modules['accessibility'].find_element_with_vision_preparation.assert_called()
 
 
 class TestFallbackMechanism(TestHybridOrchestration):
