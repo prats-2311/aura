@@ -1819,3 +1819,130 @@ class AutomationModule:
         except Exception as e:
             logger.error(f"Failed to handle validation error: {e}")
             return False
+    
+    def execute_fast_path_action(self, action_type: str, coordinates: List[int], **kwargs) -> Dict[str, Any]:
+        """
+        Execute action with pre-validated coordinates from accessibility API.
+        
+        Args:
+            action_type: 'click', 'double_click', 'type', etc.
+            coordinates: [x, y] or [x, y, width, height] from accessibility API
+            **kwargs: Additional action parameters (e.g., text for type actions)
+            
+        Returns:
+            Dictionary with execution results
+        """
+        try:
+            start_time = time.time()
+            
+            # Extract coordinates
+            if len(coordinates) >= 2:
+                x, y = coordinates[0], coordinates[1]
+            else:
+                raise ValueError("Invalid coordinates provided")
+            
+            # Skip coordinate validation for trusted accessibility coordinates
+            # but still do basic sanity checks
+            if x < 0 or y < 0 or x > self.screen_width * 2 or y > self.screen_height * 2:
+                raise ValueError(f"Coordinates ({x}, {y}) are outside reasonable bounds")
+            
+            element_info = kwargs.get('element_info', {})
+            
+            logger.info(f"Executing fast path {action_type} at ({x}, {y}) on element: {element_info.get('title', 'unknown')}")
+            
+            # Execute the action based on type
+            success = False
+            
+            if action_type == 'click':
+                success = self._attempt_click(x, y)
+                
+            elif action_type == 'double_click':
+                success = self._cliclick_double_click(x, y) if self.is_macos else False
+                if not success:
+                    success = self._macos_double_click(x, y) if self.is_macos else False
+                
+            elif action_type == 'type':
+                text = kwargs.get('text', '')
+                if not text:
+                    raise ValueError("Text parameter required for type action")
+                
+                # First click to focus the element
+                click_success = self._attempt_click(x, y)
+                if click_success:
+                    time.sleep(0.1)  # Brief pause to ensure focus
+                    success = self._cliclick_type(text) if self.is_macos else False
+                    if not success:
+                        success = self._macos_type(text) if self.is_macos else False
+                
+            elif action_type == 'scroll':
+                direction = kwargs.get('direction', 'up')
+                amount = kwargs.get('amount', SCROLL_AMOUNT)
+                success = self._cliclick_scroll(direction, amount) if self.is_macos else False
+                if not success:
+                    success = self._macos_scroll(direction, amount) if self.is_macos else False
+                
+            else:
+                raise ValueError(f"Unsupported action type: {action_type}")
+            
+            execution_time = time.time() - start_time
+            
+            # Record action in history
+            action_record = {
+                'action': action_type,
+                'coordinates': coordinates,
+                'timestamp': time.time(),
+                'success': success,
+                'execution_time': execution_time,
+                'fast_path': True,
+                'element_info': element_info
+            }
+            
+            if hasattr(self, 'action_history'):
+                self.action_history.append(action_record)
+                # Keep history size manageable
+                if len(self.action_history) > 100:
+                    self.action_history = self.action_history[-50:]
+            
+            result = {
+                'success': success,
+                'action_type': action_type,
+                'coordinates': coordinates,
+                'execution_time': execution_time,
+                'fast_path': True,
+                'element_title': element_info.get('title', ''),
+                'element_role': element_info.get('role', ''),
+                'message': f"Fast path {action_type} {'succeeded' if success else 'failed'}"
+            }
+            
+            if success:
+                logger.info(f"Fast path {action_type} completed successfully in {execution_time:.3f}s")
+            else:
+                logger.warning(f"Fast path {action_type} failed")
+            
+            return result
+            
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="automation",
+                function="execute_fast_path_action",
+                category=ErrorCategory.PROCESSING_ERROR,
+                severity=ErrorSeverity.MEDIUM,
+                context={
+                    "action_type": action_type,
+                    "coordinates": coordinates,
+                    "kwargs": kwargs
+                }
+            )
+            
+            logger.error(f"Fast path action execution failed: {error_info.message}")
+            
+            return {
+                'success': False,
+                'action_type': action_type,
+                'coordinates': coordinates,
+                'execution_time': 0.0,
+                'fast_path': True,
+                'error': error_info.user_message,
+                'message': f"Fast path {action_type} failed: {error_info.user_message}"
+            }

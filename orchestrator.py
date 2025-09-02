@@ -22,6 +22,7 @@ from modules.reasoning import ReasoningModule
 from modules.automation import AutomationModule
 from modules.audio import AudioModule
 from modules.feedback import FeedbackModule, FeedbackPriority
+from modules.accessibility import AccessibilityModule
 from modules.error_handler import (
     global_error_handler,
     with_error_handling,
@@ -105,6 +106,10 @@ class Orchestrator:
         self.automation_module = None
         self.audio_module = None
         self.feedback_module = None
+        self.accessibility_module = None
+        
+        # Fast path configuration
+        self.fast_path_enabled = True
         
         # Command tracking
         self.current_command = None
@@ -230,21 +235,24 @@ class Orchestrator:
                     'reasoning': 'healthy' if self.module_availability.get('reasoning', False) else 'unavailable',
                     'automation': 'healthy' if self.module_availability.get('automation', False) else 'unavailable',
                     'audio': 'healthy' if self.module_availability.get('audio', False) else 'unavailable',
-                    'feedback': 'healthy' if self.module_availability.get('feedback', False) else 'unavailable'
+                    'feedback': 'healthy' if self.module_availability.get('feedback', False) else 'unavailable',
+                    'accessibility': 'healthy' if self.module_availability.get('accessibility', False) else 'unavailable'
                 },
                 'error_rates': {
                     'vision': 0.0,
                     'reasoning': 0.0,
                     'automation': 0.0,
                     'audio': 0.0,
-                    'feedback': 0.0
+                    'feedback': 0.0,
+                    'accessibility': 0.0
                 },
                 'recovery_attempts': {
                     'vision': 0,
                     'reasoning': 0,
                     'automation': 0,
                     'audio': 0,
-                    'feedback': 0
+                    'feedback': 0,
+                    'accessibility': 0
                 }
             }
             
@@ -439,6 +447,13 @@ class Orchestrator:
                 self.feedback_module = FeedbackModule(audio_module=self.audio_module)
                 return True
                 
+            elif module_name == 'accessibility':
+                # Attempt to reinitialize accessibility module
+                self.accessibility_module = AccessibilityModule()
+                # Re-enable fast path if accessibility module recovers
+                self.fast_path_enabled = True
+                return True
+                
             else:
                 logger.warning(f"Unknown module for recovery: {module_name}")
                 return False
@@ -593,6 +608,12 @@ class Orchestrator:
                 # Feedback module failure - use basic logging for feedback
                 logger.warning("Feedback module unavailable. Audio feedback will be disabled.")
                 return True
+                
+            elif failed_module == 'accessibility':
+                # Accessibility module failure - disable fast path, use vision fallback
+                logger.warning("Accessibility module unavailable. Fast path GUI automation will be disabled.")
+                self.fast_path_enabled = False
+                return True
             
             return False
             
@@ -658,7 +679,8 @@ class Orchestrator:
             'reasoning': False,
             'automation': False,
             'audio': False,
-            'feedback': False
+            'feedback': False,
+            'accessibility': False
         }
         
         initialization_errors = []
@@ -753,6 +775,26 @@ class Orchestrator:
             initialization_errors.append(f"Feedback Module: {error_info.user_message}")
             logger.warning(f"Feedback Module initialization failed: {error_info.message}")
         
+        # Initialize Accessibility Module (for fast path GUI automation)
+        try:
+            logger.info("Initializing Accessibility Module...")
+            self.accessibility_module = AccessibilityModule()
+            module_init_status['accessibility'] = True
+            logger.info("Accessibility Module initialized successfully")
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_initialize_modules",
+                category=ErrorCategory.CONFIGURATION_ERROR,
+                severity=ErrorSeverity.MEDIUM,
+                context={"module": "accessibility"}
+            )
+            initialization_errors.append(f"Accessibility Module: {error_info.user_message}")
+            logger.warning(f"Accessibility Module initialization failed: {error_info.message}")
+            # Disable fast path if accessibility module fails
+            self.fast_path_enabled = False
+        
         # Store module availability for graceful degradation
         self.module_availability = module_init_status.copy()
         
@@ -777,7 +819,7 @@ class Orchestrator:
             raise OrchestratorError(f"Critical module initialization failed: {error_info.user_message}")
         
         # Log warnings for non-critical module failures
-        non_critical_failures = [module for module in ['audio', 'feedback'] if not module_init_status[module]]
+        non_critical_failures = [module for module in ['audio', 'feedback', 'accessibility'] if not module_init_status[module]]
         if non_critical_failures:
             logger.warning(f"Non-critical modules failed to initialize: {', '.join(non_critical_failures)}. "
                           f"System will operate with reduced functionality.")
@@ -1120,8 +1162,51 @@ class Orchestrator:
                 logger.info(f"[{execution_id}] Detected {validation_result.command_type}, routing to information extraction mode")
                 return self._route_to_question_answering(command, execution_context)
             
-            # Provide initial feedback
-            self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
+            # Step 1.5: Attempt Fast Path for GUI Commands
+            fast_path_result = None
+            if self._is_gui_command(normalized_command, validation_result.__dict__):
+                logger.info(f"[{execution_id}] Attempting fast path execution for GUI command")
+                self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.PERCEPTION, 15)
+                
+                fast_path_result = self._attempt_fast_path_execution(normalized_command, validation_result.__dict__)
+                
+                if fast_path_result and fast_path_result.get('success'):
+                    # Fast path succeeded - complete execution
+                    logger.info(f"[{execution_id}] Fast path execution successful")
+                    
+                    execution_context["status"] = CommandStatus.COMPLETED
+                    execution_context["end_time"] = time.time()
+                    execution_context["total_duration"] = execution_context["end_time"] - start_time
+                    execution_context["fast_path_used"] = True
+                    execution_context["fast_path_result"] = fast_path_result
+                    execution_context["steps_completed"].extend([ExecutionStep.PERCEPTION, ExecutionStep.REASONING, ExecutionStep.ACTION])
+                    
+                    # Provide success feedback
+                    if self.feedback_module:
+                        self.feedback_module.play("success", FeedbackPriority.HIGH)
+                    
+                    # Final progress update
+                    self._update_progress(execution_id, CommandStatus.COMPLETED, None, 100)
+                    
+                    # Add to command history
+                    self.command_history.append(execution_context.copy())
+                    
+                    logger.info(f"[{execution_id}] Command completed via fast path in {execution_context['total_duration']:.2f}s")
+                    return self._format_execution_result(execution_context)
+                else:
+                    # Fast path failed - continue with vision fallback
+                    logger.info(f"[{execution_id}] Fast path failed, falling back to vision workflow")
+                    execution_context["fast_path_attempted"] = True
+                    execution_context["fast_path_result"] = fast_path_result
+                    execution_context["fallback_reason"] = "fast_path_failed"
+                    
+                    # Provide fallback feedback
+                    if self.feedback_module:
+                        self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
+            
+            # Provide initial feedback (if not already provided above)
+            if not fast_path_result and self.feedback_module:
+                self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
             
             # Step 2: Parallel Perception and Reasoning Preparation
             execution_context["status"] = CommandStatus.PROCESSING
@@ -1528,6 +1613,65 @@ class Orchestrator:
                 "normalized_command": validation_result.normalized_command if validation_result else command
             } if validation_result else None
         }
+        
+        # Add hybrid execution path information
+        if execution_context.get("fast_path_used"):
+            result["execution_path"] = "fast"
+            result["fast_path_result"] = execution_context.get("fast_path_result")
+            
+            # Record hybrid performance metrics
+            fast_path_result = execution_context.get("fast_path_result", {})
+            metric = PerformanceMetrics(
+                operation="hybrid_execution_fast_path",
+                duration=result["duration"],
+                success=result["success"],
+                parallel_execution=False,
+                metadata={
+                    'command_type': validation_result.command_type if validation_result else "unknown",
+                    'element_found': bool(fast_path_result.get('element_found')),
+                    'element_role': fast_path_result.get('element_found', {}).get('role', ''),
+                    'element_title': fast_path_result.get('element_found', {}).get('title', ''),
+                    'app_name': fast_path_result.get('element_found', {}).get('app_name', ''),
+                    'execution_path': 'fast'
+                }
+            )
+            performance_monitor.record_metric(metric)
+            
+        elif execution_context.get("fast_path_attempted"):
+            result["execution_path"] = "slow"
+            result["fallback_reason"] = execution_context.get("fallback_reason", "fast_path_failed")
+            result["fast_path_attempted"] = True
+            
+            # Record hybrid performance metrics for fallback
+            metric = PerformanceMetrics(
+                operation="hybrid_execution_vision_fallback",
+                duration=result["duration"],
+                success=result["success"],
+                parallel_execution=False,
+                metadata={
+                    'command_type': validation_result.command_type if validation_result else "unknown",
+                    'fallback_reason': execution_context.get("fallback_reason", "unknown"),
+                    'fast_path_attempted': True,
+                    'execution_path': 'slow'
+                }
+            )
+            performance_monitor.record_metric(metric)
+            
+        else:
+            result["execution_path"] = "vision_only"
+            
+            # Record standard vision-only performance metrics
+            metric = PerformanceMetrics(
+                operation="standard_vision_execution",
+                duration=result["duration"],
+                success=result["success"],
+                parallel_execution=execution_context.get("parallel_processing_used", False),
+                metadata={
+                    'command_type': validation_result.command_type if validation_result else "unknown",
+                    'execution_path': 'vision_only'
+                }
+            )
+            performance_monitor.record_metric(metric)
         
         return result
     
@@ -2435,3 +2579,258 @@ Focus on being helpful while being honest about what information is actually vis
         
         logger.info(f"Created fallback context with {len(fallback_elements)} elements")
         return fallback_context
+    
+    def _attempt_fast_path_execution(self, command: str, command_info: Dict) -> Optional[Dict[str, Any]]:
+        """
+        Attempt to execute command using fast path accessibility detection.
+        
+        Args:
+            command: The user command
+            command_info: Preprocessed command information
+            
+        Returns:
+            Action result if successful, None if fast path fails
+        """
+        if not self.fast_path_enabled or not self.accessibility_module:
+            logger.debug("Fast path disabled or accessibility module unavailable")
+            return None
+        
+        if not self.accessibility_module.is_accessibility_enabled():
+            logger.debug("Accessibility API not enabled, skipping fast path")
+            return None
+        
+        try:
+            logger.info("Attempting fast path execution")
+            start_time = time.time()
+            
+            # Extract GUI elements from command
+            gui_elements = self._extract_gui_elements_from_command(command)
+            if not gui_elements:
+                logger.debug("No GUI elements detected in command")
+                return None
+            
+            logger.debug(f"Extracted GUI elements: {gui_elements}")
+            
+            # Attempt to find the element using accessibility API
+            element_result = self.accessibility_module.find_element(
+                role=gui_elements.get('role', ''),
+                label=gui_elements.get('label', ''),
+                app_name=gui_elements.get('app_name')
+            )
+            
+            if not element_result:
+                logger.debug("Element not found via accessibility API")
+                return None
+            
+            logger.info(f"Found element via accessibility API: {element_result}")
+            
+            # Execute the action using automation module
+            action_type = gui_elements.get('action', 'click')
+            coordinates = element_result['center_point']
+            
+            if not self.automation_module:
+                logger.error("Automation module not available for fast path execution")
+                return None
+            
+            # Execute fast path action
+            action_result = self.automation_module.execute_fast_path_action(
+                action_type=action_type,
+                coordinates=coordinates,
+                element_info=element_result
+            )
+            
+            execution_time = time.time() - start_time
+            
+            # Record performance metrics
+            metric = PerformanceMetrics(
+                operation="fast_path_execution",
+                duration=execution_time,
+                success=action_result.get('success', False),
+                parallel_execution=False,
+                metadata={
+                    'element_role': element_result.get('role', ''),
+                    'element_title': element_result.get('title', ''),
+                    'action_type': action_type,
+                    'app_name': element_result.get('app_name', ''),
+                    'coordinates': coordinates
+                }
+            )
+            performance_monitor.record_metric(metric)
+            
+            logger.info(f"Fast path execution completed in {execution_time:.2f}s")
+            
+            return {
+                'success': action_result.get('success', False),
+                'execution_time': execution_time,
+                'path_used': 'fast',
+                'element_found': element_result,
+                'action_result': action_result,
+                'message': f"Successfully executed {action_type} on {element_result.get('title', 'element')} using fast path"
+            }
+            
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_attempt_fast_path_execution",
+                category=ErrorCategory.PROCESSING_ERROR,
+                severity=ErrorSeverity.MEDIUM,
+                context={"command": command, "gui_elements": gui_elements}
+            )
+            logger.warning(f"Fast path execution failed: {error_info.message}")
+            return None
+    
+    def _extract_gui_elements_from_command(self, command: str) -> Dict[str, str]:
+        """
+        Extract target element information from user command.
+        
+        Args:
+            command: User command to parse
+            
+        Returns:
+            Dictionary with 'role', 'label', 'action', and optionally 'app_name' keys
+        """
+        gui_elements = {
+            'role': '',
+            'label': '',
+            'action': 'click',
+            'app_name': None
+        }
+        
+        try:
+            command_lower = command.lower().strip()
+            
+            # Extract action type
+            action_patterns = {
+                'click': [r'\b(?:click|press|tap)\b', r'\bselect\b'],
+                'double_click': [r'\bdouble.?click\b', r'\bopen\b'],
+                'type': [r'\btype\b', r'\benter\b', r'\binput\b', r'\bwrite\b'],
+                'scroll': [r'\bscroll\b', r'\bpage\s+(?:up|down)\b']
+            }
+            
+            for action, patterns in action_patterns.items():
+                for pattern in patterns:
+                    if re.search(pattern, command_lower):
+                        gui_elements['action'] = action
+                        break
+                if gui_elements['action'] != 'click':
+                    break
+            
+            # Extract element role/type
+            role_patterns = {
+                'button': [r'\bbutton\b', r'\bbtn\b'],
+                'menu': [r'\bmenu\b', r'\bmenuitem\b', r'\bmenubar\b'],
+                'text_field': [r'\btext\s*field\b', r'\binput\s*field\b', r'\btext\s*box\b'],
+                'checkbox': [r'\bcheckbox\b', r'\bcheck\s*box\b'],
+                'link': [r'\blink\b', r'\bhyperlink\b'],
+                'tab': [r'\btab\b'],
+                'window': [r'\bwindow\b', r'\bdialog\b']
+            }
+            
+            for role, patterns in role_patterns.items():
+                for pattern in patterns:
+                    if re.search(pattern, command_lower):
+                        gui_elements['role'] = role
+                        break
+                if gui_elements['role']:
+                    break
+            
+            # Extract element label/text
+            label_patterns = [
+                r'(?:click|press|tap|select)\s+(?:on\s+)?(?:the\s+)?["\']([^"\']+)["\']',  # Quoted text
+                r'(?:click|press|tap|select)\s+(?:on\s+)?(?:the\s+)?(\w+(?:\s+\w+)*?)(?:\s+(?:button|menu|link|tab))?$',  # Text before element type
+                r'(?:button|menu|link|tab)\s+["\']([^"\']+)["\']',  # Element type followed by quoted text
+                r'(?:button|menu|link|tab)\s+(\w+(?:\s+\w+)*)',  # Element type followed by text
+            ]
+            
+            for pattern in label_patterns:
+                match = re.search(pattern, command_lower)
+                if match:
+                    gui_elements['label'] = match.group(1).strip()
+                    break
+            
+            # If no specific label found, try to extract any quoted text
+            if not gui_elements['label']:
+                quoted_match = re.search(r'["\']([^"\']+)["\']', command_lower)
+                if quoted_match:
+                    gui_elements['label'] = quoted_match.group(1).strip()
+            
+            # If still no label, try to extract text after common action words
+            if not gui_elements['label']:
+                action_match = re.search(r'(?:click|press|tap|select)\s+(?:on\s+)?(?:the\s+)?(.+)', command_lower)
+                if action_match:
+                    potential_label = action_match.group(1).strip()
+                    # Clean up common suffixes
+                    potential_label = re.sub(r'\s+(?:button|menu|link|tab|item)$', '', potential_label)
+                    if potential_label and len(potential_label) > 0:
+                        gui_elements['label'] = potential_label
+            
+            # Extract application name if specified
+            app_patterns = [
+                r'in\s+(\w+(?:\s+\w+)*?)(?:\s+app|\s+application|$)',
+                r'(?:on|in)\s+(\w+)(?:\s+window|\s+app|\s+application)',
+            ]
+            
+            for pattern in app_patterns:
+                match = re.search(pattern, command_lower)
+                if match:
+                    app_name = match.group(1).strip()
+                    # Filter out common words that aren't app names
+                    if app_name not in ['the', 'this', 'that', 'my', 'current', 'active']:
+                        gui_elements['app_name'] = app_name.title()
+                        break
+            
+            # Validate that we have enough information for GUI command
+            if not gui_elements['label'] and not gui_elements['role']:
+                logger.debug("Insufficient GUI element information extracted")
+                return {}
+            
+            # Set default role if not specified but we have a label
+            if gui_elements['label'] and not gui_elements['role']:
+                gui_elements['role'] = 'button'  # Default assumption
+            
+            logger.debug(f"Extracted GUI elements: {gui_elements}")
+            return gui_elements
+            
+        except Exception as e:
+            logger.error(f"Error extracting GUI elements from command: {e}")
+            return {}
+    
+    def _is_gui_command(self, command: str, command_info: Dict) -> bool:
+        """
+        Determine if a command is a GUI interaction command suitable for fast path.
+        
+        Args:
+            command: The user command
+            command_info: Preprocessed command information
+            
+        Returns:
+            True if command is a GUI command, False otherwise
+        """
+        try:
+            command_type = command_info.get('command_type', 'unknown')
+            
+            # Check if command type indicates GUI interaction
+            gui_command_types = ['click', 'type', 'scroll', 'form_fill']
+            if command_type in gui_command_types:
+                return True
+            
+            # Check for GUI-related keywords in the command
+            command_lower = command.lower()
+            gui_keywords = [
+                'click', 'press', 'tap', 'select', 'button', 'menu', 'link',
+                'type', 'enter', 'input', 'text field', 'checkbox', 'tab',
+                'scroll', 'page up', 'page down', 'window', 'dialog'
+            ]
+            
+            for keyword in gui_keywords:
+                if keyword in command_lower:
+                    return True
+            
+            # Check if we can extract GUI elements from the command
+            gui_elements = self._extract_gui_elements_from_command(command)
+            return bool(gui_elements.get('label') or gui_elements.get('role'))
+            
+        except Exception as e:
+            logger.debug(f"Error determining if command is GUI command: {e}")
+            return False
