@@ -1,0 +1,360 @@
+{
+  "fast_path_tests": {
+    "native_macos_apps": {
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": [],
+      "execution_time": 0.568213939666748,
+      "test_details": {
+        "test_finder_fast_path_integration": {
+          "status": "error",
+          "execution_time": 0.20437097549438477,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_system_preferences_fast_path_integration": {
+          "status": "error",
+          "execution_time": 0.183729887008667,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_menu_bar_fast_path_integration": {
+          "status": "error",
+          "execution_time": 0.18010401725769043,
+          "error": "Pytest returned code 4",
+          "output": []
+        }
+      }
+    },
+    "web_browser_automation": {
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": [],
+      "execution_time": 0.5426948070526123,
+      "test_details": {
+        "test_safari_fast_path_integration": {
+          "status": "error",
+          "execution_time": 0.18386101722717285,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_chrome_fast_path_integration": {
+          "status": "error",
+          "execution_time": 0.18073606491088867,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_web_form_fast_path_integration": {
+          "status": "error",
+          "execution_time": 0.17808985710144043,
+          "error": "Pytest returned code 4",
+          "output": []
+        }
+      }
+    },
+    "gui_patterns": {
+      "total_tests": 4,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": [],
+      "execution_time": 0.7145988941192627,
+      "test_details": {
+        "test_button_patterns_fast_path": {
+          "status": "error",
+          "execution_time": 0.17949795722961426,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_menu_patterns_fast_path": {
+          "status": "error",
+          "execution_time": 0.17852401733398438,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_text_field_patterns_fast_path": {
+          "status": "error",
+          "execution_time": 0.1786820888519287,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_form_element_patterns_fast_path": {
+          "status": "error",
+          "execution_time": 0.17788481712341309,
+          "error": "Pytest returned code 4",
+          "output": []
+        }
+      }
+    },
+    "performance_benchmarks": {
+      "total_tests": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": [],
+      "execution_time": 0.3594522476196289,
+      "test_details": {
+        "test_fast_path_performance_benchmarks": {
+          "status": "error",
+          "execution_time": 0.18003296852111816,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_accessibility_tree_traversal_performance": {
+          "status": "error",
+          "execution_time": 0.17941713333129883,
+          "error": "Pytest returned code 4",
+          "output": []
+        }
+      }
+    }
+  },
+  "fallback_tests": {
+    "non_accessible_apps": {
+      "total_tests": 4,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": [],
+      "execution_time": 0.7216038703918457,
+      "test_details": {
+        "test_accessibility_disabled_application_fallback": {
+          "status": "error",
+          "execution_time": 0.1823737621307373,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_accessibility_permission_denied_fallback": {
+          "status": "error",
+          "execution_time": 0.1821727752685547,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_accessibility_api_unavailable_fallback": {
+          "status": "error",
+          "execution_time": 0.17838215827941895,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_legacy_application_fallback": {
+          "status": "error",
+          "execution_time": 0.1786670684814453,
+          "error": "Pytest returned code 4",
+          "output": []
+        }
+      }
+    },
+    "complex_ui_elements": {
+      "total_tests": 4,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": [],
+      "execution_time": 0.7453269958496094,
+      "test_details": {
+        "test_canvas_element_fallback": {
+          "status": "error",
+          "execution_time": 0.18453717231750488,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_custom_control_fallback": {
+          "status": "error",
+          "execution_time": 0.18192410469055176,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_dynamic_content_fallback": {
+          "status": "error",
+          "execution_time": 0.18407177925109863,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_overlapping_elements_fallback": {
+          "status": "error",
+          "execution_time": 0.19478607177734375,
+          "error": "Pytest returned code 4",
+          "output": []
+        }
+      }
+    },
+    "error_injection": {
+      "total_tests": 5,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": [],
+      "execution_time": 0.9043209552764893,
+      "test_details": {
+        "test_accessibility_timeout_recovery": {
+          "status": "error",
+          "execution_time": 0.18448615074157715,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_accessibility_memory_error_recovery": {
+          "status": "error",
+          "execution_time": 0.18107104301452637,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_accessibility_connection_error_recovery": {
+          "status": "error",
+          "execution_time": 0.17969894409179688,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_intermittent_accessibility_failure_recovery": {
+          "status": "error",
+          "execution_time": 0.179703950881958,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_accessibility_degraded_mode_recovery": {
+          "status": "error",
+          "execution_time": 0.1793522834777832,
+          "error": "Pytest returned code 4",
+          "output": []
+        }
+      }
+    },
+    "fallback_performance": {
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": [],
+      "execution_time": 0.5427749156951904,
+      "test_details": {
+        "test_fallback_transition_performance": {
+          "status": "error",
+          "execution_time": 0.17909002304077148,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_fallback_audio_feedback_timing": {
+          "status": "error",
+          "execution_time": 0.18246698379516602,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_fallback_resource_cleanup": {
+          "status": "error",
+          "execution_time": 0.1812121868133545,
+          "error": "Pytest returned code 4",
+          "output": []
+        }
+      }
+    },
+    "fallback_integration": {
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": [],
+      "execution_time": 0.5391850471496582,
+      "test_details": {
+        "test_seamless_fallback_to_vision_workflow": {
+          "status": "error",
+          "execution_time": 0.17780399322509766,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_fallback_preserves_command_context": {
+          "status": "error",
+          "execution_time": 0.18050885200500488,
+          "error": "Pytest returned code 4",
+          "output": []
+        },
+        "test_fallback_error_reporting": {
+          "status": "error",
+          "execution_time": 0.18086600303649902,
+          "error": "Pytest returned code 4",
+          "output": []
+        }
+      }
+    }
+  },
+  "performance_metrics": {
+    "fast_path_performance": {
+      "average_execution_time": 0,
+      "success_rate": 0,
+      "performance_requirement_compliance": 0
+    },
+    "fallback_performance": {
+      "average_fallback_time": 0.18174606875369423,
+      "fallback_success_rate": 0.0,
+      "resource_cleanup_success": 0
+    },
+    "overall_hybrid_performance": {
+      "total_test_execution_time": 0,
+      "hybrid_workflow_efficiency": 0
+    }
+  },
+  "summary": {
+    "test_execution_summary": {
+      "total_tests": 31,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "success_rate": 0.0
+    },
+    "requirements_compliance": {
+      "requirement_5_5": {
+        "description": "Integration tests for native applications and browsers",
+        "native_app_coverage": false,
+        "browser_coverage": false,
+        "compliant": false
+      },
+      "requirement_1_4": {
+        "description": "Common GUI patterns work with fast path",
+        "patterns_tested": 4,
+        "patterns_working": 0,
+        "compliant": false
+      },
+      "requirement_5_3": {
+        "description": "Fallback scenarios validation",
+        "fallback_tests_total": 19,
+        "fallback_tests_passed": 0,
+        "compliant": false
+      },
+      "requirement_2_1": {
+        "description": "Automatic fallback to vision workflow",
+        "fallback_scenarios_tested": 4,
+        "successful_fallbacks": 0,
+        "compliant": false
+      },
+      "requirement_2_2": {
+        "description": "Consistent user experience during fallback",
+        "integration_tests": 3,
+        "successful_integrations": 0,
+        "compliant": false
+      }
+    },
+    "performance_analysis": {
+      "fast_path_performance": {
+        "average_execution_time": 0,
+        "success_rate": 0,
+        "performance_requirement_compliance": 0
+      },
+      "fallback_performance": {
+        "average_fallback_time": 0.18174606875369423,
+        "fallback_success_rate": 0.0,
+        "resource_cleanup_success": 0
+      },
+      "overall_hybrid_performance": {
+        "total_test_execution_time": 0,
+        "hybrid_workflow_efficiency": 0
+      }
+    },
+    "recommendations": [
+      "Fast path performance compliance is below 90%. Consider optimizing accessibility tree traversal.",
+      "Fast path success rate is below 80%. Review element detection algorithms and fuzzy matching.",
+      "Fallback success rate is below 90%. Improve error handling and recovery mechanisms."
+    ]
+  }
+}
