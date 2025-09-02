@@ -144,6 +144,10 @@ class Orchestrator:
         # Initialize system health monitoring
         self._initialize_system_health()
         
+        # Background preloading state
+        self.last_active_app = None
+        self.background_preload_enabled = True
+        
         logger.info("Orchestrator initialized successfully")
     
     @measure_performance("parallel_perception_reasoning", include_system_metrics=True)
@@ -1167,6 +1171,9 @@ class Orchestrator:
             if self._is_gui_command(normalized_command, validation_result.__dict__):
                 logger.info(f"[{execution_id}] Attempting fast path execution for GUI command")
                 self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.PERCEPTION, 15)
+                
+                # Handle application focus changes and start background preloading
+                self._handle_application_focus_change()
                 
                 fast_path_result = self._attempt_fast_path_execution(normalized_command, validation_result.__dict__)
                 
@@ -2573,6 +2580,96 @@ Focus on being helpful while being honest about what information is actually vis
         logger.info(f"Created fallback context with {len(fallback_elements)} elements")
         return fallback_context
     
+    def _handle_application_focus_change(self):
+        """Handle application focus changes and start background preloading."""
+        if not self.background_preload_enabled or not self.accessibility_module:
+            return
+        
+        try:
+            current_app = self.accessibility_module.get_active_application()
+            if not current_app:
+                return
+            
+            app_name = current_app.get('name')
+            app_pid = current_app.get('pid')
+            
+            # Check if application focus changed
+            if (self.last_active_app and 
+                self.last_active_app.get('name') == app_name and 
+                self.last_active_app.get('pid') == app_pid):
+                return  # No change
+            
+            logger.debug(f"Application focus changed to: {app_name}")
+            self.last_active_app = current_app
+            
+            # Start background tree loading for new application
+            if current_app.get('accessible', False):
+                task_id = self.accessibility_module.start_background_tree_loading(app_name, app_pid)
+                logger.debug(f"Started background preloading for {app_name}: {task_id}")
+                
+                # Start predictive caching
+                if self.accessibility_module.predictive_cache_enabled:
+                    predictive_task_id = self.accessibility_module.start_predictive_caching(app_name, app_pid)
+                    logger.debug(f"Started predictive caching for {app_name}: {predictive_task_id}")
+            
+            # Clean up old background tasks
+            self.accessibility_module.cleanup_background_tasks()
+            
+        except Exception as e:
+            logger.debug(f"Error handling application focus change: {e}")
+    
+    def get_parallel_processing_status(self) -> Dict[str, Any]:
+        """
+        Get status of parallel processing operations.
+        
+        Returns:
+            Dictionary with parallel processing status and statistics
+        """
+        status = {
+            'orchestrator': {
+                'parallel_processing_enabled': self.enable_parallel_processing,
+                'parallel_perception_reasoning': self.parallel_perception_reasoning,
+                'background_preload_enabled': self.background_preload_enabled,
+                'last_active_app': self.last_active_app
+            }
+        }
+        
+        # Add accessibility module parallel processing stats
+        if self.accessibility_module:
+            status['accessibility'] = self.accessibility_module.get_parallel_processing_stats()
+            status['cache'] = self.accessibility_module.get_cache_statistics()
+        
+        return status
+    
+    def configure_parallel_processing(self, 
+                                    orchestrator_parallel: Optional[bool] = None,
+                                    background_preload: Optional[bool] = None,
+                                    accessibility_parallel: Optional[bool] = None,
+                                    predictive_cache: Optional[bool] = None):
+        """
+        Configure parallel processing settings across modules.
+        
+        Args:
+            orchestrator_parallel: Enable/disable orchestrator parallel processing
+            background_preload: Enable/disable background preloading
+            accessibility_parallel: Enable/disable accessibility parallel processing
+            predictive_cache: Enable/disable predictive caching
+        """
+        if orchestrator_parallel is not None:
+            self.enable_parallel_processing = orchestrator_parallel
+            self.parallel_perception_reasoning = orchestrator_parallel
+            logger.info(f"Orchestrator parallel processing {'enabled' if orchestrator_parallel else 'disabled'}")
+        
+        if background_preload is not None:
+            self.background_preload_enabled = background_preload
+            logger.info(f"Background preloading {'enabled' if background_preload else 'disabled'}")
+        
+        if self.accessibility_module:
+            self.accessibility_module.configure_parallel_processing(
+                enabled=accessibility_parallel,
+                predictive_cache=predictive_cache
+            )
+    
     def _attempt_fast_path_execution(self, command: str, command_info: Dict) -> Optional[Dict[str, Any]]:
         """
         Attempt to execute command using fast path accessibility detection with enhanced error recovery.
@@ -2620,11 +2717,22 @@ Focus on being helpful while being honest about what information is actually vis
                 
                 logger.debug(f"Extracted GUI elements: {gui_elements}")
                 
-                # Attempt to find the element using accessibility API
-                element_result = self.accessibility_module.find_element(
+                # Attempt to find the element using accessibility API with parallel vision preparation
+                def prepare_vision_capture():
+                    """Prepare vision capture as fallback."""
+                    try:
+                        if self.vision_module and self.module_availability.get('vision', False):
+                            return self.vision_module.capture_screen()
+                        return None
+                    except Exception as e:
+                        logger.debug(f"Vision preparation failed: {e}")
+                        return None
+                
+                element_result = self.accessibility_module.find_element_with_vision_preparation(
                     role=gui_elements.get('role', ''),
                     label=gui_elements.get('label', ''),
-                    app_name=gui_elements.get('app_name')
+                    app_name=gui_elements.get('app_name'),
+                    vision_callback=prepare_vision_capture if self.enable_parallel_processing else None
                 )
                 
                 if not element_result:
