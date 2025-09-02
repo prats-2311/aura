@@ -459,107 +459,279 @@ class AutomationModule:
         
         logger.debug(f"Successfully clicked at ({x}, {y})")
     
-    def _attempt_click(self, x: int, y: int) -> bool:
-        """Attempt a single click and return success status - cliclick PRIMARY."""
+    def _attempt_click(self, x: int, y: int, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Attempt a single click and return success status - cliclick PRIMARY.
+        
+        Args:
+            x: X coordinate
+            y: Y coordinate
+            fast_path: Whether this is a fast path execution (from accessibility API)
+            element_info: Optional element information for optimization
+            
+        Returns:
+            bool: True if click succeeded, False otherwise
+        """
         try:
             if self.is_macos:
                 # cliclick is PRIMARY method - most reliable
                 if self.has_cliclick:
-                    logger.debug(f"Using cliclick (PRIMARY) for click at ({x}, {y})")
-                    success = self._cliclick_click(x, y)
+                    path_type = "FAST" if fast_path else "SLOW"
+                    logger.debug(f"Using cliclick (PRIMARY) for {path_type} PATH click at ({x}, {y})")
+                    success = self._cliclick_click(x, y, fast_path=fast_path, element_info=element_info)
                     if success:
                         return True
                     else:
                         logger.warning("cliclick (PRIMARY) failed, trying AppleScript fallback")
                 
                 # AppleScript is FALLBACK ONLY
-                logger.debug(f"Using AppleScript (FALLBACK) for click at ({x}, {y})")
+                path_type = "FAST" if fast_path else "SLOW"
+                logger.debug(f"Using AppleScript (FALLBACK) for {path_type} PATH click at ({x}, {y})")
                 return self._macos_click(x, y)
             else:
                 # Use PyAutoGUI for other platforms
+                start_time = time.time()
                 pyautogui.moveTo(x, y, duration=MOUSE_MOVE_DURATION)
                 pyautogui.click()
+                execution_time = time.time() - start_time
+                
+                # Log performance for non-macOS platforms too
+                self._log_click_performance(execution_time, fast_path, True, element_info)
                 return True
         except Exception as e:
             logger.warning(f"Click attempt failed at ({x}, {y}): {e}")
+            # Log failed performance
+            if 'start_time' in locals():
+                execution_time = time.time() - start_time
+                self._log_click_performance(execution_time, fast_path, False, element_info)
             return False
     
-    def _cliclick_click(self, x: int, y: int) -> bool:
-        """Execute a click using cliclick on macOS."""
+    def _cliclick_click(self, x: int, y: int, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Execute a click using cliclick on macOS with fast path optimization.
+        
+        Args:
+            x: X coordinate
+            y: Y coordinate  
+            fast_path: Whether this is a fast path execution (from accessibility API)
+            element_info: Optional element information for logging and precision handling
+            
+        Returns:
+            bool: True if click succeeded, False otherwise
+        """
         try:
+            start_time = time.time()
+            
+            # Handle coordinate precision for accessibility API results
+            if fast_path and element_info:
+                # Accessibility API coordinates are typically more precise
+                # Apply any necessary coordinate adjustments for better accuracy
+                adjusted_x, adjusted_y = self._adjust_accessibility_coordinates(x, y, element_info)
+                logger.debug(f"Fast path coordinate adjustment: ({x}, {y}) -> ({adjusted_x}, {adjusted_y})")
+                x, y = adjusted_x, adjusted_y
+            
+            # Execute cliclick with optimized timeout for fast path
+            timeout = 3 if fast_path else 5  # Shorter timeout for fast path
+            
             result = subprocess.run(
                 ['cliclick', f'c:{x},{y}'],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=timeout
             )
             
+            execution_time = time.time() - start_time
+            
+            # Performance logging with path differentiation
             if result.returncode == 0:
-                logger.debug(f"cliclick executed successfully at ({x}, {y})")
+                path_type = "FAST" if fast_path else "SLOW"
+                element_desc = element_info.get('title', 'unknown') if element_info else 'unknown'
+                logger.info(f"cliclick {path_type} PATH: Click succeeded at ({x}, {y}) on '{element_desc}' in {execution_time:.3f}s")
+                
+                # Log performance metrics for monitoring
+                self._log_click_performance(execution_time, fast_path, True, element_info)
                 return True
             else:
-                logger.warning(f"cliclick failed: {result.stderr}")
+                path_type = "FAST" if fast_path else "SLOW"
+                logger.warning(f"cliclick {path_type} PATH: Click failed at ({x}, {y}): {result.stderr}")
+                self._log_click_performance(execution_time, fast_path, False, element_info)
                 return False
                 
         except subprocess.TimeoutExpired:
-            logger.error(f"cliclick timed out at ({x}, {y})")
+            execution_time = time.time() - start_time
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.error(f"cliclick {path_type} PATH: Click timed out at ({x}, {y}) after {execution_time:.3f}s")
+            self._log_click_performance(execution_time, fast_path, False, element_info)
             return False
         except Exception as e:
-            logger.error(f"cliclick failed with exception: {e}")
+            execution_time = time.time() - start_time if 'start_time' in locals() else 0.0
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.error(f"cliclick {path_type} PATH: Click failed with exception at ({x}, {y}): {e}")
+            self._log_click_performance(execution_time, fast_path, False, element_info)
             return False
     
-    def _cliclick_double_click(self, x: int, y: int) -> bool:
-        """Execute a double-click using cliclick on macOS."""
+    def _cliclick_double_click(self, x: int, y: int, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Execute a double-click using cliclick on macOS with fast path optimization.
+        
+        Args:
+            x: X coordinate
+            y: Y coordinate
+            fast_path: Whether this is a fast path execution
+            element_info: Optional element information for optimization
+            
+        Returns:
+            bool: True if double-click succeeded, False otherwise
+        """
         try:
+            start_time = time.time()
+            
+            # Handle coordinate precision for accessibility API results
+            if fast_path and element_info:
+                adjusted_x, adjusted_y = self._adjust_accessibility_coordinates(x, y, element_info)
+                logger.debug(f"Fast path double-click coordinate adjustment: ({x}, {y}) -> ({adjusted_x}, {adjusted_y})")
+                x, y = adjusted_x, adjusted_y
+            
+            # Execute cliclick with optimized timeout for fast path
+            timeout = 3 if fast_path else 5
+            
             result = subprocess.run(
                 ['cliclick', f'dc:{x},{y}'],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=timeout
             )
             
+            execution_time = time.time() - start_time
+            
             if result.returncode == 0:
-                logger.debug(f"cliclick double-click executed successfully at ({x}, {y})")
+                path_type = "FAST" if fast_path else "SLOW"
+                element_desc = element_info.get('title', 'unknown') if element_info else 'unknown'
+                logger.info(f"cliclick {path_type} PATH: Double-click succeeded at ({x}, {y}) on '{element_desc}' in {execution_time:.3f}s")
+                
+                # Log performance metrics
+                perf_record = {
+                    'timestamp': time.time(),
+                    'execution_time': execution_time,
+                    'path_type': 'fast' if fast_path else 'slow',
+                    'success': True,
+                    'action': 'double_click'
+                }
+                if element_info:
+                    perf_record.update({
+                        'element_role': element_info.get('role', ''),
+                        'element_title': element_info.get('title', ''),
+                        'app_name': element_info.get('app_name', '')
+                    })
+                
+                if not hasattr(self, 'performance_history'):
+                    self.performance_history = []
+                self.performance_history.append(perf_record)
+                
                 return True
             else:
-                logger.warning(f"cliclick double-click failed: {result.stderr}")
+                path_type = "FAST" if fast_path else "SLOW"
+                logger.warning(f"cliclick {path_type} PATH: Double-click failed at ({x}, {y}): {result.stderr}")
                 return False
                 
         except subprocess.TimeoutExpired:
-            logger.error(f"cliclick double-click timed out at ({x}, {y})")
+            execution_time = time.time() - start_time
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.error(f"cliclick {path_type} PATH: Double-click timed out at ({x}, {y}) after {execution_time:.3f}s")
             return False
         except Exception as e:
-            logger.error(f"cliclick double-click failed with exception: {e}")
+            execution_time = time.time() - start_time if 'start_time' in locals() else 0.0
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.error(f"cliclick {path_type} PATH: Double-click failed with exception at ({x}, {y}): {e}")
             return False
     
-    def _cliclick_type(self, text: str) -> bool:
-        """Execute typing using cliclick on macOS."""
+    def _cliclick_type(self, text: str, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Execute typing using cliclick on macOS with fast path optimization.
+        
+        Args:
+            text: Text to type
+            fast_path: Whether this is a fast path execution
+            element_info: Optional element information for optimization
+            
+        Returns:
+            bool: True if typing succeeded, False otherwise
+        """
         try:
+            start_time = time.time()
+            
+            # Optimize timeout for fast path
+            timeout = 8 if fast_path else 10
+            
             # cliclick uses 't:' for typing
             result = subprocess.run(
                 ['cliclick', f't:{text}'],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=timeout
             )
             
+            execution_time = time.time() - start_time
+            
             if result.returncode == 0:
-                logger.debug(f"cliclick typing executed successfully")
+                path_type = "FAST" if fast_path else "SLOW"
+                text_preview = text[:30] + "..." if len(text) > 30 else text
+                element_desc = element_info.get('title', 'unknown') if element_info else 'unknown'
+                logger.info(f"cliclick {path_type} PATH: Typing succeeded on '{element_desc}' in {execution_time:.3f}s: '{text_preview}'")
+                
+                # Log performance metrics
+                perf_record = {
+                    'timestamp': time.time(),
+                    'execution_time': execution_time,
+                    'path_type': 'fast' if fast_path else 'slow',
+                    'success': True,
+                    'action': 'type',
+                    'text_length': len(text)
+                }
+                if element_info:
+                    perf_record.update({
+                        'element_role': element_info.get('role', ''),
+                        'element_title': element_info.get('title', ''),
+                        'app_name': element_info.get('app_name', '')
+                    })
+                
+                if not hasattr(self, 'performance_history'):
+                    self.performance_history = []
+                self.performance_history.append(perf_record)
+                
                 return True
             else:
-                logger.warning(f"cliclick typing failed: {result.stderr}")
+                path_type = "FAST" if fast_path else "SLOW"
+                logger.warning(f"cliclick {path_type} PATH: Typing failed: {result.stderr}")
                 return False
                 
         except subprocess.TimeoutExpired:
-            logger.error(f"cliclick typing timed out")
+            execution_time = time.time() - start_time
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.error(f"cliclick {path_type} PATH: Typing timed out after {execution_time:.3f}s")
             return False
         except Exception as e:
-            logger.error(f"cliclick typing failed with exception: {e}")
+            execution_time = time.time() - start_time if 'start_time' in locals() else 0.0
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.error(f"cliclick {path_type} PATH: Typing failed with exception: {e}")
             return False
     
-    def _cliclick_scroll(self, direction: str, amount: int) -> bool:
-        """Execute scrolling using cliclick on macOS."""
+    def _cliclick_scroll(self, direction: str, amount: int, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Execute scrolling using cliclick on macOS with fast path optimization.
+        
+        Args:
+            direction: Scroll direction ('up', 'down')
+            amount: Scroll amount
+            fast_path: Whether this is a fast path execution
+            element_info: Optional element information for optimization
+            
+        Returns:
+            bool: True if scroll succeeded, False otherwise
+        """
         try:
+            start_time = time.time()
+            
             # cliclick scroll commands: w:+5 (up), w:-5 (down)
             if direction == "up":
                 scroll_cmd = f"w:+{amount}"
@@ -567,28 +739,63 @@ class AutomationModule:
                 scroll_cmd = f"w:-{amount}"
             else:
                 # cliclick doesn't support left/right scroll easily, return False
-                logger.debug(f"cliclick doesn't support {direction} scroll, using fallback")
+                path_type = "FAST" if fast_path else "SLOW"
+                logger.debug(f"cliclick {path_type} PATH: doesn't support {direction} scroll, using fallback")
                 return False
+            
+            # Optimize timeout for fast path
+            timeout = 3 if fast_path else 5
             
             result = subprocess.run(
                 ['cliclick', scroll_cmd],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=timeout
             )
             
+            execution_time = time.time() - start_time
+            
             if result.returncode == 0:
-                logger.debug(f"cliclick scroll {direction} executed successfully")
+                path_type = "FAST" if fast_path else "SLOW"
+                element_desc = element_info.get('title', 'unknown') if element_info else 'unknown'
+                logger.info(f"cliclick {path_type} PATH: Scroll {direction} succeeded on '{element_desc}' in {execution_time:.3f}s")
+                
+                # Log performance metrics
+                perf_record = {
+                    'timestamp': time.time(),
+                    'execution_time': execution_time,
+                    'path_type': 'fast' if fast_path else 'slow',
+                    'success': True,
+                    'action': 'scroll',
+                    'scroll_direction': direction,
+                    'scroll_amount': amount
+                }
+                if element_info:
+                    perf_record.update({
+                        'element_role': element_info.get('role', ''),
+                        'element_title': element_info.get('title', ''),
+                        'app_name': element_info.get('app_name', '')
+                    })
+                
+                if not hasattr(self, 'performance_history'):
+                    self.performance_history = []
+                self.performance_history.append(perf_record)
+                
                 return True
             else:
-                logger.warning(f"cliclick scroll failed: {result.stderr}")
+                path_type = "FAST" if fast_path else "SLOW"
+                logger.warning(f"cliclick {path_type} PATH: Scroll failed: {result.stderr}")
                 return False
                 
         except subprocess.TimeoutExpired:
-            logger.error(f"cliclick scroll timed out")
+            execution_time = time.time() - start_time
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.error(f"cliclick {path_type} PATH: Scroll timed out after {execution_time:.3f}s")
             return False
         except Exception as e:
-            logger.error(f"cliclick scroll failed with exception: {e}")
+            execution_time = time.time() - start_time if 'start_time' in locals() else 0.0
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.error(f"cliclick {path_type} PATH: Scroll failed with exception: {e}")
             return False
     
     def _cliclick_key(self, key: str) -> bool:
@@ -1099,6 +1306,133 @@ class AutomationModule:
         else:
             return pyautogui.position()
     
+    def _adjust_accessibility_coordinates(self, x: int, y: int, element_info: Dict[str, Any]) -> Tuple[int, int]:
+        """
+        Adjust coordinates from accessibility API for better precision.
+        
+        Args:
+            x: Original X coordinate
+            y: Original Y coordinate
+            element_info: Element information from accessibility API
+            
+        Returns:
+            Tuple[int, int]: Adjusted coordinates
+        """
+        try:
+            # Get element role and size for precision adjustments
+            role = element_info.get('role', '')
+            element_size = element_info.get('coordinates', [])
+            
+            # Apply role-specific coordinate adjustments
+            if role == 'AXButton':
+                # For buttons, ensure we click in the center
+                if len(element_size) >= 4:
+                    width = element_size[2] - element_size[0]
+                    height = element_size[3] - element_size[1]
+                    # Ensure we're clicking in the center of the button
+                    center_x = element_size[0] + width // 2
+                    center_y = element_size[1] + height // 2
+                    return (center_x, center_y)
+            
+            elif role == 'AXMenuItem':
+                # For menu items, click slightly to the right of center to avoid icons
+                if len(element_size) >= 4:
+                    width = element_size[2] - element_size[0]
+                    height = element_size[3] - element_size[1]
+                    # Click 25% from left edge, vertically centered
+                    adjusted_x = element_size[0] + width // 4
+                    adjusted_y = element_size[1] + height // 2
+                    return (adjusted_x, adjusted_y)
+            
+            elif role in ['AXTextField', 'AXTextArea']:
+                # For text fields, click slightly inside the border
+                if len(element_size) >= 4:
+                    width = element_size[2] - element_size[0]
+                    height = element_size[3] - element_size[1]
+                    # Click 10% from left edge, vertically centered
+                    adjusted_x = element_size[0] + max(5, width // 10)
+                    adjusted_y = element_size[1] + height // 2
+                    return (adjusted_x, adjusted_y)
+            
+            # For other elements or if no size info, return original coordinates
+            return (x, y)
+            
+        except Exception as e:
+            logger.debug(f"Coordinate adjustment failed, using original: {e}")
+            return (x, y)
+    
+    def _log_click_performance(self, execution_time: float, fast_path: bool, success: bool, element_info: Optional[Dict[str, Any]] = None):
+        """
+        Log performance metrics for click operations.
+        
+        Args:
+            execution_time: Time taken to execute the click
+            fast_path: Whether this was a fast path execution
+            success: Whether the click succeeded
+            element_info: Optional element information
+        """
+        try:
+            # Create performance record
+            perf_record = {
+                'timestamp': time.time(),
+                'execution_time': execution_time,
+                'path_type': 'fast' if fast_path else 'slow',
+                'success': success,
+                'action': 'click'
+            }
+            
+            if element_info:
+                perf_record.update({
+                    'element_role': element_info.get('role', ''),
+                    'element_title': element_info.get('title', ''),
+                    'app_name': element_info.get('app_name', '')
+                })
+            
+            # Store in performance history (initialize if needed)
+            if not hasattr(self, 'performance_history'):
+                self.performance_history = []
+            
+            self.performance_history.append(perf_record)
+            
+            # Keep history size manageable (last 200 operations)
+            if len(self.performance_history) > 200:
+                self.performance_history = self.performance_history[-100:]
+            
+            # Log performance summary periodically
+            if len(self.performance_history) % 10 == 0:
+                self._log_performance_summary()
+                
+        except Exception as e:
+            logger.debug(f"Performance logging failed: {e}")
+    
+    def _log_performance_summary(self):
+        """Log a summary of recent performance metrics."""
+        try:
+            if not hasattr(self, 'performance_history') or not self.performance_history:
+                return
+            
+            recent_records = self.performance_history[-10:]  # Last 10 operations
+            
+            fast_path_records = [r for r in recent_records if r['path_type'] == 'fast']
+            slow_path_records = [r for r in recent_records if r['path_type'] == 'slow']
+            
+            if fast_path_records:
+                fast_avg_time = sum(r['execution_time'] for r in fast_path_records) / len(fast_path_records)
+                fast_success_rate = sum(1 for r in fast_path_records if r['success']) / len(fast_path_records) * 100
+                logger.info(f"FAST PATH Performance: avg={fast_avg_time:.3f}s, success={fast_success_rate:.1f}% ({len(fast_path_records)} ops)")
+            
+            if slow_path_records:
+                slow_avg_time = sum(r['execution_time'] for r in slow_path_records) / len(slow_path_records)
+                slow_success_rate = sum(1 for r in slow_path_records if r['success']) / len(slow_path_records) * 100
+                logger.info(f"SLOW PATH Performance: avg={slow_avg_time:.3f}s, success={slow_success_rate:.1f}% ({len(slow_path_records)} ops)")
+            
+            if fast_path_records and slow_path_records:
+                speedup = slow_avg_time / fast_avg_time if fast_avg_time > 0 else 0
+                logger.info(f"Fast path speedup: {speedup:.1f}x faster than slow path")
+                
+        except Exception as e:
+            logger.debug(f"Performance summary logging failed: {e}")
+
     def _get_macos_mouse_position(self) -> Tuple[int, int]:
         """Get mouse position on macOS using system commands."""
         try:
@@ -1241,6 +1575,95 @@ class AutomationModule:
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         logger.info(f"Updated retry settings: max_retries={max_retries}, retry_delay={retry_delay}s")
+    
+    def get_performance_metrics(self, path_type: Optional[str] = None, limit: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Get performance metrics for fast path vs slow path execution.
+        
+        Args:
+            path_type: Filter by path type ('fast' or 'slow'), None for all
+            limit: Maximum number of recent records to analyze, None for all
+            
+        Returns:
+            Dictionary containing performance statistics
+        """
+        try:
+            if not hasattr(self, 'performance_history') or not self.performance_history:
+                return {
+                    'total_operations': 0,
+                    'fast_path_operations': 0,
+                    'slow_path_operations': 0,
+                    'average_execution_time': 0.0,
+                    'fast_path_avg_time': 0.0,
+                    'slow_path_avg_time': 0.0,
+                    'success_rate': 0.0,
+                    'fast_path_success_rate': 0.0,
+                    'slow_path_success_rate': 0.0,
+                    'speedup_factor': 0.0
+                }
+            
+            # Get records to analyze
+            records = self.performance_history
+            if limit:
+                records = records[-limit:]
+            
+            # Filter by path type if specified
+            if path_type:
+                records = [r for r in records if r.get('path_type') == path_type]
+            
+            if not records:
+                return {'error': f'No records found for path_type: {path_type}'}
+            
+            # Calculate metrics
+            total_ops = len(records)
+            fast_records = [r for r in records if r.get('path_type') == 'fast']
+            slow_records = [r for r in records if r.get('path_type') == 'slow']
+            
+            successful_ops = sum(1 for r in records if r.get('success', False))
+            total_time = sum(r.get('execution_time', 0) for r in records)
+            
+            fast_successful = sum(1 for r in fast_records if r.get('success', False))
+            fast_total_time = sum(r.get('execution_time', 0) for r in fast_records)
+            
+            slow_successful = sum(1 for r in slow_records if r.get('success', False))
+            slow_total_time = sum(r.get('execution_time', 0) for r in slow_records)
+            
+            metrics = {
+                'total_operations': total_ops,
+                'fast_path_operations': len(fast_records),
+                'slow_path_operations': len(slow_records),
+                'average_execution_time': total_time / total_ops if total_ops > 0 else 0.0,
+                'fast_path_avg_time': fast_total_time / len(fast_records) if fast_records else 0.0,
+                'slow_path_avg_time': slow_total_time / len(slow_records) if slow_records else 0.0,
+                'success_rate': (successful_ops / total_ops * 100) if total_ops > 0 else 0.0,
+                'fast_path_success_rate': (fast_successful / len(fast_records) * 100) if fast_records else 0.0,
+                'slow_path_success_rate': (slow_successful / len(slow_records) * 100) if slow_records else 0.0
+            }
+            
+            # Calculate speedup factor
+            if metrics['slow_path_avg_time'] > 0 and metrics['fast_path_avg_time'] > 0:
+                metrics['speedup_factor'] = metrics['slow_path_avg_time'] / metrics['fast_path_avg_time']
+            else:
+                metrics['speedup_factor'] = 0.0
+            
+            # Add breakdown by action type
+            action_breakdown = {}
+            for action_type in ['click', 'double_click', 'type', 'scroll']:
+                action_records = [r for r in records if r.get('action') == action_type]
+                if action_records:
+                    action_breakdown[action_type] = {
+                        'count': len(action_records),
+                        'avg_time': sum(r.get('execution_time', 0) for r in action_records) / len(action_records),
+                        'success_rate': sum(1 for r in action_records if r.get('success', False)) / len(action_records) * 100
+                    }
+            
+            metrics['action_breakdown'] = action_breakdown
+            
+            return metrics
+            
+        except Exception as e:
+            logger.error(f"Failed to calculate performance metrics: {e}")
+            return {'error': str(e)}
     
     def fill_form(self, form_data: Dict[str, Any], form_values: Dict[str, str], 
                   confirm_before_submit: bool = True) -> Dict[str, Any]:
@@ -1854,12 +2277,21 @@ class AutomationModule:
             success = False
             
             if action_type == 'click':
-                success = self._attempt_click(x, y)
+                success = self._attempt_click(x, y, fast_path=True, element_info=element_info)
                 
             elif action_type == 'double_click':
-                success = self._cliclick_double_click(x, y) if self.is_macos else False
-                if not success:
-                    success = self._macos_double_click(x, y) if self.is_macos else False
+                if self.is_macos:
+                    success = self._cliclick_double_click(x, y, fast_path=True, element_info=element_info)
+                    if not success:
+                        success = self._macos_double_click(x, y)
+                else:
+                    # For non-macOS platforms, use PyAutoGUI with performance logging
+                    start_time = time.time()
+                    pyautogui.moveTo(x, y, duration=MOUSE_MOVE_DURATION)
+                    pyautogui.doubleClick()
+                    execution_time = time.time() - start_time
+                    self._log_click_performance(execution_time, True, True, element_info)
+                    success = True
                 
             elif action_type == 'type':
                 text = kwargs.get('text', '')
@@ -1867,19 +2299,82 @@ class AutomationModule:
                     raise ValueError("Text parameter required for type action")
                 
                 # First click to focus the element
-                click_success = self._attempt_click(x, y)
+                click_success = self._attempt_click(x, y, fast_path=True, element_info=element_info)
                 if click_success:
                     time.sleep(0.1)  # Brief pause to ensure focus
-                    success = self._cliclick_type(text) if self.is_macos else False
-                    if not success:
-                        success = self._macos_type(text) if self.is_macos else False
+                    if self.is_macos:
+                        success = self._cliclick_type(text, fast_path=True, element_info=element_info)
+                        if not success:
+                            success = self._macos_type(text)
+                    else:
+                        # For non-macOS platforms, use PyAutoGUI with performance logging
+                        start_time = time.time()
+                        pyautogui.typewrite(text, interval=TYPE_INTERVAL)
+                        execution_time = time.time() - start_time
+                        
+                        # Log typing performance
+                        perf_record = {
+                            'timestamp': time.time(),
+                            'execution_time': execution_time,
+                            'path_type': 'fast',
+                            'success': True,
+                            'action': 'type',
+                            'text_length': len(text)
+                        }
+                        if element_info:
+                            perf_record.update({
+                                'element_role': element_info.get('role', ''),
+                                'element_title': element_info.get('title', ''),
+                                'app_name': element_info.get('app_name', '')
+                            })
+                        
+                        if not hasattr(self, 'performance_history'):
+                            self.performance_history = []
+                        self.performance_history.append(perf_record)
+                        success = True
                 
             elif action_type == 'scroll':
                 direction = kwargs.get('direction', 'up')
                 amount = kwargs.get('amount', SCROLL_AMOUNT)
-                success = self._cliclick_scroll(direction, amount) if self.is_macos else False
-                if not success:
-                    success = self._macos_scroll(direction, amount) if self.is_macos else False
+                if self.is_macos:
+                    success = self._cliclick_scroll(direction, amount, fast_path=True, element_info=element_info)
+                    if not success:
+                        success = self._macos_scroll(direction, amount)
+                else:
+                    # For non-macOS platforms, use PyAutoGUI with performance logging
+                    start_time = time.time()
+                    if direction == "up":
+                        pyautogui.scroll(amount)
+                    elif direction == "down":
+                        pyautogui.scroll(-amount)
+                    elif direction == "left":
+                        pyautogui.hscroll(-amount)
+                    elif direction == "right":
+                        pyautogui.hscroll(amount)
+                    
+                    execution_time = time.time() - start_time
+                    
+                    # Log scroll performance
+                    perf_record = {
+                        'timestamp': time.time(),
+                        'execution_time': execution_time,
+                        'path_type': 'fast',
+                        'success': True,
+                        'action': 'scroll',
+                        'scroll_direction': direction,
+                        'scroll_amount': amount
+                    }
+                    if element_info:
+                        perf_record.update({
+                            'element_role': element_info.get('role', ''),
+                            'element_title': element_info.get('title', ''),
+                            'app_name': element_info.get('app_name', '')
+                        })
+                    
+                    if not hasattr(self, 'performance_history'):
+                        self.performance_history = []
+                    self.performance_history.append(perf_record)
+                    success = True
                 
             else:
                 raise ValueError(f"Unsupported action type: {action_type}")
