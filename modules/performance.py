@@ -59,6 +59,26 @@ class PerformanceMetrics:
 
 
 @dataclass
+class HybridPerformanceMetrics:
+    """Performance metrics for hybrid execution paths."""
+    timestamp: float = field(default_factory=time.time)
+    command: str = ""
+    path_used: str = ""  # 'fast' or 'slow'
+    total_execution_time: float = 0.0
+    element_detection_time: float = 0.0
+    action_execution_time: float = 0.0
+    success: bool = True
+    fallback_triggered: bool = False
+    app_name: Optional[str] = None
+    element_found: bool = False
+    error_message: str = ""
+    accessibility_api_available: bool = True
+    vision_model_used: bool = False
+    reasoning_model_used: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class CacheEntry:
     """Cache entry with expiration and metadata."""
     data: Any
@@ -443,6 +463,170 @@ class ParallelProcessor:
             logger.error(f"Error shutting down parallel processor: {e}")
 
 
+class HybridPerformanceMonitor:
+    """Performance monitoring specifically for hybrid execution paths."""
+    
+    def __init__(self, max_metrics: int = 500):
+        """
+        Initialize hybrid performance monitor.
+        
+        Args:
+            max_metrics: Maximum number of hybrid metrics to keep in memory
+        """
+        self.max_metrics = max_metrics
+        self.hybrid_metrics = deque(maxlen=max_metrics)
+        self.hybrid_lock = threading.Lock()
+        
+        # Path-specific statistics
+        self.path_stats = {
+            'fast': {
+                'count': 0,
+                'success_count': 0,
+                'total_duration': 0.0,
+                'avg_duration': 0.0,
+                'min_duration': float('inf'),
+                'max_duration': 0.0,
+                'fallback_count': 0
+            },
+            'slow': {
+                'count': 0,
+                'success_count': 0,
+                'total_duration': 0.0,
+                'avg_duration': 0.0,
+                'min_duration': float('inf'),
+                'max_duration': 0.0,
+                'fallback_count': 0
+            }
+        }
+        
+        # Application-specific statistics
+        self.app_stats = defaultdict(lambda: {
+            'fast_path_success_rate': 0.0,
+            'fast_path_attempts': 0,
+            'fast_path_successes': 0,
+            'avg_fast_duration': 0.0,
+            'avg_slow_duration': 0.0
+        })
+        
+        logger.info(f"Hybrid performance monitor initialized with {max_metrics} max metrics")
+    
+    def record_hybrid_metric(self, metric: HybridPerformanceMetrics) -> None:
+        """
+        Record a hybrid performance metric.
+        
+        Args:
+            metric: Hybrid performance metric to record
+        """
+        with self.hybrid_lock:
+            self.hybrid_metrics.append(metric)
+            
+            # Update path statistics
+            path = metric.path_used
+            if path in self.path_stats:
+                stats = self.path_stats[path]
+                stats['count'] += 1
+                stats['total_duration'] += metric.total_execution_time
+                
+                if metric.success:
+                    stats['success_count'] += 1
+                
+                if metric.fallback_triggered:
+                    stats['fallback_count'] += 1
+                
+                # Update duration statistics
+                stats['avg_duration'] = stats['total_duration'] / stats['count']
+                stats['min_duration'] = min(stats['min_duration'], metric.total_execution_time)
+                stats['max_duration'] = max(stats['max_duration'], metric.total_execution_time)
+            
+            # Update application statistics
+            if metric.app_name:
+                app_stats = self.app_stats[metric.app_name]
+                
+                if metric.path_used == 'fast':
+                    app_stats['fast_path_attempts'] += 1
+                    if metric.success and not metric.fallback_triggered:
+                        app_stats['fast_path_successes'] += 1
+                    
+                    # Update success rate
+                    app_stats['fast_path_success_rate'] = (
+                        app_stats['fast_path_successes'] / app_stats['fast_path_attempts'] * 100
+                    )
+                    
+                    # Update average durations
+                    fast_metrics = [m for m in self.hybrid_metrics 
+                                  if m.app_name == metric.app_name and m.path_used == 'fast']
+                    if fast_metrics:
+                        app_stats['avg_fast_duration'] = sum(m.total_execution_time for m in fast_metrics) / len(fast_metrics)
+                
+                elif metric.path_used == 'slow':
+                    slow_metrics = [m for m in self.hybrid_metrics 
+                                  if m.app_name == metric.app_name and m.path_used == 'slow']
+                    if slow_metrics:
+                        app_stats['avg_slow_duration'] = sum(m.total_execution_time for m in slow_metrics) / len(slow_metrics)
+    
+    def get_hybrid_stats(self, time_window_minutes: int = 60) -> Dict[str, Any]:
+        """
+        Get hybrid performance statistics for the specified time window.
+        
+        Args:
+            time_window_minutes: Time window in minutes
+            
+        Returns:
+            Hybrid performance statistics dictionary
+        """
+        cutoff_time = time.time() - (time_window_minutes * 60)
+        
+        with self.hybrid_lock:
+            # Filter metrics within time window
+            recent_metrics = [m for m in self.hybrid_metrics if m.timestamp >= cutoff_time]
+            
+            if not recent_metrics:
+                return {
+                    'time_window_minutes': time_window_minutes,
+                    'total_commands': 0,
+                    'fast_path_usage': 0.0,
+                    'slow_path_usage': 0.0,
+                    'overall_success_rate': 0.0,
+                    'fallback_rate': 0.0,
+                    'avg_fast_duration': 0.0,
+                    'avg_slow_duration': 0.0,
+                    'path_stats': self.path_stats.copy(),
+                    'app_stats': dict(self.app_stats)
+                }
+            
+            # Calculate statistics
+            total_commands = len(recent_metrics)
+            fast_path_commands = [m for m in recent_metrics if m.path_used == 'fast']
+            slow_path_commands = [m for m in recent_metrics if m.path_used == 'slow']
+            successful_commands = [m for m in recent_metrics if m.success]
+            fallback_commands = [m for m in recent_metrics if m.fallback_triggered]
+            
+            fast_path_usage = (len(fast_path_commands) / total_commands * 100) if total_commands > 0 else 0
+            slow_path_usage = (len(slow_path_commands) / total_commands * 100) if total_commands > 0 else 0
+            overall_success_rate = (len(successful_commands) / total_commands * 100) if total_commands > 0 else 0
+            fallback_rate = (len(fallback_commands) / total_commands * 100) if total_commands > 0 else 0
+            
+            avg_fast_duration = (sum(m.total_execution_time for m in fast_path_commands) / 
+                               len(fast_path_commands)) if fast_path_commands else 0
+            avg_slow_duration = (sum(m.total_execution_time for m in slow_path_commands) / 
+                               len(slow_path_commands)) if slow_path_commands else 0
+            
+            return {
+                'time_window_minutes': time_window_minutes,
+                'total_commands': total_commands,
+                'fast_path_usage_percent': fast_path_usage,
+                'slow_path_usage_percent': slow_path_usage,
+                'overall_success_rate_percent': overall_success_rate,
+                'fallback_rate_percent': fallback_rate,
+                'avg_fast_duration_seconds': avg_fast_duration,
+                'avg_slow_duration_seconds': avg_slow_duration,
+                'performance_improvement': ((avg_slow_duration - avg_fast_duration) / avg_slow_duration * 100) 
+                                         if avg_slow_duration > 0 else 0,
+                'path_stats': self.path_stats.copy(),
+                'app_stats': dict(self.app_stats)
+            }
+
+
 class PerformanceMonitor:
     """Performance monitoring and metrics collection."""
     
@@ -633,6 +817,7 @@ connection_pool = ConnectionPool()
 image_cache = ImageCache()
 parallel_processor = ParallelProcessor()
 performance_monitor = PerformanceMonitor()
+hybrid_performance_monitor = HybridPerformanceMonitor()
 
 
 def measure_performance(operation: str, include_system_metrics: bool = False):
@@ -703,6 +888,135 @@ def measure_performance(operation: str, include_system_metrics: bool = False):
     return decorator
 
 
+def measure_fast_path_performance(command: str = "", app_name: str = None):
+    """
+    Decorator to measure performance of fast path operations.
+    
+    Args:
+        command: User command being executed
+        app_name: Name of the target application
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            element_detection_start = start_time
+            
+            success = True
+            error_message = ""
+            element_found = False
+            fallback_triggered = False
+            result = None
+            
+            try:
+                result = func(*args, **kwargs)
+                
+                # Check if result indicates element was found
+                if isinstance(result, dict):
+                    element_found = result.get('element_found', False)
+                    fallback_triggered = result.get('fallback_required', False)
+                elif result is not None:
+                    element_found = True
+                
+                return result
+            except Exception as e:
+                success = False
+                error_message = str(e)
+                fallback_triggered = True
+                raise
+            finally:
+                total_duration = time.time() - start_time
+                
+                # For fast path, element detection and action execution happen together
+                element_detection_time = total_duration
+                action_execution_time = 0.0
+                
+                # Create and record hybrid metric
+                hybrid_metric = HybridPerformanceMetrics(
+                    command=command or func.__name__,
+                    path_used='fast',
+                    total_execution_time=total_duration,
+                    element_detection_time=element_detection_time,
+                    action_execution_time=action_execution_time,
+                    success=success,
+                    fallback_triggered=fallback_triggered,
+                    app_name=app_name,
+                    element_found=element_found,
+                    error_message=error_message,
+                    accessibility_api_available=True,
+                    vision_model_used=False,
+                    reasoning_model_used=False,
+                    metadata={
+                        'function_name': func.__name__,
+                        'args_count': len(args),
+                        'kwargs_count': len(kwargs)
+                    }
+                )
+                
+                hybrid_performance_monitor.record_hybrid_metric(hybrid_metric)
+        
+        return wrapper
+    return decorator
+
+
+def measure_slow_path_performance(command: str = "", app_name: str = None):
+    """
+    Decorator to measure performance of slow path (vision-based) operations.
+    
+    Args:
+        command: User command being executed
+        app_name: Name of the target application
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            
+            success = True
+            error_message = ""
+            result = None
+            
+            try:
+                result = func(*args, **kwargs)
+                return result
+            except Exception as e:
+                success = False
+                error_message = str(e)
+                raise
+            finally:
+                total_duration = time.time() - start_time
+                
+                # For slow path, we don't separate detection and execution times
+                # as they're interleaved in the vision-reasoning workflow
+                element_detection_time = total_duration * 0.7  # Estimate
+                action_execution_time = total_duration * 0.3   # Estimate
+                
+                # Create and record hybrid metric
+                hybrid_metric = HybridPerformanceMetrics(
+                    command=command or func.__name__,
+                    path_used='slow',
+                    total_execution_time=total_duration,
+                    element_detection_time=element_detection_time,
+                    action_execution_time=action_execution_time,
+                    success=success,
+                    fallback_triggered=False,  # Slow path is the fallback
+                    app_name=app_name,
+                    element_found=success,  # If slow path succeeds, element was found
+                    error_message=error_message,
+                    accessibility_api_available=False,  # Slow path used when accessibility fails
+                    vision_model_used=True,
+                    reasoning_model_used=True,
+                    metadata={
+                        'function_name': func.__name__,
+                        'args_count': len(args),
+                        'kwargs_count': len(kwargs)
+                    }
+                )
+                
+                hybrid_performance_monitor.record_hybrid_metric(hybrid_metric)
+        
+        return wrapper
+    return decorator
+
+
 def cleanup_performance_resources():
     """Clean up all performance-related resources."""
     try:
@@ -710,6 +1024,7 @@ def cleanup_performance_resources():
         image_cache.clear_cache()
         parallel_processor.shutdown()
         performance_monitor.stop_monitoring()
+        # Hybrid performance monitor doesn't need explicit cleanup as it's just data storage
         logger.info("Performance resources cleaned up")
     except Exception as e:
         logger.error(f"Error cleaning up performance resources: {e}")

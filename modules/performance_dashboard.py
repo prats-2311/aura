@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 
 from .performance import (
     performance_monitor,
+    hybrid_performance_monitor,
     connection_pool,
     image_cache,
     parallel_processor
@@ -49,6 +50,9 @@ class PerformanceDashboard:
             # Get performance summary
             summary = performance_monitor.get_performance_summary(time_window_minutes=5)
             
+            # Get hybrid performance statistics
+            hybrid_stats = hybrid_performance_monitor.get_hybrid_stats(time_window_minutes=5)
+            
             # Get system metrics
             system_metrics = performance_monitor.get_system_metrics()
             
@@ -66,11 +70,12 @@ class PerformanceDashboard:
                 'uptime_seconds': uptime_seconds,
                 'uptime_formatted': self._format_duration(uptime_seconds),
                 'performance_summary': summary,
+                'hybrid_performance': hybrid_stats,
                 'system_metrics': system_metrics,
                 'cache_statistics': cache_stats,
                 'operation_statistics': operation_stats,
                 'optimization_recommendations': self.get_optimization_recommendations(),
-                'health_status': self._calculate_health_status(summary, system_metrics, cache_stats)
+                'health_status': self._calculate_health_status(summary, system_metrics, cache_stats, hybrid_stats)
             }
             
         except Exception as e:
@@ -99,6 +104,7 @@ class PerformanceDashboard:
             
             # Get current metrics
             summary = performance_monitor.get_performance_summary(time_window_minutes=15)
+            hybrid_stats = hybrid_performance_monitor.get_hybrid_stats(time_window_minutes=15)
             system_metrics = performance_monitor.get_system_metrics()
             cache_stats = image_cache.get_cache_stats()
             
@@ -179,6 +185,43 @@ class PerformanceDashboard:
                     'threshold': cache_max_mb * 0.9
                 })
             
+            # Hybrid performance recommendations
+            fast_path_usage = hybrid_stats.get('fast_path_usage_percent', 0)
+            if fast_path_usage < 50 and hybrid_stats.get('total_commands', 0) > 5:
+                recommendations.append({
+                    'type': 'hybrid',
+                    'priority': 'medium',
+                    'title': 'Low Fast Path Usage',
+                    'description': f"Fast path is only used {fast_path_usage:.1f}% of the time. Check accessibility API availability and application compatibility.",
+                    'action': 'improve_fast_path_usage',
+                    'current_value': fast_path_usage,
+                    'threshold': 50
+                })
+            
+            fallback_rate = hybrid_stats.get('fallback_rate_percent', 0)
+            if fallback_rate > 30 and hybrid_stats.get('total_commands', 0) > 5:
+                recommendations.append({
+                    'type': 'hybrid',
+                    'priority': 'medium',
+                    'title': 'High Fallback Rate',
+                    'description': f"Fast path falls back to slow path {fallback_rate:.1f}% of the time. Consider improving element detection accuracy.",
+                    'action': 'reduce_fallback_rate',
+                    'current_value': fallback_rate,
+                    'threshold': 30
+                })
+            
+            performance_improvement = hybrid_stats.get('performance_improvement', 0)
+            if performance_improvement < 50 and hybrid_stats.get('total_commands', 0) > 5:
+                recommendations.append({
+                    'type': 'hybrid',
+                    'priority': 'low',
+                    'title': 'Limited Performance Improvement',
+                    'description': f"Fast path only provides {performance_improvement:.1f}% performance improvement. Consider optimizing fast path implementation.",
+                    'action': 'optimize_fast_path',
+                    'current_value': performance_improvement,
+                    'threshold': 50
+                })
+            
             self.optimization_recommendations = recommendations
             return recommendations
             
@@ -186,7 +229,7 @@ class PerformanceDashboard:
             logger.error(f"Failed to generate optimization recommendations: {e}")
             return []
     
-    def _calculate_health_status(self, summary: Dict, system_metrics: Dict, cache_stats: Dict) -> str:
+    def _calculate_health_status(self, summary: Dict, system_metrics: Dict, cache_stats: Dict, hybrid_stats: Dict = None) -> str:
         """
         Calculate overall system health status.
         
@@ -194,6 +237,7 @@ class PerformanceDashboard:
             summary: Performance summary
             system_metrics: System metrics
             cache_stats: Cache statistics
+            hybrid_stats: Hybrid performance statistics
             
         Returns:
             Health status string
@@ -221,6 +265,25 @@ class PerformanceDashboard:
             target_duration = TARGET_API_RESPONSE_TIME_MS / 1000
             if avg_duration > target_duration:
                 health_score -= min(15, (avg_duration - target_duration) * 5)
+            
+            # Factor in hybrid performance if available
+            if hybrid_stats and hybrid_stats.get('total_commands', 0) > 0:
+                # Bonus for good fast path usage
+                fast_path_usage = hybrid_stats.get('fast_path_usage_percent', 0)
+                if fast_path_usage > 70:
+                    health_score += 5  # Bonus for good fast path usage
+                elif fast_path_usage < 30:
+                    health_score -= 5  # Penalty for poor fast path usage
+                
+                # Factor in fallback rate
+                fallback_rate = hybrid_stats.get('fallback_rate_percent', 0)
+                if fallback_rate > 50:
+                    health_score -= min(10, fallback_rate / 10)
+                
+                # Factor in performance improvement
+                performance_improvement = hybrid_stats.get('performance_improvement', 0)
+                if performance_improvement > 70:
+                    health_score += 3  # Bonus for significant improvement
             
             # Determine health status
             if health_score >= 90:

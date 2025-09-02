@@ -39,6 +39,9 @@ class FeedbackType(Enum):
     SOUND = "sound"
     SPEECH = "speech"
     COMBINED = "combined"
+    HYBRID_FAST = "hybrid_fast"
+    HYBRID_SLOW = "hybrid_slow"
+    HYBRID_FALLBACK = "hybrid_fallback"
 
 
 class FeedbackModule:
@@ -63,6 +66,25 @@ class FeedbackModule:
         self.processing_thread = None
         self.sound_cache = {}
         
+        # Initialize hybrid feedback configuration from config
+        from config import (
+            HYBRID_FEEDBACK_ENABLED,
+            HYBRID_FAST_PATH_FEEDBACK,
+            HYBRID_SLOW_PATH_FEEDBACK,
+            HYBRID_FALLBACK_FEEDBACK,
+            HYBRID_FEEDBACK_VOLUME,
+            HYBRID_FEEDBACK_MESSAGES
+        )
+        
+        self.hybrid_config = {
+            'enabled': HYBRID_FEEDBACK_ENABLED,
+            'fast_path_enabled': HYBRID_FAST_PATH_FEEDBACK,
+            'slow_path_enabled': HYBRID_SLOW_PATH_FEEDBACK,
+            'fallback_enabled': HYBRID_FALLBACK_FEEDBACK,
+            'volume_adjustment': HYBRID_FEEDBACK_VOLUME,
+            'messages_enabled': HYBRID_FEEDBACK_MESSAGES
+        }
+        
         # Initialize pygame mixer for sound effects
         self._initialize_pygame()
         
@@ -72,7 +94,7 @@ class FeedbackModule:
         # Start feedback processing thread
         self._start_processing_thread()
         
-        logger.info("FeedbackModule initialized successfully")
+        logger.info(f"FeedbackModule initialized successfully with hybrid config: {self.hybrid_config}")
     
     def _initialize_pygame(self) -> None:
         """Initialize pygame mixer for audio playback with error handling."""
@@ -214,6 +236,9 @@ class FeedbackModule:
         try:
             feedback_type = feedback_item.get("type", FeedbackType.SOUND)
             
+            # Check hybrid configuration
+            hybrid_config = getattr(self, 'hybrid_config', {})
+            
             if feedback_type == FeedbackType.SOUND:
                 self._play_sound_effect(feedback_item)
             elif feedback_type == FeedbackType.SPEECH:
@@ -223,6 +248,21 @@ class FeedbackModule:
                 self._play_sound_effect(feedback_item)
                 time.sleep(0.1)  # Brief pause between sound and speech
                 self._play_speech(feedback_item)
+            elif feedback_type == FeedbackType.HYBRID_FAST:
+                if hybrid_config.get('fast_path_enabled', True):
+                    self._play_hybrid_sound_effect(feedback_item)
+            elif feedback_type == FeedbackType.HYBRID_SLOW:
+                if hybrid_config.get('slow_path_enabled', True):
+                    self._play_hybrid_sound_effect(feedback_item)
+                    if feedback_item.get("message"):
+                        time.sleep(0.1)
+                        self._play_speech(feedback_item)
+            elif feedback_type == FeedbackType.HYBRID_FALLBACK:
+                if hybrid_config.get('fallback_enabled', True):
+                    self._play_hybrid_sound_effect(feedback_item)
+                    if feedback_item.get("message"):
+                        time.sleep(0.2)  # Longer pause for fallback
+                        self._play_speech(feedback_item)
             
         except Exception as e:
             logger.error(f"Error executing feedback: {e}")
@@ -276,6 +316,48 @@ class FeedbackModule:
             
         except Exception as e:
             logger.error(f"Error playing TTS message: {e}")
+    
+    def _play_hybrid_sound_effect(self, feedback_item: Dict[str, Any]) -> None:
+        """
+        Play a hybrid sound effect with volume and duration modifications.
+        
+        Args:
+            feedback_item: Dictionary containing hybrid sound details
+        """
+        try:
+            sound_name = feedback_item.get("sound_name")
+            if not sound_name:
+                logger.warning("No sound name specified for hybrid sound effect")
+                return
+            
+            # Get sound from cache
+            sound = self.sound_cache.get(sound_name)
+            if sound is None:
+                logger.warning(f"Sound '{sound_name}' not available")
+                return
+            
+            # Apply volume modification
+            volume_modifier = feedback_item.get("volume_modifier", 1.0)
+            hybrid_config = getattr(self, 'hybrid_config', {})
+            global_volume_adjustment = hybrid_config.get('volume_adjustment', 1.0)
+            
+            # Calculate final volume
+            final_volume = volume_modifier * global_volume_adjustment
+            final_volume = max(0.0, min(1.0, final_volume))  # Clamp to valid range
+            
+            # Set volume and play sound
+            sound.set_volume(final_volume)
+            sound.play()
+            
+            # Duration modification is handled by the sound itself
+            # For future enhancement, could implement sound truncation
+            duration_modifier = feedback_item.get("duration_modifier", 1.0)
+            
+            logger.debug(f"Played hybrid sound effect: {sound_name} "
+                        f"(volume: {final_volume:.2f}, duration_mod: {duration_modifier:.2f})")
+            
+        except Exception as e:
+            logger.error(f"Error playing hybrid sound effect: {e}")
     
     @with_error_handling(
         category=ErrorCategory.HARDWARE_ERROR,
@@ -538,6 +620,140 @@ class FeedbackModule:
         except Exception as e:
             logger.error(f"Error waiting for feedback completion: {e}")
             return False
+    
+    def play_fast_path_feedback(self, success: bool = True, priority: FeedbackPriority = FeedbackPriority.LOW) -> None:
+        """
+        Play audio feedback for fast path execution.
+        
+        Args:
+            success: Whether the fast path execution was successful
+            priority: Priority level for the feedback
+        """
+        try:
+            # Check if hybrid feedback is enabled
+            if not self.hybrid_config.get('enabled', True) or not self.hybrid_config.get('fast_path_enabled', True):
+                return
+            
+            if success:
+                # Subtle success sound for fast path - shorter/quieter than normal success
+                feedback_item = {
+                    "type": FeedbackType.HYBRID_FAST,
+                    "sound_name": "success",
+                    "volume_modifier": 0.7,  # Quieter than normal
+                    "duration_modifier": 0.5,  # Shorter than normal
+                    "message": None
+                }
+            else:
+                # Fast path failed, will fallback - use a neutral sound
+                feedback_item = {
+                    "type": FeedbackType.HYBRID_FAST,
+                    "sound_name": "thinking",
+                    "volume_modifier": 0.5,  # Very quiet
+                    "duration_modifier": 0.3,  # Very short
+                    "message": None
+                }
+            
+            self._add_to_queue(feedback_item, priority)
+            logger.debug(f"Queued fast path feedback: success={success}")
+            
+        except Exception as e:
+            logger.error(f"Error queuing fast path feedback: {e}")
+    
+    def play_slow_path_feedback(self, message: str = None, priority: FeedbackPriority = FeedbackPriority.LOW) -> None:
+        """
+        Play audio feedback for slow path (vision-based) execution.
+        
+        Args:
+            message: Optional message to speak
+            priority: Priority level for the feedback
+        """
+        try:
+            # Check if hybrid feedback is enabled
+            if not self.hybrid_config.get('enabled', True) or not self.hybrid_config.get('slow_path_enabled', True):
+                return
+            
+            # Only include message if messages are enabled
+            message_to_use = message if self.hybrid_config.get('messages_enabled', True) else None
+            
+            feedback_item = {
+                "type": FeedbackType.HYBRID_SLOW,
+                "sound_name": "thinking",
+                "volume_modifier": 1.0,  # Normal volume
+                "duration_modifier": 1.0,  # Normal duration
+                "message": message_to_use
+            }
+            
+            self._add_to_queue(feedback_item, priority)
+            logger.debug(f"Queued slow path feedback with message: {message}")
+            
+        except Exception as e:
+            logger.error(f"Error queuing slow path feedback: {e}")
+    
+    def play_fallback_feedback(self, reason: str = None, priority: FeedbackPriority = FeedbackPriority.NORMAL) -> None:
+        """
+        Play audio feedback when falling back from fast path to slow path.
+        
+        Args:
+            reason: Optional reason for fallback
+            priority: Priority level for the feedback
+        """
+        try:
+            # Check if hybrid feedback is enabled
+            if not self.hybrid_config.get('enabled', True) or not self.hybrid_config.get('fallback_enabled', True):
+                return
+            
+            # Only include message if messages are enabled
+            message_to_use = None
+            if self.hybrid_config.get('messages_enabled', True) and reason:
+                message_to_use = f"Switching to visual analysis: {reason}"
+            
+            # Use a distinctive sound pattern for fallback
+            feedback_item = {
+                "type": FeedbackType.HYBRID_FALLBACK,
+                "sound_name": "thinking",
+                "volume_modifier": 0.8,  # Slightly quieter
+                "duration_modifier": 1.2,  # Slightly longer
+                "message": message_to_use,
+                "fallback_reason": reason
+            }
+            
+            self._add_to_queue(feedback_item, priority)
+            logger.debug(f"Queued fallback feedback: {reason}")
+            
+        except Exception as e:
+            logger.error(f"Error queuing fallback feedback: {e}")
+    
+    def configure_hybrid_feedback(self, 
+                                fast_path_enabled: bool = True,
+                                slow_path_enabled: bool = True,
+                                fallback_enabled: bool = True,
+                                volume_adjustment: float = 1.0) -> None:
+        """
+        Configure hybrid feedback preferences.
+        
+        Args:
+            fast_path_enabled: Whether to play fast path feedback
+            slow_path_enabled: Whether to play slow path feedback
+            fallback_enabled: Whether to play fallback feedback
+            volume_adjustment: Global volume adjustment for hybrid feedback (0.0-1.0)
+        """
+        try:
+            # Store configuration in metadata
+            if not hasattr(self, 'hybrid_config'):
+                self.hybrid_config = {}
+            
+            self.hybrid_config.update({
+                'fast_path_enabled': fast_path_enabled,
+                'slow_path_enabled': slow_path_enabled,
+                'fallback_enabled': fallback_enabled,
+                'volume_adjustment': max(0.0, min(1.0, volume_adjustment))
+            })
+            
+            logger.info(f"Hybrid feedback configured: fast={fast_path_enabled}, slow={slow_path_enabled}, "
+                       f"fallback={fallback_enabled}, volume={volume_adjustment}")
+            
+        except Exception as e:
+            logger.error(f"Error configuring hybrid feedback: {e}")
     
     def validate_sound_files(self) -> Dict[str, Any]:
         """

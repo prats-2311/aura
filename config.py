@@ -204,6 +204,14 @@ AUDIO_SILENCE_THRESHOLD = 0.005  # Threshold for silence detection (0.0 to 1.0) 
 TTS_SPEED = 1.0           # Text-to-speech speed multiplier
 TTS_VOLUME = 0.8          # Text-to-speech volume (0.0 to 1.0)
 
+# Hybrid feedback settings
+HYBRID_FEEDBACK_ENABLED = True  # Enable hybrid-specific audio feedback
+HYBRID_FAST_PATH_FEEDBACK = True  # Play subtle feedback for fast path execution
+HYBRID_SLOW_PATH_FEEDBACK = True  # Play feedback when using slow path (vision analysis)
+HYBRID_FALLBACK_FEEDBACK = True  # Play feedback when falling back from fast to slow path
+HYBRID_FEEDBACK_VOLUME = 0.6  # Volume adjustment for hybrid feedback (0.0 to 1.0)
+HYBRID_FEEDBACK_MESSAGES = True  # Enable spoken messages for hybrid feedback
+
 # -- System Settings --
 # Screen capture settings
 SCREENSHOT_QUALITY = 85    # JPEG quality for API transmission (1-100)
@@ -411,6 +419,10 @@ def validate_config():
     if TTS_VOLUME < 0 or TTS_VOLUME > 1:
         errors.append("TTS_VOLUME must be between 0.0 and 1.0")
     
+    # Check hybrid feedback settings
+    if not 0.0 <= HYBRID_FEEDBACK_VOLUME <= 1.0:
+        errors.append("HYBRID_FEEDBACK_VOLUME must be between 0.0 and 1.0")
+    
     # Check automation settings
     if MOUSE_MOVE_DURATION < 0:
         errors.append("MOUSE_MOVE_DURATION cannot be negative")
@@ -461,7 +473,13 @@ def get_config_summary():
             'recording_duration': AUDIO_RECORDING_DURATION,
             'silence_threshold': AUDIO_SILENCE_THRESHOLD,
             'tts_speed': TTS_SPEED,
-            'tts_volume': TTS_VOLUME
+            'tts_volume': TTS_VOLUME,
+            'hybrid_feedback_enabled': HYBRID_FEEDBACK_ENABLED,
+            'hybrid_fast_path_feedback': HYBRID_FAST_PATH_FEEDBACK,
+            'hybrid_slow_path_feedback': HYBRID_SLOW_PATH_FEEDBACK,
+            'hybrid_fallback_feedback': HYBRID_FALLBACK_FEEDBACK,
+            'hybrid_feedback_volume': HYBRID_FEEDBACK_VOLUME,
+            'hybrid_feedback_messages': HYBRID_FEEDBACK_MESSAGES
         },
         'vision': {
             'screenshot_quality': SCREENSHOT_QUALITY,
