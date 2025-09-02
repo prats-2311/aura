@@ -1195,14 +1195,7 @@ class Orchestrator:
                     return self._format_execution_result(execution_context)
                 else:
                     # Fast path failed - continue with vision fallback
-                    logger.info(f"[{execution_id}] Fast path failed, falling back to vision workflow")
-                    execution_context["fast_path_attempted"] = True
-                    execution_context["fast_path_result"] = fast_path_result
-                    execution_context["fallback_reason"] = "fast_path_failed"
-                    
-                    # Provide fallback feedback
-                    if self.feedback_module:
-                        self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
+                    self._handle_fast_path_fallback(execution_id, execution_context, fast_path_result, normalized_command)
             
             # Provide initial feedback (if not already provided above)
             if not fast_path_result and self.feedback_module:
@@ -2582,7 +2575,7 @@ Focus on being helpful while being honest about what information is actually vis
     
     def _attempt_fast_path_execution(self, command: str, command_info: Dict) -> Optional[Dict[str, Any]]:
         """
-        Attempt to execute command using fast path accessibility detection.
+        Attempt to execute command using fast path accessibility detection with enhanced error recovery.
         
         Args:
             command: The user command
@@ -2593,92 +2586,381 @@ Focus on being helpful while being honest about what information is actually vis
         """
         if not self.fast_path_enabled or not self.accessibility_module:
             logger.debug("Fast path disabled or accessibility module unavailable")
-            return None
+            return self._create_fast_path_failure_result("fast_path_disabled", command)
         
-        if not self.accessibility_module.is_accessibility_enabled():
-            logger.debug("Accessibility API not enabled, skipping fast path")
-            return None
+        # Check accessibility module status
+        accessibility_status = self.accessibility_module.get_accessibility_status()
+        if not accessibility_status.get('api_initialized', False):
+            logger.debug("Accessibility API not initialized, skipping fast path")
+            return self._create_fast_path_failure_result("accessibility_not_initialized", command, accessibility_status)
         
-        try:
-            logger.info("Attempting fast path execution")
-            start_time = time.time()
-            
-            # Extract GUI elements from command
-            gui_elements = self._extract_gui_elements_from_command(command)
-            if not gui_elements:
-                logger.debug("No GUI elements detected in command")
-                return None
-            
-            logger.debug(f"Extracted GUI elements: {gui_elements}")
-            
-            # Attempt to find the element using accessibility API
-            element_result = self.accessibility_module.find_element(
-                role=gui_elements.get('role', ''),
-                label=gui_elements.get('label', ''),
-                app_name=gui_elements.get('app_name')
-            )
-            
-            if not element_result:
-                logger.debug("Element not found via accessibility API")
-                return None
-            
-            logger.info(f"Found element via accessibility API: {element_result}")
-            
-            # Execute the action using automation module
-            action_type = gui_elements.get('action', 'click')
-            coordinates = element_result['center_point']
-            
-            if not self.automation_module:
-                logger.error("Automation module not available for fast path execution")
-                return None
-            
-            # Execute fast path action
-            action_result = self.automation_module.execute_fast_path_action(
-                action_type=action_type,
-                coordinates=coordinates,
-                element_info=element_result
-            )
-            
-            execution_time = time.time() - start_time
-            
-            # Record performance metrics
-            metric = PerformanceMetrics(
-                operation="fast_path_execution",
-                duration=execution_time,
-                success=action_result.get('success', False),
-                parallel_execution=False,
-                metadata={
-                    'element_role': element_result.get('role', ''),
-                    'element_title': element_result.get('title', ''),
-                    'action_type': action_type,
-                    'app_name': element_result.get('app_name', ''),
-                    'coordinates': coordinates
+        # If in degraded mode, check if recovery is possible
+        if accessibility_status.get('degraded_mode', False):
+            if accessibility_status.get('can_attempt_recovery', False):
+                logger.info("Accessibility module in degraded mode, attempting recovery")
+                # The accessibility module will handle recovery internally
+            else:
+                logger.debug("Accessibility module in degraded mode, cannot recover")
+                return self._create_fast_path_failure_result("accessibility_degraded", command, accessibility_status)
+        
+        # Attempt fast path execution with retry logic
+        max_retries = 2
+        retry_delay = 0.5  # seconds
+        
+        for attempt in range(max_retries + 1):
+            try:
+                logger.info(f"Attempting fast path execution (attempt {attempt + 1}/{max_retries + 1})")
+                start_time = time.time()
+                
+                # Extract GUI elements from command
+                gui_elements = self._extract_gui_elements_from_command(command)
+                if not gui_elements:
+                    logger.debug("No GUI elements detected in command")
+                    return self._create_fast_path_failure_result("no_gui_elements", command)
+                
+                logger.debug(f"Extracted GUI elements: {gui_elements}")
+                
+                # Attempt to find the element using accessibility API
+                element_result = self.accessibility_module.find_element(
+                    role=gui_elements.get('role', ''),
+                    label=gui_elements.get('label', ''),
+                    app_name=gui_elements.get('app_name')
+                )
+                
+                if not element_result:
+                    logger.debug("Element not found via accessibility API")
+                    # For element not found, don't retry - it's likely a legitimate miss
+                    return self._create_fast_path_failure_result("element_not_found", command, {
+                        'gui_elements': gui_elements,
+                        'attempt': attempt + 1
+                    })
+                
+                logger.info(f"Found element via accessibility API: {element_result}")
+                
+                # Execute the action using automation module
+                action_type = gui_elements.get('action', 'click')
+                coordinates = element_result['center_point']
+                
+                if not self.automation_module:
+                    logger.error("Automation module not available for fast path execution")
+                    return self._create_fast_path_failure_result("automation_unavailable", command)
+                
+                # Execute fast path action
+                action_result = self.automation_module.execute_fast_path_action(
+                    action_type=action_type,
+                    coordinates=coordinates,
+                    element_info=element_result
+                )
+                
+                execution_time = time.time() - start_time
+                
+                # Check if action was successful
+                if not action_result.get('success', False):
+                    logger.warning(f"Fast path action failed: {action_result.get('error', 'Unknown error')}")
+                    
+                    # For action failures, retry might help (transient issues)
+                    if attempt < max_retries:
+                        logger.info(f"Retrying fast path execution after action failure (attempt {attempt + 1})")
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        return self._create_fast_path_failure_result("action_failed", command, {
+                            'action_result': action_result,
+                            'element_found': element_result,
+                            'attempts': attempt + 1
+                        })
+                
+                # Record successful performance metrics
+                metric = PerformanceMetrics(
+                    operation="fast_path_execution_success",
+                    duration=execution_time,
+                    success=True,
+                    parallel_execution=False,
+                    metadata={
+                        'element_role': element_result.get('role', ''),
+                        'element_title': element_result.get('title', ''),
+                        'action_type': action_type,
+                        'app_name': element_result.get('app_name', ''),
+                        'coordinates': coordinates,
+                        'attempts': attempt + 1,
+                        'retry_used': attempt > 0
+                    }
+                )
+                performance_monitor.record_metric(metric)
+                
+                logger.info(f"Fast path execution successful in {execution_time:.2f}s (attempt {attempt + 1})")
+                
+                return {
+                    'success': True,
+                    'execution_time': execution_time,
+                    'path_used': 'fast',
+                    'element_found': element_result,
+                    'action_result': action_result,
+                    'attempts': attempt + 1,
+                    'retry_used': attempt > 0,
+                    'message': f"Successfully executed {action_type} on {element_result.get('title', 'element')} using fast path"
                 }
-            )
-            performance_monitor.record_metric(metric)
+                
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="orchestrator",
+                    function="_attempt_fast_path_execution",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    severity=ErrorSeverity.MEDIUM,
+                    context={
+                        "command": command, 
+                        "gui_elements": gui_elements if 'gui_elements' in locals() else None,
+                        "attempt": attempt + 1,
+                        "max_retries": max_retries
+                    }
+                )
+                
+                logger.warning(f"Fast path execution failed on attempt {attempt + 1}: {error_info.message}")
+                
+                # Determine if we should retry based on error type
+                should_retry = self._should_retry_fast_path_error(e, attempt, max_retries)
+                
+                if should_retry and attempt < max_retries:
+                    logger.info(f"Retrying fast path execution after error (attempt {attempt + 1})")
+                    time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                    continue
+                else:
+                    # Record failed performance metrics
+                    metric = PerformanceMetrics(
+                        operation="fast_path_execution_failed",
+                        duration=time.time() - start_time if 'start_time' in locals() else 0,
+                        success=False,
+                        parallel_execution=False,
+                        metadata={
+                            'error_type': type(e).__name__,
+                            'error_message': str(e),
+                            'attempts': attempt + 1,
+                            'final_failure': True
+                        }
+                    )
+                    performance_monitor.record_metric(metric)
+                    
+                    return self._create_fast_path_failure_result("execution_error", command, {
+                        'error': str(e),
+                        'error_type': type(e).__name__,
+                        'attempts': attempt + 1,
+                        'error_info': error_info.__dict__ if error_info else None
+                    })
+        
+        # Should not reach here, but just in case
+        return self._create_fast_path_failure_result("max_retries_exceeded", command)
+    
+    def _should_retry_fast_path_error(self, error: Exception, attempt: int, max_retries: int) -> bool:
+        """
+        Determine if a fast path error should trigger a retry.
+        
+        Args:
+            error: The exception that occurred
+            attempt: Current attempt number (0-based)
+            max_retries: Maximum number of retries allowed
             
-            logger.info(f"Fast path execution completed in {execution_time:.2f}s")
+        Returns:
+            True if retry should be attempted, False otherwise
+        """
+        if attempt >= max_retries:
+            return False
+        
+        # Import accessibility exceptions for checking
+        from modules.accessibility import (
+            AccessibilityPermissionError, 
+            AccessibilityAPIUnavailableError,
+            ElementNotFoundError,
+            AccessibilityTimeoutError,
+            AccessibilityTreeTraversalError
+        )
+        
+        # Don't retry for these error types (they're unlikely to resolve with retry)
+        non_retryable_errors = (
+            AccessibilityPermissionError,
+            AccessibilityAPIUnavailableError,
+            ElementNotFoundError
+        )
+        
+        if isinstance(error, non_retryable_errors):
+            return False
+        
+        # Retry for these error types (they might be transient)
+        retryable_errors = (
+            AccessibilityTimeoutError,
+            AccessibilityTreeTraversalError,
+            ConnectionError,
+            TimeoutError
+        )
+        
+        if isinstance(error, retryable_errors):
+            return True
+        
+        # For other exceptions, retry once
+        return attempt == 0
+    
+    def _create_fast_path_failure_result(self, failure_reason: str, command: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Create a standardized fast path failure result for logging and diagnostics.
+        
+        Args:
+            failure_reason: Reason for failure
+            command: Original command
+            context: Additional context information
             
-            return {
-                'success': action_result.get('success', False),
-                'execution_time': execution_time,
-                'path_used': 'fast',
-                'element_found': element_result,
-                'action_result': action_result,
-                'message': f"Successfully executed {action_type} on {element_result.get('title', 'element')} using fast path"
+        Returns:
+            Failure result dictionary
+        """
+        result = {
+            'success': False,
+            'path_used': 'fast',
+            'failure_reason': failure_reason,
+            'command': command,
+            'timestamp': time.time(),
+            'fallback_required': True
+        }
+        
+        if context:
+            result['context'] = context
+        
+        # Log failure for diagnostics
+        logger.info(f"Fast path failure: {failure_reason} for command: '{command}'")
+        if context:
+            logger.debug(f"Fast path failure context: {context}")
+        
+        # Record failure metrics
+        metric = PerformanceMetrics(
+            operation="fast_path_failure",
+            duration=0,
+            success=False,
+            parallel_execution=False,
+            metadata={
+                'failure_reason': failure_reason,
+                'command_length': len(command),
+                'has_context': bool(context)
             }
+        )
+        performance_monitor.record_metric(metric)
+        
+        return result
+    
+    def _handle_fast_path_fallback(self, execution_id: str, execution_context: Dict[str, Any], 
+                                 fast_path_result: Dict[str, Any], command: str) -> None:
+        """
+        Handle fallback from fast path to vision workflow with comprehensive logging and diagnostics.
+        
+        Args:
+            execution_id: Unique execution identifier
+            execution_context: Current execution context
+            fast_path_result: Result from failed fast path attempt
+            command: Original command
+        """
+        # Extract failure details
+        failure_reason = fast_path_result.get('failure_reason', 'unknown')
+        failure_context = fast_path_result.get('context', {})
+        
+        # Log detailed fallback information
+        logger.info(f"[{execution_id}] Fast path failed, falling back to vision workflow")
+        logger.info(f"[{execution_id}] Fallback reason: {failure_reason}")
+        
+        if failure_context:
+            logger.debug(f"[{execution_id}] Fallback context: {failure_context}")
+        
+        # Update execution context with fallback information
+        execution_context["fast_path_attempted"] = True
+        execution_context["fast_path_result"] = fast_path_result
+        execution_context["fallback_reason"] = failure_reason
+        execution_context["fallback_timestamp"] = time.time()
+        
+        # Log accessibility diagnostics if available
+        if self.accessibility_module:
+            try:
+                accessibility_status = self.accessibility_module.get_accessibility_status()
+                diagnostics = self.accessibility_module.get_error_diagnostics()
+                
+                logger.debug(f"[{execution_id}] Accessibility status during fallback: {accessibility_status}")
+                
+                # Log specific diagnostic information
+                if accessibility_status.get('degraded_mode'):
+                    logger.warning(f"[{execution_id}] Accessibility module in degraded mode - error count: {accessibility_status.get('error_count', 0)}")
+                
+                if diagnostics.get('recovery_state', {}).get('can_attempt_recovery'):
+                    logger.info(f"[{execution_id}] Accessibility recovery may be possible in future attempts")
+                
+                # Store diagnostics for later analysis
+                execution_context["accessibility_diagnostics"] = {
+                    'status': accessibility_status,
+                    'diagnostics': diagnostics,
+                    'fallback_timestamp': time.time()
+                }
+                
+            except Exception as e:
+                logger.warning(f"[{execution_id}] Could not retrieve accessibility diagnostics: {e}")
+        
+        # Categorize fallback reason for metrics
+        fallback_category = self._categorize_fallback_reason(failure_reason)
+        
+        # Record fallback metrics
+        metric = PerformanceMetrics(
+            operation="fast_path_fallback",
+            duration=0,  # Fallback itself doesn't take time
+            success=True,  # Fallback is successful if it happens
+            parallel_execution=False,
+            metadata={
+                'failure_reason': failure_reason,
+                'fallback_category': fallback_category,
+                'command_type': execution_context.get('validation_result', {}).get('command_type', 'unknown'),
+                'accessibility_degraded': self.accessibility_module.degraded_mode if self.accessibility_module else False,
+                'has_context': bool(failure_context)
+            }
+        )
+        performance_monitor.record_metric(metric)
+        
+        # Provide appropriate feedback based on failure reason
+        if self.feedback_module:
+            if failure_reason in ['accessibility_degraded', 'accessibility_not_initialized']:
+                # Subtle indication that we're using visual analysis due to accessibility issues
+                self.feedback_module.play("thinking", FeedbackPriority.LOW)
+            else:
+                # Standard thinking sound for normal fallback
+                self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
+        
+        # Log user-friendly fallback message
+        fallback_messages = {
+            'element_not_found': f"Element not found via fast detection, using visual analysis",
+            'accessibility_degraded': f"Using visual analysis due to accessibility limitations",
+            'accessibility_not_initialized': f"Using visual analysis (accessibility unavailable)",
+            'no_gui_elements': f"Command requires visual analysis",
+            'action_failed': f"Fast action failed, retrying with visual analysis",
+            'execution_error': f"Fast path error, using visual analysis as backup"
+        }
+        
+        user_message = fallback_messages.get(failure_reason, f"Using visual analysis for command execution")
+        logger.info(f"[{execution_id}] {user_message}")
+    
+    def _categorize_fallback_reason(self, failure_reason: str) -> str:
+        """
+        Categorize fallback reasons for metrics and analysis.
+        
+        Args:
+            failure_reason: The specific failure reason
             
-        except Exception as e:
-            error_info = global_error_handler.handle_error(
-                error=e,
-                module="orchestrator",
-                function="_attempt_fast_path_execution",
-                category=ErrorCategory.PROCESSING_ERROR,
-                severity=ErrorSeverity.MEDIUM,
-                context={"command": command, "gui_elements": gui_elements}
-            )
-            logger.warning(f"Fast path execution failed: {error_info.message}")
-            return None
+        Returns:
+            General category of the failure
+        """
+        category_mapping = {
+            'element_not_found': 'element_detection',
+            'accessibility_degraded': 'accessibility_issue',
+            'accessibility_not_initialized': 'accessibility_issue',
+            'fast_path_disabled': 'configuration',
+            'no_gui_elements': 'command_parsing',
+            'action_failed': 'action_execution',
+            'execution_error': 'system_error',
+            'automation_unavailable': 'system_error',
+            'max_retries_exceeded': 'retry_exhausted'
+        }
+        
+        return category_mapping.get(failure_reason, 'unknown')
     
     def _extract_gui_elements_from_command(self, command: str) -> Dict[str, str]:
         """

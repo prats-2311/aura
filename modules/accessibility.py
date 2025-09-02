@@ -6,6 +6,7 @@ using the Accessibility API, enabling near-instantaneous GUI automation.
 """
 
 import logging
+import time
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 import re
@@ -35,17 +36,50 @@ class AccessibilityElement:
 
 class AccessibilityPermissionError(Exception):
     """Raised when accessibility permissions are not granted."""
-    pass
+    def __init__(self, message: str, recovery_suggestion: Optional[str] = None):
+        super().__init__(message)
+        self.recovery_suggestion = recovery_suggestion or (
+            "Please grant accessibility permissions in System Preferences > "
+            "Security & Privacy > Privacy > Accessibility"
+        )
 
 
 class AccessibilityAPIUnavailableError(Exception):
     """Raised when accessibility API is not available."""
-    pass
+    def __init__(self, message: str, recovery_suggestion: Optional[str] = None):
+        super().__init__(message)
+        self.recovery_suggestion = recovery_suggestion or (
+            "Install required accessibility frameworks: pip install pyobjc-framework-AppKit pyobjc-framework-Accessibility"
+        )
 
 
 class ElementNotFoundError(Exception):
     """Raised when requested element cannot be found."""
-    pass
+    def __init__(self, message: str, element_role: Optional[str] = None, element_label: Optional[str] = None):
+        super().__init__(message)
+        self.element_role = element_role
+        self.element_label = element_label
+
+
+class AccessibilityTimeoutError(Exception):
+    """Raised when accessibility operations timeout."""
+    def __init__(self, message: str, operation: Optional[str] = None):
+        super().__init__(message)
+        self.operation = operation
+
+
+class AccessibilityTreeTraversalError(Exception):
+    """Raised when accessibility tree traversal fails."""
+    def __init__(self, message: str, depth: Optional[int] = None):
+        super().__init__(message)
+        self.depth = depth
+
+
+class AccessibilityCoordinateError(Exception):
+    """Raised when coordinate calculation fails."""
+    def __init__(self, message: str, element_info: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.element_info = element_info
 
 
 class AccessibilityModule:
@@ -59,38 +93,151 @@ class AccessibilityModule:
         self.logger = logging.getLogger(__name__)
         self.workspace = None
         self.accessibility_enabled = False
+        self.degraded_mode = False
+        self.last_error_time = None
+        self.error_count = 0
+        self.max_retries = 3
+        self.retry_delay = 1.0  # seconds
+        self.permission_check_interval = 30.0  # seconds
+        
+        # Error recovery state
+        self.recovery_attempts = 0
+        self.max_recovery_attempts = 5
+        self.backoff_multiplier = 2.0
         
         try:
             self._initialize_accessibility_api()
+        except AccessibilityPermissionError as e:
+            self.logger.warning(f"Accessibility permissions not granted: {e}")
+            self._enter_degraded_mode("permission_denied", str(e))
+        except AccessibilityAPIUnavailableError as e:
+            self.logger.error(f"Accessibility API unavailable: {e}")
+            self._enter_degraded_mode("api_unavailable", str(e))
         except Exception as e:
-            self.logger.error(f"Failed to initialize AccessibilityModule: {e}")
-            raise AccessibilityAPIUnavailableError(f"Accessibility API initialization failed: {e}")
+            self.logger.error(f"Unexpected error initializing AccessibilityModule: {e}")
+            self._enter_degraded_mode("initialization_failed", str(e))
     
     def _initialize_accessibility_api(self):
         """Initialize the accessibility API and check permissions."""
         if not ACCESSIBILITY_AVAILABLE:
-            raise AccessibilityAPIUnavailableError("Accessibility frameworks not installed")
+            raise AccessibilityAPIUnavailableError(
+                "Accessibility frameworks not installed",
+                "Install required frameworks: pip install pyobjc-framework-AppKit pyobjc-framework-Accessibility"
+            )
         
         try:
             # Initialize NSWorkspace for application management
             self.workspace = NSWorkspace.sharedWorkspace()
+            if self.workspace is None:
+                raise AccessibilityAPIUnavailableError("Cannot initialize NSWorkspace")
             
             # Test accessibility permissions by trying to get system-wide element
             system_wide = AppKit.AXUIElementCreateSystemWide()
             if system_wide is None:
-                raise AccessibilityPermissionError("Cannot create system-wide accessibility element")
+                raise AccessibilityPermissionError(
+                    "Cannot create system-wide accessibility element - permissions required"
+                )
             
             # Try to get the focused application to test permissions
             focused_app = self._get_focused_application_element()
             if focused_app is None:
                 self.logger.warning("Cannot access focused application - accessibility permissions may be limited")
+                # Don't fail initialization, but note limited functionality
             
             self.accessibility_enabled = True
+            self.degraded_mode = False
+            self.error_count = 0
+            self.recovery_attempts = 0
             self.logger.info("AccessibilityModule initialized successfully")
             
+        except AccessibilityPermissionError:
+            raise  # Re-raise permission errors as-is
         except Exception as e:
             self.logger.error(f"Accessibility API initialization error: {e}")
-            raise AccessibilityPermissionError(f"Accessibility permissions required: {e}")
+            raise AccessibilityAPIUnavailableError(f"Failed to initialize accessibility API: {e}")
+    
+    def _enter_degraded_mode(self, reason: str, error_message: str):
+        """Enter degraded mode when accessibility API is not fully functional."""
+        self.degraded_mode = True
+        self.accessibility_enabled = False
+        self.last_error_time = time.time()
+        
+        self.logger.warning(f"AccessibilityModule entering degraded mode: {reason}")
+        self.logger.debug(f"Degraded mode details: {error_message}")
+    
+    def _attempt_recovery(self) -> bool:
+        """Attempt to recover from accessibility errors."""
+        if self.recovery_attempts >= self.max_recovery_attempts:
+            self.logger.warning("Maximum recovery attempts reached, staying in degraded mode")
+            return False
+        
+        self.recovery_attempts += 1
+        delay = self.retry_delay * (self.backoff_multiplier ** (self.recovery_attempts - 1))
+        
+        self.logger.info(f"Attempting accessibility recovery (attempt {self.recovery_attempts}/{self.max_recovery_attempts})")
+        
+        try:
+            time.sleep(delay)
+            self._initialize_accessibility_api()
+            self.logger.info("Accessibility recovery successful")
+            return True
+            
+        except Exception as e:
+            self.logger.warning(f"Recovery attempt {self.recovery_attempts} failed: {e}")
+            return False
+    
+    def _should_attempt_recovery(self) -> bool:
+        """Determine if recovery should be attempted based on current state."""
+        if not self.degraded_mode:
+            return False
+        
+        if self.recovery_attempts >= self.max_recovery_attempts:
+            return False
+        
+        # Only attempt recovery if enough time has passed since last error
+        if self.last_error_time and (time.time() - self.last_error_time) < self.permission_check_interval:
+            return False
+        
+        return True
+    
+    def _handle_accessibility_error(self, error: Exception, operation: str) -> None:
+        """Handle accessibility errors with appropriate recovery logic."""
+        self.error_count += 1
+        self.last_error_time = time.time()
+        
+        error_msg = f"Accessibility error in {operation}: {error}"
+        self.logger.error(error_msg)
+        
+        # Determine if this is a recoverable error
+        if isinstance(error, (AccessibilityPermissionError, AccessibilityAPIUnavailableError)):
+            if not self.degraded_mode:
+                self._enter_degraded_mode("api_error", str(error))
+        
+        # Log error details for diagnostics
+        self.logger.debug(f"Error details - Count: {self.error_count}, Operation: {operation}, Type: {type(error).__name__}")
+    
+    def _with_error_recovery(self, operation_name: str):
+        """Decorator for methods that should attempt error recovery."""
+        def decorator(func):
+            def wrapper(*args, **kwargs):
+                # Attempt recovery if in degraded mode and conditions are met
+                if self.degraded_mode and self._should_attempt_recovery():
+                    if self._attempt_recovery():
+                        self.logger.info(f"Recovery successful, retrying {operation_name}")
+                
+                # If still in degraded mode, return None or appropriate fallback
+                if self.degraded_mode:
+                    self.logger.debug(f"Skipping {operation_name} - in degraded mode")
+                    return None
+                
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    self._handle_accessibility_error(e, operation_name)
+                    return None
+            
+            return wrapper
+        return decorator
     
     def _get_focused_application_element(self):
         """Get the accessibility element for the currently focused application."""
@@ -144,7 +291,7 @@ class AccessibilityModule:
             return app_info
             
         except Exception as e:
-            self.logger.error(f"Error getting active application: {e}")
+            self._handle_accessibility_error(e, "get_active_application")
             return None
     
     def is_accessibility_enabled(self) -> bool:
@@ -156,25 +303,81 @@ class AccessibilityModule:
         Get detailed status of accessibility API availability.
         
         Returns:
-            Dictionary with status information
+            Dictionary with comprehensive status information
         """
         status = {
             'frameworks_available': ACCESSIBILITY_AVAILABLE,
             'api_initialized': self.accessibility_enabled,
             'workspace_available': self.workspace is not None,
-            'permissions_granted': False
+            'permissions_granted': False,
+            'degraded_mode': self.degraded_mode,
+            'error_count': self.error_count,
+            'recovery_attempts': self.recovery_attempts,
+            'last_error_time': self.last_error_time,
+            'can_attempt_recovery': self._should_attempt_recovery()
         }
         
         if self.accessibility_enabled:
             # Test permissions by trying to access focused app
-            focused_app = self._get_focused_application_element()
-            status['permissions_granted'] = focused_app is not None
+            try:
+                focused_app = self._get_focused_application_element()
+                status['permissions_granted'] = focused_app is not None
+            except Exception as e:
+                status['permissions_granted'] = False
+                status['permission_test_error'] = str(e)
         
         return status
     
+    def get_error_diagnostics(self) -> Dict[str, Any]:
+        """
+        Get detailed error diagnostics for troubleshooting.
+        
+        Returns:
+            Dictionary with diagnostic information
+        """
+        diagnostics = {
+            'module_state': {
+                'accessibility_enabled': self.accessibility_enabled,
+                'degraded_mode': self.degraded_mode,
+                'error_count': self.error_count,
+                'recovery_attempts': self.recovery_attempts,
+                'max_recovery_attempts': self.max_recovery_attempts,
+                'last_error_time': self.last_error_time
+            },
+            'system_state': {
+                'frameworks_available': ACCESSIBILITY_AVAILABLE,
+                'workspace_initialized': self.workspace is not None
+            },
+            'recovery_state': {
+                'can_attempt_recovery': self._should_attempt_recovery(),
+                'next_retry_delay': self.retry_delay * (self.backoff_multiplier ** self.recovery_attempts),
+                'time_since_last_error': time.time() - self.last_error_time if self.last_error_time else None
+            }
+        }
+        
+        # Test current accessibility state
+        try:
+            if self.workspace:
+                app = self.workspace.frontmostApplication()
+                diagnostics['current_app'] = {
+                    'name': app.localizedName() if app else None,
+                    'accessible': False
+                }
+                
+                if app:
+                    try:
+                        focused_element = self._get_focused_application_element()
+                        diagnostics['current_app']['accessible'] = focused_element is not None
+                    except Exception as e:
+                        diagnostics['current_app']['access_error'] = str(e)
+        except Exception as e:
+            diagnostics['app_test_error'] = str(e)
+        
+        return diagnostics
+    
     def find_element(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
-        Find UI element by role and label.
+        Find UI element by role and label with error recovery.
         
         Args:
             role: Accessibility role (e.g., 'AXButton', 'AXMenuItem')
@@ -192,6 +395,16 @@ class AccessibilityModule:
                 'app_name': 'Safari'
             }
         """
+        # Attempt recovery if in degraded mode
+        if self.degraded_mode and self._should_attempt_recovery():
+            if self._attempt_recovery():
+                self.logger.info("Recovery successful, retrying find_element")
+        
+        # If still in degraded mode, return None
+        if self.degraded_mode:
+            self.logger.debug("Skipping find_element - in degraded mode")
+            return None
+        
         if not self.accessibility_enabled:
             return None
         
@@ -199,10 +412,17 @@ class AccessibilityModule:
             # Get the target application element
             app_element = self._get_target_application_element(app_name)
             if not app_element:
-                return None
+                raise ElementNotFoundError(
+                    f"Cannot access application: {app_name or 'focused app'}", 
+                    element_role=role, 
+                    element_label=label
+                )
             
             # Traverse the accessibility tree to find the element
-            found_elements = self.traverse_accessibility_tree(app_element, max_depth=5)
+            try:
+                found_elements = self.traverse_accessibility_tree(app_element, max_depth=5)
+            except Exception as e:
+                raise AccessibilityTreeTraversalError(f"Failed to traverse accessibility tree: {e}")
             
             # Filter elements by actionability and visibility
             actionable_elements = self.filter_elements_by_criteria(
@@ -221,8 +441,14 @@ class AccessibilityModule:
             if matching_elements:
                 best_match = self.find_best_matching_element(matching_elements, label)
                 if best_match:
-                    coordinates = self._calculate_element_coordinates(best_match['element'])
-                    if coordinates:
+                    try:
+                        coordinates = self._calculate_element_coordinates(best_match['element'])
+                        if not coordinates:
+                            raise AccessibilityCoordinateError(
+                                f"Failed to calculate coordinates for element", 
+                                element_info=best_match
+                            )
+                        
                         return {
                             'coordinates': coordinates,
                             'center_point': [
@@ -234,16 +460,28 @@ class AccessibilityModule:
                             'enabled': best_match.get('enabled', True),
                             'app_name': app_name or self._get_app_name_from_element(app_element)
                         }
+                    except AccessibilityCoordinateError as e:
+                        self.logger.warning(f"Coordinate calculation failed: {e}")
+                        return None
             
+            # Element not found
+            raise ElementNotFoundError(
+                f"Element not found: {role} with label '{label}'", 
+                element_role=role, 
+                element_label=label
+            )
+            
+        except (ElementNotFoundError, AccessibilityTreeTraversalError, AccessibilityCoordinateError) as e:
+            # These are expected errors that don't indicate API problems
+            self.logger.debug(f"Element search failed: {e}")
             return None
-            
         except Exception as e:
-            self.logger.error(f"Error finding element {role}:'{label}': {e}")
+            self._handle_accessibility_error(e, "find_element")
             return None
     
     def traverse_accessibility_tree(self, element, max_depth: int = 5) -> List[Dict[str, Any]]:
         """
-        Recursively traverse accessibility tree to find all elements.
+        Recursively traverse accessibility tree to find all elements with error handling.
         
         Args:
             element: Root accessibility element to start traversal
@@ -264,13 +502,23 @@ class AccessibilityModule:
                 elements.append(element_info)
             
             # Get children and traverse recursively
-            children = self._get_element_children(element)
-            for child in children:
-                child_elements = self.traverse_accessibility_tree(child, max_depth - 1)
-                elements.extend(child_elements)
+            try:
+                children = self._get_element_children(element)
+                for child in children:
+                    try:
+                        child_elements = self.traverse_accessibility_tree(child, max_depth - 1)
+                        elements.extend(child_elements)
+                    except Exception as e:
+                        # Log child traversal errors but continue with other children
+                        self.logger.debug(f"Error traversing child element: {e}")
+                        continue
+            except Exception as e:
+                # Log children access error but don't fail the entire traversal
+                self.logger.debug(f"Error accessing element children: {e}")
         
         except Exception as e:
             self.logger.debug(f"Error traversing element: {e}")
+            # Don't re-raise - return partial results
         
         return elements
     
