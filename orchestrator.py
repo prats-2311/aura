@@ -3017,7 +3017,7 @@ Focus on being helpful while being honest about what information is actually vis
             metadata={
                 'failure_reason': failure_reason,
                 'fallback_category': fallback_category,
-                'command_type': execution_context.get('validation_result', {}).get('command_type', 'unknown'),
+                'command_type': getattr(execution_context.get('validation_result'), 'command_type', 'unknown'),
                 'accessibility_degraded': self.accessibility_module.degraded_mode if self.accessibility_module else False,
                 'has_context': bool(failure_context)
             }

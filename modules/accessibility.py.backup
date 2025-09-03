@@ -25,31 +25,6 @@ except ImportError as e:
     ACCESSIBILITY_AVAILABLE = False
     logging.warning(f"Accessibility frameworks not available: {e}")
 
-# Import accessibility functions
-try:
-    from ApplicationServices import (
-        AXUIElementCreateSystemWide,
-        AXUIElementCreateApplication,
-        AXUIElementCopyAttributeValue,
-        kAXFocusedApplicationAttribute,
-        kAXRoleAttribute,
-        kAXTitleAttribute,
-        kAXDescriptionAttribute,
-        kAXEnabledAttribute,
-        kAXChildrenAttribute,
-        kAXPositionAttribute,
-        kAXSizeAttribute
-    )
-    ACCESSIBILITY_FUNCTIONS_AVAILABLE = True
-except ImportError:
-    # Fallback: try to load via objc bundle
-    try:
-        import objc
-        bundle = objc.loadBundle('ApplicationServices', globals())
-        ACCESSIBILITY_FUNCTIONS_AVAILABLE = 'AXUIElementCreateSystemWide' in globals()
-    except:
-        ACCESSIBILITY_FUNCTIONS_AVAILABLE = False
-
 
 @dataclass
 class AccessibilityElement:
@@ -237,9 +212,7 @@ class AccessibilityModule:
                 raise AccessibilityAPIUnavailableError("Cannot initialize NSWorkspace")
             
             # Test accessibility permissions by trying to get system-wide element
-            system_wide = None
-            if ACCESSIBILITY_FUNCTIONS_AVAILABLE:
-                system_wide = AXUIElementCreateSystemWide()
+            system_wide = AppKit.AXUIElementCreateSystemWide()
             if system_wide is None:
                 raise AccessibilityPermissionError(
                     "Cannot create system-wide accessibility element - permissions required"
@@ -614,9 +587,7 @@ class AccessibilityModule:
     def _get_focused_application_element(self):
         """Get the accessibility element for the currently focused application."""
         try:
-            system_wide = None
-            if ACCESSIBILITY_FUNCTIONS_AVAILABLE:
-                system_wide = AXUIElementCreateSystemWide()
+            system_wide = AppKit.AXUIElementCreateSystemWide()
             focused_app_ref = AppKit.AXUIElementCopyAttributeValue(
                 system_wide, 
                 AppKit.kAXFocusedApplicationAttribute, 
