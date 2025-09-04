@@ -634,10 +634,14 @@ class Orchestrator:
                 r'tap\s+(?:on\s+)?(?:the\s+)?(.+)'
             ],
             'type': [
-                r'type\s+["\'](.+)["\']',
+                r'type\s+["\'](.+)["\']',  # Quoted text
+                r'type\s+(.+)',  # Unquoted text (more flexible)
                 r'enter\s+["\'](.+)["\']',
+                r'enter\s+(.+)',  # Unquoted text
                 r'input\s+["\'](.+)["\']',
-                r'write\s+["\'](.+)["\']'
+                r'input\s+(.+)',  # Unquoted text
+                r'write\s+["\'](.+)["\']',
+                r'write\s+(.+)'  # Unquoted text
             ],
             'scroll': [
                 r'scroll\s+(up|down|left|right)',
@@ -2709,7 +2713,13 @@ Focus on being helpful while being honest about what information is actually vis
                 logger.info(f"Attempting fast path execution (attempt {attempt + 1}/{max_retries + 1})")
                 start_time = time.time()
                 
-                # Extract GUI elements from command
+                # Check if this is a direct typing command (no GUI element needed)
+                command_type = command_info.get('command_type', 'unknown')
+                if command_type == 'type':
+                    # Handle direct typing without needing to find GUI elements
+                    return self._execute_direct_typing_command(command, command_info)
+                
+                # Extract GUI elements from command for other types
                 gui_elements = self._extract_gui_elements_from_command(command)
                 if not gui_elements:
                     logger.debug("No GUI elements detected in command")
@@ -3069,6 +3079,127 @@ Focus on being helpful while being honest about what information is actually vis
         }
         
         return category_mapping.get(failure_reason, 'unknown')
+    
+    def _execute_direct_typing_command(self, command: str, command_info: Dict) -> Dict[str, Any]:
+        """
+        Execute a direct typing command without needing to find GUI elements.
+        
+        Args:
+            command: The user command
+            command_info: Preprocessed command information
+            
+        Returns:
+            Action result dictionary
+        """
+        try:
+            logger.info(f"Executing direct typing command: {command}")
+            start_time = time.time()
+            
+            # Extract text to type from command
+            text_to_type = self._extract_text_from_type_command(command)
+            if not text_to_type:
+                logger.warning("Could not extract text from typing command")
+                return self._create_fast_path_failure_result("no_text_to_type", command)
+            
+            logger.debug(f"Text to type: '{text_to_type}'")
+            
+            if not self.automation_module:
+                logger.error("Automation module not available for direct typing")
+                return self._create_fast_path_failure_result("automation_unavailable", command)
+            
+            # Execute direct typing using automation module
+            type_action = {
+                'action': 'type',
+                'text': text_to_type
+            }
+            
+            try:
+                self.automation_module.execute_action(type_action)
+                action_result = {'success': True}
+            except Exception as e:
+                action_result = {'success': False, 'error': str(e)}
+            
+            execution_time = time.time() - start_time
+            
+            if action_result.get('success', False):
+                logger.info(f"Direct typing successful in {execution_time:.3f}s")
+                
+                # Record successful performance metrics
+                metric = PerformanceMetrics(
+                    operation="direct_typing_success",
+                    duration=execution_time,
+                    success=True,
+                    parallel_execution=False,
+                    metadata={
+                        'text_length': len(text_to_type),
+                        'command': command,
+                        'method': 'direct_typing'
+                    }
+                )
+                performance_monitor.record_metric(metric)
+                
+                return {
+                    'success': True,
+                    'path_used': 'fast',
+                    'action_type': 'type',
+                    'text_typed': text_to_type,
+                    'execution_time': execution_time,
+                    'command': command,
+                    'timestamp': time.time()
+                }
+            else:
+                logger.warning(f"Direct typing failed: {action_result.get('error', 'Unknown error')}")
+                return self._create_fast_path_failure_result("typing_failed", command, {
+                    'action_result': action_result,
+                    'text_to_type': text_to_type
+                })
+                
+        except Exception as e:
+            logger.error(f"Error in direct typing execution: {e}")
+            return self._create_fast_path_failure_result("typing_error", command, {'error': str(e)})
+    
+    def _extract_text_from_type_command(self, command: str) -> str:
+        """
+        Extract the text to type from a typing command.
+        
+        Args:
+            command: The user command
+            
+        Returns:
+            Text to type, or empty string if not found
+        """
+        command_lower = command.lower().strip()
+        
+        # Try patterns with quotes first
+        quoted_patterns = [
+            r'type\s+["\'](.+)["\']',
+            r'enter\s+["\'](.+)["\']',
+            r'input\s+["\'](.+)["\']',
+            r'write\s+["\'](.+)["\']'
+        ]
+        
+        for pattern in quoted_patterns:
+            match = re.search(pattern, command_lower)
+            if match:
+                return match.group(1).strip()
+        
+        # Try patterns without quotes
+        unquoted_patterns = [
+            r'type\s+(.+)',
+            r'enter\s+(.+)',
+            r'input\s+(.+)',
+            r'write\s+(.+)'
+        ]
+        
+        for pattern in unquoted_patterns:
+            match = re.search(pattern, command_lower)
+            if match:
+                text = match.group(1).strip()
+                # Remove common trailing words that aren't part of the text
+                text = re.sub(r'\s+(please|now|here)$', '', text)
+                return text
+        
+        return ""
     
     def _extract_gui_elements_from_command(self, command: str) -> Dict[str, str]:
         """
