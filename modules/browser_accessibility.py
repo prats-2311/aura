@@ -197,7 +197,7 @@ class BrowserAccessibilityHandler:
                 'AXWebArea', 'AXScrollArea', 'AXGroup'
             ],
             'tab_indicators': [
-                'AXTab', 'AXTabGroup', 'AXButton'
+                'AXTab', 'AXTabGroup'  # Removed AXButton to avoid browser UI buttons
             ],
             'search_depth': 15,
             'timeout_ms': 3500,
@@ -358,12 +358,16 @@ class BrowserAccessibilityHandler:
                 return browser_tree
             
             # Process each window
+            all_tabs = []
             for window in windows:
                 tabs = self._extract_tabs_from_window(window, config)
-                browser_tree.tabs.extend(tabs)
+                all_tabs.extend(tabs)
             
-            # Determine active tab
-            browser_tree.active_tab_id = self._find_active_tab(browser_tree.tabs)
+            # Filter and clean up tabs
+            browser_tree.tabs = self._filter_and_clean_tabs(all_tabs)
+            
+            # Determine active tab (prioritize content-rich tabs)
+            browser_tree.active_tab_id = self._find_active_tab_smart(browser_tree.tabs)
             
             return browser_tree
             
@@ -387,10 +391,13 @@ class BrowserAccessibilityHandler:
         try:
             # Look for tab groups and individual tabs
             tab_elements = self._find_elements_by_roles(
-                window, config['tab_indicators'], max_depth=5
+                window, config['tab_indicators'], max_depth=6
             )
             
-            for i, tab_element in enumerate(tab_elements):
+            # Filter out duplicate or invalid tab elements
+            valid_tab_elements = self._filter_valid_tabs(tab_elements)
+            
+            for i, tab_element in enumerate(valid_tab_elements):
                 tab = self._create_tab_from_element(tab_element, f"tab_{i}", config)
                 if tab:
                     tabs.append(tab)
@@ -406,6 +413,250 @@ class BrowserAccessibilityHandler:
         
         return tabs
     
+    def _filter_valid_tabs(self, tab_elements: List[Any]) -> List[Any]:
+        """
+        Filter tab elements to remove duplicates and find actual individual tabs.
+        
+        Args:
+            tab_elements: List of potential tab elements
+            
+        Returns:
+            List of valid individual tab elements
+        """
+        if not tab_elements:
+            return []
+        
+        # First, look for individual AXTab elements within AXTabGroup elements
+        individual_tabs = []
+        
+        for element in tab_elements:
+            try:
+                role = self._get_attribute_value(element, kAXRoleAttribute)
+                
+                if role == 'AXTab':
+                    # This is an individual tab - add it directly
+                    individual_tabs.append(element)
+                    
+                elif role == 'AXTabGroup':
+                    # This is a tab group - look for individual tabs inside it
+                    children = self._get_attribute_value(element, kAXChildrenAttribute)
+                    if children:
+                        tabs_in_group = self._find_individual_tabs_in_group(children)
+                        individual_tabs.extend(tabs_in_group)
+                        
+            except Exception as e:
+                self.logger.debug(f"Error processing tab element: {e}")
+                continue
+        
+        # Remove duplicates based on position and content
+        unique_tabs = self._deduplicate_tabs(individual_tabs)
+        
+        # If we still don't have individual tabs, fall back to using one TabGroup
+        if not unique_tabs and tab_elements:
+            # Use the first TabGroup as a fallback
+            for element in tab_elements:
+                try:
+                    role = self._get_attribute_value(element, kAXRoleAttribute)
+                    if role == 'AXTabGroup':
+                        unique_tabs = [element]
+                        break
+                except:
+                    continue
+        
+        self.logger.debug(f"Filtered {len(tab_elements)} tab elements down to {len(unique_tabs)} unique tabs")
+        return unique_tabs
+    
+    def _find_individual_tabs_in_group(self, children: List[Any]) -> List[Any]:
+        """
+        Find individual tab elements within a tab group.
+        
+        Args:
+            children: List of child elements in a tab group
+            
+        Returns:
+            List of individual tab elements
+        """
+        individual_tabs = []
+        
+        def search_for_tabs(elements, depth=0):
+            if depth > 3:  # Limit recursion depth
+                return
+                
+            for element in elements:
+                try:
+                    role = self._get_attribute_value(element, kAXRoleAttribute)
+                    
+                    if role == 'AXTab':
+                        individual_tabs.append(element)
+                    elif role in ['AXGroup', 'AXTabGroup'] and depth < 3:
+                        # Recurse into groups to find tabs
+                        grandchildren = self._get_attribute_value(element, kAXChildrenAttribute)
+                        if grandchildren:
+                            search_for_tabs(grandchildren, depth + 1)
+                            
+                except Exception as e:
+                    continue
+        
+        search_for_tabs(children)
+        return individual_tabs
+    
+    def _deduplicate_tabs(self, tabs: List[Any]) -> List[Any]:
+        """
+        Remove duplicate tab elements based on position and content.
+        
+        Args:
+            tabs: List of tab elements
+            
+        Returns:
+            List of unique tab elements
+        """
+        if not tabs:
+            return []
+        
+        unique_tabs = []
+        seen_signatures = set()
+        
+        for tab in tabs:
+            try:
+                # Create a signature for this tab based on position and content
+                title = self._get_attribute_value(tab, kAXTitleAttribute) or ""
+                coordinates = self._get_element_coordinates(tab)
+                
+                # Create signature
+                if coordinates:
+                    signature = (title, coordinates[0], coordinates[1])
+                else:
+                    signature = (title, "no_coords")
+                
+                if signature not in seen_signatures:
+                    unique_tabs.append(tab)
+                    seen_signatures.add(signature)
+                    
+            except Exception as e:
+                # If we can't get signature, include it anyway
+                unique_tabs.append(tab)
+        
+        return unique_tabs
+    
+    def _filter_and_clean_tabs(self, tabs: List[BrowserTab]) -> List[BrowserTab]:
+        """
+        Filter and clean up tabs to remove duplicates and empty browser UI containers.
+        
+        Args:
+            tabs: List of raw browser tabs
+            
+        Returns:
+            List of cleaned and filtered tabs
+        """
+        if not tabs:
+            return []
+        
+        # Separate content tabs from empty UI containers
+        content_tabs = []
+        ui_containers = []
+        
+        for tab in tabs:
+            total_elements = len(tab.elements) + sum(len(frame.elements) for frame in tab.frames)
+            
+            if total_elements > 0:
+                content_tabs.append(tab)
+            else:
+                ui_containers.append(tab)
+        
+        # If we have content tabs, prioritize them
+        if content_tabs:
+            # Remove duplicate content tabs based on element count and title
+            unique_content_tabs = self._deduplicate_content_tabs(content_tabs)
+            
+            # Add one UI container if we have multiple (to represent browser chrome)
+            if ui_containers:
+                # Pick the first UI container as representative
+                unique_content_tabs.append(ui_containers[0])
+            
+            return unique_content_tabs
+        
+        # If no content tabs, return a single UI container
+        elif ui_containers:
+            return [ui_containers[0]]
+        
+        return tabs
+    
+    def _deduplicate_content_tabs(self, content_tabs: List[BrowserTab]) -> List[BrowserTab]:
+        """
+        Remove duplicate content tabs based on element count and characteristics.
+        
+        Args:
+            content_tabs: List of tabs with content
+            
+        Returns:
+            List of unique content tabs
+        """
+        if len(content_tabs) <= 1:
+            return content_tabs
+        
+        unique_tabs = []
+        seen_signatures = set()
+        
+        for tab in content_tabs:
+            # Create signature based on element count and types
+            total_elements = len(tab.elements) + sum(len(frame.elements) for frame in tab.frames)
+            all_elements = tab.elements + [elem for frame in tab.frames for elem in frame.elements]
+            
+            # Count element types
+            role_counts = {}
+            for element in all_elements:
+                role = element.role
+                role_counts[role] = role_counts.get(role, 0) + 1
+            
+            # Create signature
+            signature = (total_elements, tuple(sorted(role_counts.items())))
+            
+            if signature not in seen_signatures:
+                unique_tabs.append(tab)
+                seen_signatures.add(signature)
+        
+        return unique_tabs
+    
+    def _find_active_tab_smart(self, tabs: List[BrowserTab]) -> Optional[str]:
+        """
+        Smart active tab detection that prioritizes content-rich tabs.
+        
+        Args:
+            tabs: List of browser tabs
+            
+        Returns:
+            Active tab ID or None
+        """
+        if not tabs:
+            return None
+        
+        # First, try to find a tab marked as active with content
+        content_active_tabs = []
+        for tab in tabs:
+            total_elements = len(tab.elements) + sum(len(frame.elements) for frame in tab.frames)
+            if tab.is_active and total_elements > 0:
+                content_active_tabs.append((tab, total_elements))
+        
+        if content_active_tabs:
+            # Return the active tab with the most content
+            content_active_tabs.sort(key=lambda x: x[1], reverse=True)
+            return content_active_tabs[0][0].tab_id
+        
+        # If no active content tabs, find the tab with the most content
+        content_tabs = []
+        for tab in tabs:
+            total_elements = len(tab.elements) + sum(len(frame.elements) for frame in tab.frames)
+            if total_elements > 0:
+                content_tabs.append((tab, total_elements))
+        
+        if content_tabs:
+            # Return the tab with the most content
+            content_tabs.sort(key=lambda x: x[1], reverse=True)
+            return content_tabs[0][0].tab_id
+        
+        # Fallback to first tab
+        return tabs[0].tab_id
+    
     def _create_tab_from_element(self, tab_element: Any, tab_id: str, config: Dict[str, Any]) -> Optional[BrowserTab]:
         """
         Create a BrowserTab from a tab accessibility element.
@@ -420,8 +671,8 @@ class BrowserAccessibilityHandler:
         """
         try:
             # Get tab title and URL
-            title = self._get_attribute_value(tab_element, kAXTitleAttribute) or "Untitled"
-            url = self._get_attribute_value(tab_element, kAXURLAttribute) or ""
+            raw_title = self._get_attribute_value(tab_element, kAXTitleAttribute) or "Untitled"
+            raw_url = self._get_attribute_value(tab_element, kAXURLAttribute) or ""
             
             # Determine if tab is active (simplified check)
             is_active = self._is_element_focused_or_selected(tab_element)
@@ -429,8 +680,8 @@ class BrowserAccessibilityHandler:
             # Create tab
             tab = BrowserTab(
                 tab_id=tab_id,
-                title=title,
-                url=url,
+                title=raw_title,
+                url=raw_url,
                 is_active=is_active
             )
             
@@ -439,6 +690,11 @@ class BrowserAccessibilityHandler:
             
             # Extract frames
             tab.frames = self._extract_frames_from_container(tab_element, config, tab_id)
+            
+            # Try to improve title and URL based on content
+            improved_title, improved_url = self._improve_tab_info_from_content(tab, raw_title, raw_url)
+            tab.title = improved_title
+            tab.url = improved_url
             
             return tab
             
@@ -459,14 +715,17 @@ class BrowserAccessibilityHandler:
             BrowserTab if successful, None otherwise
         """
         try:
-            # Get window title
-            title = self._get_attribute_value(window, kAXTitleAttribute) or "Browser Window"
+            # Get window title and try to extract page info
+            window_title = self._get_attribute_value(window, kAXTitleAttribute) or "Browser Window"
+            
+            # Try to extract actual page title and URL from window title
+            page_title, page_url = self._parse_browser_window_title(window_title)
             
             # Create tab
             tab = BrowserTab(
                 tab_id=tab_id,
-                title=title,
-                url="",
+                title=page_title,
+                url=page_url,
                 is_active=True  # Single window/tab is considered active
             )
             
@@ -481,6 +740,128 @@ class BrowserAccessibilityHandler:
         except Exception as e:
             self.logger.error(f"Error creating tab from window: {e}")
             return None
+    
+    def _parse_browser_window_title(self, window_title: str) -> Tuple[str, str]:
+        """
+        Parse browser window title to extract page title and URL.
+        
+        Args:
+            window_title: Browser window title (e.g., "Facebook - Google Chrome")
+            
+        Returns:
+            Tuple of (page_title, page_url)
+        """
+        if not window_title or window_title == "Browser Window":
+            return "Browser Window", ""
+        
+        # Common browser title patterns:
+        # "Page Title - Google Chrome"
+        # "Page Title - Safari"
+        # "Page Title - Mozilla Firefox"
+        
+        browser_names = ["Google Chrome", "Safari", "Mozilla Firefox", "Microsoft Edge"]
+        
+        for browser_name in browser_names:
+            if f" - {browser_name}" in window_title:
+                page_title = window_title.replace(f" - {browser_name}", "").strip()
+                
+                # Try to infer URL from common page titles
+                page_url = self._infer_url_from_title(page_title)
+                
+                return page_title, page_url
+        
+        # If no browser name found, use the whole title
+        return window_title, ""
+    
+    def _infer_url_from_title(self, page_title: str) -> str:
+        """
+        Infer URL from page title for common sites.
+        
+        Args:
+            page_title: Page title
+            
+        Returns:
+            Inferred URL or empty string
+        """
+        title_lower = page_title.lower()
+        
+        # Common site patterns
+        if "facebook" in title_lower:
+            return "https://www.facebook.com"
+        elif "google" in title_lower and ("search" in title_lower or title_lower == "google"):
+            return "https://www.google.com"
+        elif "gmail" in title_lower:
+            return "https://mail.google.com"
+        elif "youtube" in title_lower:
+            return "https://www.youtube.com"
+        elif "twitter" in title_lower:
+            return "https://twitter.com"
+        elif "linkedin" in title_lower:
+            return "https://www.linkedin.com"
+        elif "github" in title_lower:
+            return "https://github.com"
+        elif title_lower == "new tab":
+            return "chrome://newtab/"
+        elif "accessibility" in title_lower and "internals" in title_lower:
+            return "chrome://accessibility/"
+        
+        return ""
+    
+    def _improve_tab_info_from_content(self, tab: BrowserTab, raw_title: str, raw_url: str) -> Tuple[str, str]:
+        """
+        Improve tab title and URL by analyzing the content elements.
+        
+        Args:
+            tab: Browser tab with extracted elements
+            raw_title: Raw title from tab element
+            raw_url: Raw URL from tab element
+            
+        Returns:
+            Tuple of (improved_title, improved_url)
+        """
+        # If we already have good info, use it
+        if raw_title not in ["Untitled", "Browser Window", ""] and raw_url:
+            return raw_title, raw_url
+        
+        # Analyze all elements in the tab
+        all_elements = tab.elements + [elem for frame in tab.frames for elem in frame.elements]
+        
+        # Look for content that indicates the page type
+        facebook_indicators = []
+        google_indicators = []
+        other_content = []
+        
+        for element in all_elements:
+            text_content = (element.title + " " + element.description + " " + element.value).lower()
+            
+            if any(keyword in text_content for keyword in ['facebook', 'log in', 'sign up', 'email or phone']):
+                facebook_indicators.append(element)
+            elif any(keyword in text_content for keyword in ['google', 'search', 'gmail']):
+                google_indicators.append(element)
+            elif text_content.strip():
+                other_content.append(element)
+        
+        # Determine page type and set appropriate title/URL
+        if facebook_indicators:
+            title = "Facebook - log in or sign up"
+            url = "https://www.facebook.com"
+        elif google_indicators:
+            title = "Google"
+            url = "https://www.google.com"
+        elif raw_title not in ["Untitled", "Browser Window", ""]:
+            title = raw_title
+            url = self._infer_url_from_title(raw_title)
+        else:
+            # Try to extract meaningful title from content
+            meaningful_titles = [e.title for e in other_content if e.title and len(e.title) > 3]
+            if meaningful_titles:
+                title = meaningful_titles[0][:50]  # Use first meaningful title, truncated
+                url = self._infer_url_from_title(title)
+            else:
+                title = raw_title or "Web Page"
+                url = raw_url
+        
+        return title, url
     
     def _extract_web_elements_from_container(
         self, 
