@@ -8,9 +8,9 @@
   - Write unit tests for permission validation across different system states
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 2. Create accessibility tree inspection and debugging tools
+- [x] 2. Create accessibility tree inspection and debugging tools
 
-  - [ ] 2.1 Implement AccessibilityDebugger class with tree dumping functionality
+  - [x] 2.1 Implement AccessibilityDebugger class with tree dumping functionality
 
     - Create comprehensive accessibility tree traversal and element extraction
     - Add element attribute inspection for AXTitle, AXDescription, AXValue, AXRole
@@ -18,7 +18,7 @@
     - Write unit tests for tree inspection with mocked accessibility elements
     - _Requirements: 3.1, 3.2, 3.4_
 
-  - [ ] 2.2 Add interactive element analysis and search tools
+  - [x] 2.2 Add interactive element analysis and search tools
     - Implement fuzzy text matching analysis with similarity score reporting
     - Create element search functionality with multiple search strategies
     - Add element comparison tools for debugging failed matches
