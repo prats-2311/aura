@@ -85,16 +85,16 @@ Intent categories:
 - "question_answering": Specific information requests about the screen or system
 
 Return your response in this exact JSON format:
-{
+{{
     "intent": "gui_interaction|conversational_chat|deferred_action|question_answering",
     "confidence": 0.95,
-    "parameters": {
+    "parameters": {{
         "action_type": "click|type|scroll|generate_code|general_question",
         "target": "extracted target or content request",
         "content_type": "code|text|explanation"
-    },
+    }},
     "reasoning": "Brief explanation of why this intent was chosen"
-}
+}}
 """
 
 # Conversational prompt for natural language interactions
