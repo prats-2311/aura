@@ -1,0 +1,59 @@
+2025-09-06 00:05:23,353 - __main__ - INFO - Starting comprehensive debugging system validation...
+2025-09-06 00:05:23,353 - __main__ - INFO - Running validation test: validate_permission_validator
+2025-09-06 00:05:23,353 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 00:05:23,366 - modules.permission_validator - INFO - Permission check completed: ❌ Accessibility permissions required (2 issues)
+2025-09-06 00:05:23,366 - __main__ - ERROR - ❌ validate_permission_validator FAILED: argument of type 'PermissionStatus' is not iterable
+2025-09-06 00:05:23,366 - __main__ - INFO - Running validation test: validate_accessibility_debugger
+2025-09-06 00:05:23,366 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 00:05:23,366 - modules.accessibility_debugger - ERROR - Failed to dump accessibility tree: No focused application found and no app_name specified
+2025-09-06 00:05:23,366 - __main__ - ERROR - ❌ validate_accessibility_debugger FAILED: No focused application found and no app_name specified
+2025-09-06 00:05:23,366 - __main__ - INFO - Running validation test: validate_diagnostic_tools
+2025-09-06 00:05:23,366 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 00:05:23,366 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 00:05:23,366 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 00:05:23,366 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 00:05:23,366 - __main__ - ERROR - ❌ validate_diagnostic_tools FAILED: 'AccessibilityHealthChecker' object has no attribute 'check_accessibility_api_health'
+2025-09-06 00:05:23,366 - __main__ - INFO - Running validation test: validate_error_recovery
+2025-09-06 00:05:23,366 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 00:05:23,366 - __main__ - ERROR - ❌ validate_error_recovery FAILED: 'ErrorRecoveryManager' object has no attribute 'get_recovery_strategies'
+2025-09-06 00:05:23,366 - __main__ - INFO - Running validation test: validate_performance_monitoring
+2025-09-06 00:05:23,366 - modules.fast_path_performance_monitor - INFO - Fast path performance monitor initialized with 1000 max metrics
+2025-09-06 00:05:23,367 - modules.performance_reporting_system - INFO - Performance reporting system initialized
+2025-09-06 00:05:23,367 - __main__ - ERROR - ❌ validate_performance_monitoring FAILED: 'FastPathPerformanceMonitor' object has no attribute 'start_operation_tracking'
+2025-09-06 00:05:23,367 - __main__ - INFO - Running validation test: validate_integration_with_accessibility_module
+2025-09-06 00:05:23,367 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 00:05:23,367 - modules.permission_validator - INFO - Permission check completed: ❌ Accessibility permissions required (2 issues)
+2025-09-06 00:05:23,367 - modules.accessibility - INFO - Permission validation: ❌ Accessibility permissions required (2 issues)
+2025-09-06 00:05:23,367 - modules.accessibility - WARNING - Insufficient accessibility permissions for optimal performance
+2025-09-06 00:05:23,367 - modules.accessibility - INFO - Recommendation: Restart the application after granting accessibility permissions
+2025-09-06 00:05:23,367 - modules.accessibility - INFO - Recommendation: Ensure the application has full disk access if running on macOS 10.15+
+2025-09-06 00:05:23,367 - modules.accessibility - INFO - Recommendation: Verify that the application can access other applications' UI elements
+2025-09-06 00:05:23,367 - modules.accessibility - INFO - Recommendation: Some accessibility features may not work reliably
+2025-09-06 00:05:23,367 - modules.accessibility - INFO - Recommendation: Consider granting full accessibility permissions for optimal performance
+2025-09-06 00:05:23,367 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-06 00:05:23,367 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 00:05:23,367 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 00:05:23,367 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 00:05:23,367 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 00:05:23,367 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 00:05:23,368 - modules.accessibility - WARNING - Failed to initialize debugging tools: 'dict' object has no attribute 'validate'
+2025-09-06 00:05:23,368 - modules.accessibility - WARNING - Accessibility permissions not granted: Insufficient accessibility permissions: PARTIAL
+2025-09-06 00:05:23,368 - modules.accessibility - WARNING - AccessibilityModule entering degraded mode: permission_denied
+2025-09-06 00:05:23,368 - __main__ - INFO - ✅ validate_integration_with_accessibility_module PASSED (0.00s)
+2025-09-06 00:05:23,368 - __main__ - INFO - Running validation test: validate_real_world_scenarios
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - INFO - Analyzing element detection failure for target: 'non-existent button'
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - ERROR - Failed to dump accessibility tree: No focused application found and no app_name specified
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - ERROR - Failed to analyze element detection failure: No focused application found and no app_name specified
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - INFO - Analyzing element detection failure for target: 'button'
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - ERROR - Failed to dump accessibility tree: No focused application found and no app_name specified
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - ERROR - Failed to analyze element detection failure: No focused application found and no app_name specified
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - INFO - Analyzing element detection failure for target: 'search field'
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - ERROR - Failed to dump accessibility tree: No focused application found and no app_name specified
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - ERROR - Failed to analyze element detection failure: No focused application found and no app_name specified
+2025-09-06 00:05:23,368 - __main__ - ERROR - ❌ validate_real_world_scenarios FAILED: Unknown error
+2025-09-06 00:05:23,368 - __main__ - INFO - Running validation test: validate_performance_impact
+2025-09-06 00:05:23,368 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 00:05:23,368 - __main__ - ERROR - ❌ validate_performance_impact FAILED: 'AccessibilityDebugger' object has no attribute 'check_accessibility_permissions'
+2025-09-06 00:05:23,368 - __main__ - INFO - Human-readable validation summary saved to: debugging_validation_summary_20250906_000523.md
+2025-09-06 00:05:23,368 - __main__ - INFO - Validation report saved to: debugging_validation_report_20250906_000523.json

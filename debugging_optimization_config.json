@@ -1,0 +1,25 @@
+{
+  "debugging": {
+    "enable_caching": true,
+    "cache_ttl_seconds": 30,
+    "max_cache_entries": 100,
+    "lazy_loading": true,
+    "async_diagnostics": true,
+    "performance_sampling_rate": 0.1,
+    "tree_dump_max_depth": 5,
+    "element_analysis_limit": 50
+  },
+  "performance_thresholds": {
+    "permission_check_timeout_ms": 100,
+    "tree_dump_timeout_ms": 300,
+    "failure_analysis_timeout_ms": 200,
+    "diagnostic_timeout_ms": 1000
+  },
+  "optimization_flags": {
+    "enable_background_permission_monitoring": true,
+    "enable_tree_caching": true,
+    "enable_failure_pattern_caching": true,
+    "enable_async_diagnostics": true,
+    "enable_performance_sampling": true
+  }
+}

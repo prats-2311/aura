@@ -1,0 +1,134 @@
+{
+  "validation_summary": {
+    "timestamp": "2025-09-06T00:05:23.368391",
+    "total_execution_time": 0.014992237091064453,
+    "total_tests": 8,
+    "passed_tests": 1,
+    "failed_tests": 7,
+    "success_rate": 12.5
+  },
+  "test_results": [
+    {
+      "test_name": "validate_permission_validator",
+      "status": "FAILED",
+      "execution_time": 0.012950897216796875,
+      "details": {
+        "success": false,
+        "error": "argument of type 'PermissionStatus' is not iterable"
+      },
+      "error_message": "argument of type 'PermissionStatus' is not iterable"
+    },
+    {
+      "test_name": "validate_accessibility_debugger",
+      "status": "FAILED",
+      "execution_time": 8.20159912109375e-05,
+      "details": {
+        "success": false,
+        "error": "No focused application found and no app_name specified"
+      },
+      "error_message": "No focused application found and no app_name specified"
+    },
+    {
+      "test_name": "validate_diagnostic_tools",
+      "status": "FAILED",
+      "execution_time": 0.0003151893615722656,
+      "details": {
+        "success": false,
+        "error": "'AccessibilityHealthChecker' object has no attribute 'check_accessibility_api_health'"
+      },
+      "error_message": "'AccessibilityHealthChecker' object has no attribute 'check_accessibility_api_health'"
+    },
+    {
+      "test_name": "validate_error_recovery",
+      "status": "FAILED",
+      "execution_time": 3.719329833984375e-05,
+      "details": {
+        "success": false,
+        "error": "'ErrorRecoveryManager' object has no attribute 'get_recovery_strategies'"
+      },
+      "error_message": "'ErrorRecoveryManager' object has no attribute 'get_recovery_strategies'"
+    },
+    {
+      "test_name": "validate_performance_monitoring",
+      "status": "FAILED",
+      "execution_time": 5.5789947509765625e-05,
+      "details": {
+        "success": false,
+        "error": "'FastPathPerformanceMonitor' object has no attribute 'start_operation_tracking'"
+      },
+      "error_message": "'FastPathPerformanceMonitor' object has no attribute 'start_operation_tracking'"
+    },
+    {
+      "test_name": "validate_integration_with_accessibility_module",
+      "status": "PASSED",
+      "execution_time": 0.001039266586303711,
+      "details": {
+        "success": true,
+        "debugger_integrated": false,
+        "performance_tracking_integrated": true,
+        "element_finding_working": true,
+        "element_found": false
+      },
+      "error_message": null
+    },
+    {
+      "test_name": "validate_real_world_scenarios",
+      "status": "FAILED",
+      "execution_time": 0.0001678466796875,
+      "details": {
+        "success": false,
+        "scenario_results": {
+          "button_not_found": {
+            "analysis_generated": false,
+            "error": "No focused application found and no app_name specified"
+          },
+          "ambiguous_text": {
+            "analysis_generated": false,
+            "error": "No focused application found and no app_name specified"
+          },
+          "web_element": {
+            "analysis_generated": false,
+            "error": "No focused application found and no app_name specified"
+          }
+        },
+        "successful_scenarios": 0,
+        "total_scenarios": 3
+      },
+      "error_message": null
+    },
+    {
+      "test_name": "validate_performance_impact",
+      "status": "FAILED",
+      "execution_time": 2.3126602172851562e-05,
+      "details": {
+        "success": false,
+        "error": "'AccessibilityDebugger' object has no attribute 'check_accessibility_permissions'"
+      },
+      "error_message": "'AccessibilityDebugger' object has no attribute 'check_accessibility_permissions'"
+    }
+  ],
+  "debugging_functionality_assessment": {
+    "core_functionality_working": false,
+    "permission_validation_working": false,
+    "tree_inspection_working": false,
+    "diagnostics_working": false,
+    "error_recovery_working": false,
+    "functionality_score": 0.0
+  },
+  "performance_impact_assessment": {
+    "performance_acceptable": false,
+    "reason": "Performance impact test failed or not run"
+  },
+  "recommendations": [
+    "\u26a0\ufe0f 7 validation tests failed. Review and address the following issues:",
+    "- validate_permission_validator: argument of type 'PermissionStatus' is not iterable",
+    "- validate_accessibility_debugger: No focused application found and no app_name specified",
+    "- validate_diagnostic_tools: 'AccessibilityHealthChecker' object has no attribute 'check_accessibility_api_health'",
+    "- validate_error_recovery: 'ErrorRecoveryManager' object has no attribute 'get_recovery_strategies'",
+    "- validate_performance_monitoring: 'FastPathPerformanceMonitor' object has no attribute 'start_operation_tracking'",
+    "- validate_real_world_scenarios: None",
+    "- validate_performance_impact: 'AccessibilityDebugger' object has no attribute 'check_accessibility_permissions'",
+    "\ud83d\udd27 Core debugging functionality needs attention. Ensure all debugging modules are properly implemented.",
+    "\u26a1 Performance impact is higher than expected. Consider optimizing debugging operations."
+  ]
+}
