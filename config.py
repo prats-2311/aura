@@ -523,7 +523,9 @@ def print_setup_instructions():
 def get_active_vision_model():
     """
     Get the currently active VISION-CAPABLE model from LM Studio.
-    Filters out embedding models and other non-vision models.
+    
+    This function first tries to detect the currently loaded model by making a test request,
+    then falls back to checking available models if needed.
     
     Returns:
         str: The name of the active vision model, or None if detection fails
@@ -544,11 +546,63 @@ def get_active_vision_model():
     VISION_MODEL_PATTERNS = [
         'vision', 'llava', 'gpt-4v', 'claude-3', 'gemini-pro-vision',
         'minicpm-v', 'qwen-vl', 'internvl', 'cogvlm', 'moondream',
-        'bakllava', 'yi-vl', 'deepseek-vl'
+        'bakllava', 'yi-vl', 'deepseek-vl', 'gemma', 'phi-3-vision',
+        'smolvlm', 'phi-4'
     ]
     
+    def is_embedding_model(model_name):
+        """Check if a model is an embedding model."""
+        model_lower = model_name.lower()
+        return any(pattern in model_lower for pattern in EMBEDDING_MODEL_PATTERNS)
+    
+    def is_vision_model(model_name):
+        """Check if a model is a known vision model."""
+        model_lower = model_name.lower()
+        return any(pattern in model_lower for pattern in VISION_MODEL_PATTERNS)
+    
+    # Method 1: Try to detect currently loaded model by making a test request
     try:
-        # Query LM Studio for available models
+        logger.debug("Attempting to detect currently loaded model...")
+        test_payload = {
+            "model": "any-model-name",  # LM Studio often ignores this and uses loaded model
+            "messages": [{"role": "user", "content": "Hi"}],
+            "max_tokens": 5,
+            "temperature": 0.1
+        }
+        
+        response = requests.post(
+            f"{VISION_API_BASE}/chat/completions",
+            json=test_payload,
+            timeout=8
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            if 'model' in result:
+                loaded_model = result['model']
+                logger.info(f"Detected currently loaded model: {loaded_model}")
+                
+                # Check if it's a suitable model
+                if not is_embedding_model(loaded_model):
+                    if is_vision_model(loaded_model):
+                        logger.info(f"Currently loaded model is vision-capable: {loaded_model}")
+                        return loaded_model
+                    else:
+                        logger.warning(f"Currently loaded model may have limited vision capabilities: {loaded_model}")
+                        return loaded_model  # Still use it, but warn user
+                else:
+                    logger.warning(f"Currently loaded model is an embedding model: {loaded_model}")
+            else:
+                logger.debug("No model info in test response, falling back to /models endpoint")
+        else:
+            logger.debug(f"Test request failed ({response.status_code}), falling back to /models endpoint")
+            
+    except Exception as e:
+        logger.debug(f"Could not detect loaded model via test request: {e}")
+    
+    # Method 2: Fall back to querying available models
+    try:
+        logger.debug("Querying available models from /models endpoint...")
         response = requests.get(f"{VISION_API_BASE}/models", timeout=5)
         
         if response.status_code == 200:
@@ -562,25 +616,20 @@ def get_active_vision_model():
                 # Filter out embedding models
                 vision_capable_models = []
                 for model in available_models:
-                    model_lower = model.lower()
-                    
-                    # Skip embedding models
-                    if any(pattern in model_lower for pattern in EMBEDDING_MODEL_PATTERNS):
+                    if not is_embedding_model(model):
+                        vision_capable_models.append(model)
+                    else:
                         logger.debug(f"Skipping embedding model: {model}")
-                        continue
-                    
-                    vision_capable_models.append(model)
                 
                 if not vision_capable_models:
                     logger.error("No vision-capable models found in LM Studio!")
                     logger.error("Available models are all embedding models. Please load a vision model.")
-                    logger.error("Recommended: LLaVA, GPT-4V, MiniCPM-V, or similar vision models")
+                    logger.error("Recommended: LLaVA, GPT-4V, MiniCPM-V, Phi-3-Vision, or similar vision models")
                     return None
                 
                 # Prioritize known vision models
                 for model in vision_capable_models:
-                    model_lower = model.lower()
-                    if any(pattern in model_lower for pattern in VISION_MODEL_PATTERNS):
+                    if is_vision_model(model):
                         logger.info(f"Selected vision model: {model}")
                         return model
                 
