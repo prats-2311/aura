@@ -279,7 +279,7 @@ LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG_FILE = "aura.log"
 
-# -- Debug Logging Configuration --
+# -- Comprehensive Debugging Configuration --
 # Debug levels for enhanced logging and debugging output
 DEBUG_LEVELS = {
     "BASIC": 1,      # Essential failure information and timing
@@ -328,6 +328,96 @@ DEBUG_STRUCTURED_FORMAT = {
     "thread": "%(thread)d",
     "process": "%(process)d"
 }
+
+# -- Accessibility Debugging Configuration --
+# Permission validation settings
+PERMISSION_VALIDATION_ENABLED = True
+PERMISSION_AUTO_REQUEST = False  # Automatically request permissions if missing
+PERMISSION_VALIDATION_TIMEOUT = 5.0  # Seconds to wait for permission validation
+PERMISSION_MONITORING_ENABLED = True  # Monitor for runtime permission changes
+PERMISSION_GUIDE_ENABLED = True  # Show step-by-step permission setup guide
+
+# Accessibility tree inspection settings
+TREE_INSPECTION_ENABLED = True
+TREE_DUMP_MAX_DEPTH = 10  # Maximum depth for tree traversal
+TREE_DUMP_INCLUDE_HIDDEN = False  # Include hidden elements in tree dumps
+TREE_DUMP_CACHE_ENABLED = True  # Cache tree dumps for performance
+TREE_DUMP_CACHE_TTL = 30  # Cache time-to-live in seconds
+TREE_ELEMENT_ATTRIBUTE_FILTER = []  # Empty list means include all attributes
+
+# Element analysis and search settings
+ELEMENT_ANALYSIS_ENABLED = True
+ELEMENT_SEARCH_TIMEOUT = 2.0  # Seconds for element search operations
+ELEMENT_COMPARISON_ENABLED = True  # Enable element comparison for debugging
+FUZZY_MATCH_ANALYSIS_ENABLED = True  # Detailed fuzzy matching analysis
+SIMILARITY_SCORE_THRESHOLD = 0.6  # Minimum similarity score for matches
+ELEMENT_SEARCH_STRATEGIES = [
+    "exact_match",
+    "fuzzy_match", 
+    "partial_match",
+    "role_based",
+    "attribute_based"
+]
+
+# Application detection and adaptation settings
+APPLICATION_DETECTION_ENABLED = True
+APPLICATION_STRATEGY_CACHING = True  # Cache detection strategies per application
+APPLICATION_STRATEGY_CACHE_TTL = 300  # Cache TTL in seconds
+BROWSER_SPECIFIC_HANDLING = True  # Enable browser-specific accessibility handling
+NATIVE_APP_OPTIMIZATION = True  # Optimize for native macOS applications
+WEB_APP_DETECTION = True  # Detect and handle web applications specially
+
+# Error recovery and retry settings
+ERROR_RECOVERY_ENABLED = True
+ERROR_RECOVERY_MAX_RETRIES = 3
+ERROR_RECOVERY_BACKOFF_FACTOR = 2.0  # Exponential backoff multiplier
+ERROR_RECOVERY_BASE_DELAY = 0.5  # Base delay in seconds
+ERROR_RECOVERY_MAX_DELAY = 5.0  # Maximum delay in seconds
+ACCESSIBILITY_TREE_REFRESH_ENABLED = True
+ELEMENT_CACHE_INVALIDATION_ENABLED = True
+
+# Diagnostic tools configuration
+DIAGNOSTIC_TOOLS_ENABLED = True
+DIAGNOSTIC_AUTO_RUN = False  # Automatically run diagnostics on failures
+DIAGNOSTIC_HEALTH_CHECK_INTERVAL = 300  # Seconds between automatic health checks
+DIAGNOSTIC_REPORT_FORMAT = "json"  # json, html, text
+DIAGNOSTIC_REPORT_INCLUDE_SCREENSHOTS = False  # Include screenshots in reports
+DIAGNOSTIC_PERFORMANCE_BENCHMARKING = True
+DIAGNOSTIC_ISSUE_PRIORITIZATION = True  # Prioritize issues by impact
+
+# Performance monitoring for debugging
+DEBUG_PERFORMANCE_TRACKING = True
+DEBUG_EXECUTION_TIME_LOGGING = True
+DEBUG_SUCCESS_RATE_TRACKING = True
+DEBUG_PERFORMANCE_ALERTS = True
+DEBUG_PERFORMANCE_DEGRADATION_THRESHOLD = 0.7  # Alert if success rate drops below 70%
+DEBUG_PERFORMANCE_HISTORY_SIZE = 1000  # Number of operations to track
+
+# Interactive debugging settings
+INTERACTIVE_DEBUGGING_ENABLED = True
+INTERACTIVE_SESSION_RECORDING = False  # Record debugging sessions
+INTERACTIVE_STEP_BY_STEP = False  # Enable step-by-step debugging mode
+INTERACTIVE_REAL_TIME_FEEDBACK = True  # Provide real-time feedback during debugging
+
+# Command-line debugging tools settings
+CLI_DEBUGGING_TOOLS_ENABLED = True
+CLI_TREE_INSPECTOR_ENABLED = True
+CLI_ELEMENT_TESTER_ENABLED = True
+CLI_DIAGNOSTIC_RUNNER_ENABLED = True
+CLI_PERFORMANCE_MONITOR_ENABLED = True
+
+# Debugging output and reporting settings
+DEBUG_REPORT_AUTO_GENERATION = True
+DEBUG_REPORT_INCLUDE_CONTEXT = True
+DEBUG_REPORT_INCLUDE_RECOMMENDATIONS = True
+DEBUG_REPORT_INCLUDE_RECOVERY_STEPS = True
+DEBUG_REPORT_EXPORT_FORMATS = ["json", "html"]  # Available export formats
+
+# Security and privacy settings for debugging
+DEBUG_SANITIZE_SENSITIVE_DATA = True  # Remove sensitive data from debug output
+DEBUG_CONTENT_FILTERING = True  # Filter potentially sensitive content
+DEBUG_PRIVACY_MODE = False  # Enhanced privacy mode for debugging
+DEBUG_SECURE_LOG_HANDLING = True  # Secure handling of debug logs
 
 # -- Development Settings --
 DEBUG_MODE = os.getenv("AURA_DEBUG", "false").lower() == "true"
@@ -571,6 +661,73 @@ def validate_config():
     if TYPE_INTERVAL < 0:
         errors.append("TYPE_INTERVAL cannot be negative")
     
+    # Validate debugging configuration
+    if DEBUG_LEVEL not in DEBUG_LEVELS:
+        errors.append(f"DEBUG_LEVEL must be one of: {list(DEBUG_LEVELS.keys())}")
+    
+    if DEBUG_OUTPUT_FORMAT not in ["structured", "json", "plain"]:
+        errors.append("DEBUG_OUTPUT_FORMAT must be 'structured', 'json', or 'plain'")
+    
+    # Validate permission validation settings
+    if not isinstance(PERMISSION_VALIDATION_ENABLED, bool):
+        errors.append("PERMISSION_VALIDATION_ENABLED must be a boolean")
+    
+    if not isinstance(PERMISSION_AUTO_REQUEST, bool):
+        errors.append("PERMISSION_AUTO_REQUEST must be a boolean")
+    
+    if PERMISSION_VALIDATION_TIMEOUT < 1.0 or PERMISSION_VALIDATION_TIMEOUT > 30.0:
+        warnings.append("PERMISSION_VALIDATION_TIMEOUT should be between 1.0-30.0 seconds")
+    
+    # Validate tree inspection settings
+    if TREE_DUMP_MAX_DEPTH < 1 or TREE_DUMP_MAX_DEPTH > 50:
+        warnings.append("TREE_DUMP_MAX_DEPTH should be between 1-50")
+    
+    if TREE_DUMP_CACHE_TTL < 10 or TREE_DUMP_CACHE_TTL > 300:
+        warnings.append("TREE_DUMP_CACHE_TTL should be between 10-300 seconds")
+    
+    # Validate element analysis settings
+    if ELEMENT_SEARCH_TIMEOUT < 0.5 or ELEMENT_SEARCH_TIMEOUT > 10.0:
+        warnings.append("ELEMENT_SEARCH_TIMEOUT should be between 0.5-10.0 seconds")
+    
+    if not 0.0 <= SIMILARITY_SCORE_THRESHOLD <= 1.0:
+        errors.append("SIMILARITY_SCORE_THRESHOLD must be between 0.0 and 1.0")
+    
+    if not isinstance(ELEMENT_SEARCH_STRATEGIES, list) or not ELEMENT_SEARCH_STRATEGIES:
+        errors.append("ELEMENT_SEARCH_STRATEGIES must be a non-empty list")
+    
+    # Validate error recovery settings
+    if ERROR_RECOVERY_MAX_RETRIES < 0 or ERROR_RECOVERY_MAX_RETRIES > 10:
+        warnings.append("ERROR_RECOVERY_MAX_RETRIES should be between 0-10")
+    
+    if ERROR_RECOVERY_BACKOFF_FACTOR < 1.0 or ERROR_RECOVERY_BACKOFF_FACTOR > 5.0:
+        warnings.append("ERROR_RECOVERY_BACKOFF_FACTOR should be between 1.0-5.0")
+    
+    if ERROR_RECOVERY_BASE_DELAY < 0.1 or ERROR_RECOVERY_BASE_DELAY > 2.0:
+        warnings.append("ERROR_RECOVERY_BASE_DELAY should be between 0.1-2.0 seconds")
+    
+    if ERROR_RECOVERY_MAX_DELAY < 1.0 or ERROR_RECOVERY_MAX_DELAY > 30.0:
+        warnings.append("ERROR_RECOVERY_MAX_DELAY should be between 1.0-30.0 seconds")
+    
+    # Validate diagnostic settings
+    if DIAGNOSTIC_HEALTH_CHECK_INTERVAL < 60 or DIAGNOSTIC_HEALTH_CHECK_INTERVAL > 3600:
+        warnings.append("DIAGNOSTIC_HEALTH_CHECK_INTERVAL should be between 60-3600 seconds")
+    
+    if DIAGNOSTIC_REPORT_FORMAT not in ["json", "html", "text"]:
+        errors.append("DIAGNOSTIC_REPORT_FORMAT must be 'json', 'html', or 'text'")
+    
+    # Validate performance monitoring settings
+    if not 0.0 <= DEBUG_PERFORMANCE_DEGRADATION_THRESHOLD <= 1.0:
+        errors.append("DEBUG_PERFORMANCE_DEGRADATION_THRESHOLD must be between 0.0 and 1.0")
+    
+    if DEBUG_PERFORMANCE_HISTORY_SIZE < 100 or DEBUG_PERFORMANCE_HISTORY_SIZE > 10000:
+        warnings.append("DEBUG_PERFORMANCE_HISTORY_SIZE should be between 100-10000")
+    
+    # Validate debug report export formats
+    valid_export_formats = ["json", "html", "text", "xml"]
+    for fmt in DEBUG_REPORT_EXPORT_FORMATS:
+        if fmt not in valid_export_formats:
+            errors.append(f"Invalid DEBUG_REPORT_EXPORT_FORMAT: {fmt}. Must be one of: {valid_export_formats}")
+    
     # Print results
     if warnings:
         print("Configuration Warnings:")
@@ -590,6 +747,153 @@ def validate_config():
         print("⚠️  Configuration has warnings but is functional")
     
     return True
+
+
+def validate_debugging_config():
+    """
+    Validate debugging configuration settings and provide detailed feedback.
+    
+    Returns:
+        tuple: (is_valid: bool, errors: List[str], warnings: List[str])
+    """
+    errors = []
+    warnings = []
+    
+    # Validate debug level
+    if DEBUG_LEVEL not in DEBUG_LEVELS:
+        errors.append(f"Invalid DEBUG_LEVEL '{DEBUG_LEVEL}'. Must be one of: {list(DEBUG_LEVELS.keys())}")
+    
+    # Validate output format
+    valid_formats = ["structured", "json", "plain"]
+    if DEBUG_OUTPUT_FORMAT not in valid_formats:
+        errors.append(f"Invalid DEBUG_OUTPUT_FORMAT '{DEBUG_OUTPUT_FORMAT}'. Must be one of: {valid_formats}")
+    
+    # Validate debug categories
+    if not isinstance(DEBUG_CATEGORIES, dict):
+        errors.append("DEBUG_CATEGORIES must be a dictionary")
+    else:
+        for category, enabled in DEBUG_CATEGORIES.items():
+            if not isinstance(enabled, bool):
+                errors.append(f"DEBUG_CATEGORIES['{category}'] must be a boolean")
+    
+    # Validate file settings
+    if DEBUG_LOG_MAX_SIZE < 1024 * 1024:  # 1MB minimum
+        warnings.append("DEBUG_LOG_MAX_SIZE is very small (< 1MB)")
+    
+    if DEBUG_LOG_BACKUP_COUNT < 1:
+        warnings.append("DEBUG_LOG_BACKUP_COUNT should be at least 1")
+    
+    # Validate permission settings
+    if not isinstance(PERMISSION_VALIDATION_ENABLED, bool):
+        errors.append("PERMISSION_VALIDATION_ENABLED must be a boolean")
+    
+    if PERMISSION_VALIDATION_TIMEOUT <= 0:
+        errors.append("PERMISSION_VALIDATION_TIMEOUT must be positive")
+    elif PERMISSION_VALIDATION_TIMEOUT > 30:
+        warnings.append("PERMISSION_VALIDATION_TIMEOUT is very high (> 30 seconds)")
+    
+    # Validate tree inspection settings
+    if TREE_DUMP_MAX_DEPTH <= 0:
+        errors.append("TREE_DUMP_MAX_DEPTH must be positive")
+    elif TREE_DUMP_MAX_DEPTH > 20:
+        warnings.append("TREE_DUMP_MAX_DEPTH is very high (> 20), may impact performance")
+    
+    if TREE_DUMP_CACHE_TTL <= 0:
+        errors.append("TREE_DUMP_CACHE_TTL must be positive")
+    
+    # Validate element analysis settings
+    if ELEMENT_SEARCH_TIMEOUT <= 0:
+        errors.append("ELEMENT_SEARCH_TIMEOUT must be positive")
+    elif ELEMENT_SEARCH_TIMEOUT > 10:
+        warnings.append("ELEMENT_SEARCH_TIMEOUT is very high (> 10 seconds)")
+    
+    if not 0 <= SIMILARITY_SCORE_THRESHOLD <= 1:
+        errors.append("SIMILARITY_SCORE_THRESHOLD must be between 0 and 1")
+    
+    if not isinstance(ELEMENT_SEARCH_STRATEGIES, list) or not ELEMENT_SEARCH_STRATEGIES:
+        errors.append("ELEMENT_SEARCH_STRATEGIES must be a non-empty list")
+    
+    # Validate error recovery settings
+    if ERROR_RECOVERY_MAX_RETRIES < 0:
+        errors.append("ERROR_RECOVERY_MAX_RETRIES cannot be negative")
+    elif ERROR_RECOVERY_MAX_RETRIES > 10:
+        warnings.append("ERROR_RECOVERY_MAX_RETRIES is very high (> 10)")
+    
+    if ERROR_RECOVERY_BACKOFF_FACTOR < 1:
+        errors.append("ERROR_RECOVERY_BACKOFF_FACTOR must be >= 1")
+    
+    if ERROR_RECOVERY_BASE_DELAY <= 0:
+        errors.append("ERROR_RECOVERY_BASE_DELAY must be positive")
+    
+    if ERROR_RECOVERY_MAX_DELAY <= ERROR_RECOVERY_BASE_DELAY:
+        errors.append("ERROR_RECOVERY_MAX_DELAY must be greater than ERROR_RECOVERY_BASE_DELAY")
+    
+    # Validate diagnostic settings
+    if DIAGNOSTIC_HEALTH_CHECK_INTERVAL <= 0:
+        errors.append("DIAGNOSTIC_HEALTH_CHECK_INTERVAL must be positive")
+    elif DIAGNOSTIC_HEALTH_CHECK_INTERVAL < 60:
+        warnings.append("DIAGNOSTIC_HEALTH_CHECK_INTERVAL is very low (< 60 seconds)")
+    
+    valid_report_formats = ["json", "html", "text"]
+    if DIAGNOSTIC_REPORT_FORMAT not in valid_report_formats:
+        errors.append(f"Invalid DIAGNOSTIC_REPORT_FORMAT '{DIAGNOSTIC_REPORT_FORMAT}'. Must be one of: {valid_report_formats}")
+    
+    # Validate performance tracking settings
+    if not 0 <= DEBUG_PERFORMANCE_DEGRADATION_THRESHOLD <= 1:
+        errors.append("DEBUG_PERFORMANCE_DEGRADATION_THRESHOLD must be between 0 and 1")
+    
+    if DEBUG_PERFORMANCE_HISTORY_SIZE <= 0:
+        errors.append("DEBUG_PERFORMANCE_HISTORY_SIZE must be positive")
+    elif DEBUG_PERFORMANCE_HISTORY_SIZE > 10000:
+        warnings.append("DEBUG_PERFORMANCE_HISTORY_SIZE is very high (> 10000), may impact memory usage")
+    
+    # Validate export formats
+    valid_export_formats = ["json", "html", "text", "xml"]
+    if not isinstance(DEBUG_REPORT_EXPORT_FORMATS, list):
+        errors.append("DEBUG_REPORT_EXPORT_FORMATS must be a list")
+    else:
+        for fmt in DEBUG_REPORT_EXPORT_FORMATS:
+            if fmt not in valid_export_formats:
+                errors.append(f"Invalid export format '{fmt}'. Must be one of: {valid_export_formats}")
+    
+    return len(errors) == 0, errors, warnings
+
+
+def get_debugging_config_defaults():
+    """
+    Get default values for debugging configuration.
+    
+    Returns:
+        dict: Default debugging configuration values
+    """
+    return {
+        'debug_level': 'BASIC',
+        'output_format': 'structured',
+        'log_to_file': True,
+        'log_to_console': True,
+        'permission_validation_enabled': True,
+        'permission_auto_request': False,
+        'permission_validation_timeout': 5.0,
+        'tree_inspection_enabled': True,
+        'tree_dump_max_depth': 10,
+        'tree_dump_cache_enabled': True,
+        'tree_dump_cache_ttl': 30,
+        'element_analysis_enabled': True,
+        'element_search_timeout': 2.0,
+        'similarity_score_threshold': 0.6,
+        'application_detection_enabled': True,
+        'error_recovery_enabled': True,
+        'error_recovery_max_retries': 3,
+        'error_recovery_backoff_factor': 2.0,
+        'diagnostic_tools_enabled': True,
+        'diagnostic_auto_run': False,
+        'diagnostic_health_check_interval': 300,
+        'debug_performance_tracking': True,
+        'debug_performance_degradation_threshold': 0.7,
+        'interactive_debugging_enabled': True,
+        'cli_debugging_tools_enabled': True,
+        'debug_sanitize_sensitive_data': True
+    }
 
 
 def get_config_summary():
@@ -658,6 +962,95 @@ def get_config_summary():
             'warning_threshold_ms': PERFORMANCE_WARNING_THRESHOLD,
             'history_size': PERFORMANCE_HISTORY_SIZE,
             'logging_enabled': PERFORMANCE_LOGGING_ENABLED
+        },
+        'debugging': {
+            'debug_level': DEBUG_LEVEL,
+            'output_format': DEBUG_OUTPUT_FORMAT,
+            'categories': DEBUG_CATEGORIES,
+            'log_to_file': DEBUG_LOG_TO_FILE,
+            'log_to_console': DEBUG_LOG_TO_CONSOLE,
+            'permission_validation': {
+                'enabled': PERMISSION_VALIDATION_ENABLED,
+                'auto_request': PERMISSION_AUTO_REQUEST,
+                'timeout': PERMISSION_VALIDATION_TIMEOUT,
+                'monitoring_enabled': PERMISSION_MONITORING_ENABLED,
+                'guide_enabled': PERMISSION_GUIDE_ENABLED
+            },
+            'tree_inspection': {
+                'enabled': TREE_INSPECTION_ENABLED,
+                'max_depth': TREE_DUMP_MAX_DEPTH,
+                'include_hidden': TREE_DUMP_INCLUDE_HIDDEN,
+                'cache_enabled': TREE_DUMP_CACHE_ENABLED,
+                'cache_ttl': TREE_DUMP_CACHE_TTL
+            },
+            'element_analysis': {
+                'enabled': ELEMENT_ANALYSIS_ENABLED,
+                'search_timeout': ELEMENT_SEARCH_TIMEOUT,
+                'comparison_enabled': ELEMENT_COMPARISON_ENABLED,
+                'fuzzy_match_analysis': FUZZY_MATCH_ANALYSIS_ENABLED,
+                'similarity_threshold': SIMILARITY_SCORE_THRESHOLD,
+                'search_strategies': ELEMENT_SEARCH_STRATEGIES
+            },
+            'application_detection': {
+                'enabled': APPLICATION_DETECTION_ENABLED,
+                'strategy_caching': APPLICATION_STRATEGY_CACHING,
+                'cache_ttl': APPLICATION_STRATEGY_CACHE_TTL,
+                'browser_specific': BROWSER_SPECIFIC_HANDLING,
+                'native_app_optimization': NATIVE_APP_OPTIMIZATION,
+                'web_app_detection': WEB_APP_DETECTION
+            },
+            'error_recovery': {
+                'enabled': ERROR_RECOVERY_ENABLED,
+                'max_retries': ERROR_RECOVERY_MAX_RETRIES,
+                'backoff_factor': ERROR_RECOVERY_BACKOFF_FACTOR,
+                'base_delay': ERROR_RECOVERY_BASE_DELAY,
+                'max_delay': ERROR_RECOVERY_MAX_DELAY,
+                'tree_refresh_enabled': ACCESSIBILITY_TREE_REFRESH_ENABLED,
+                'cache_invalidation_enabled': ELEMENT_CACHE_INVALIDATION_ENABLED
+            },
+            'diagnostic_tools': {
+                'enabled': DIAGNOSTIC_TOOLS_ENABLED,
+                'auto_run': DIAGNOSTIC_AUTO_RUN,
+                'health_check_interval': DIAGNOSTIC_HEALTH_CHECK_INTERVAL,
+                'report_format': DIAGNOSTIC_REPORT_FORMAT,
+                'include_screenshots': DIAGNOSTIC_REPORT_INCLUDE_SCREENSHOTS,
+                'performance_benchmarking': DIAGNOSTIC_PERFORMANCE_BENCHMARKING,
+                'issue_prioritization': DIAGNOSTIC_ISSUE_PRIORITIZATION
+            },
+            'performance_tracking': {
+                'enabled': DEBUG_PERFORMANCE_TRACKING,
+                'execution_time_logging': DEBUG_EXECUTION_TIME_LOGGING,
+                'success_rate_tracking': DEBUG_SUCCESS_RATE_TRACKING,
+                'alerts_enabled': DEBUG_PERFORMANCE_ALERTS,
+                'degradation_threshold': DEBUG_PERFORMANCE_DEGRADATION_THRESHOLD,
+                'history_size': DEBUG_PERFORMANCE_HISTORY_SIZE
+            },
+            'interactive_debugging': {
+                'enabled': INTERACTIVE_DEBUGGING_ENABLED,
+                'session_recording': INTERACTIVE_SESSION_RECORDING,
+                'step_by_step': INTERACTIVE_STEP_BY_STEP,
+                'real_time_feedback': INTERACTIVE_REAL_TIME_FEEDBACK
+            },
+            'cli_tools': {
+                'enabled': CLI_DEBUGGING_TOOLS_ENABLED,
+                'tree_inspector': CLI_TREE_INSPECTOR_ENABLED,
+                'element_tester': CLI_ELEMENT_TESTER_ENABLED,
+                'diagnostic_runner': CLI_DIAGNOSTIC_RUNNER_ENABLED,
+                'performance_monitor': CLI_PERFORMANCE_MONITOR_ENABLED
+            },
+            'reporting': {
+                'auto_generation': DEBUG_REPORT_AUTO_GENERATION,
+                'include_context': DEBUG_REPORT_INCLUDE_CONTEXT,
+                'include_recommendations': DEBUG_REPORT_INCLUDE_RECOMMENDATIONS,
+                'include_recovery_steps': DEBUG_REPORT_INCLUDE_RECOVERY_STEPS,
+                'export_formats': DEBUG_REPORT_EXPORT_FORMATS
+            },
+            'security': {
+                'sanitize_sensitive_data': DEBUG_SANITIZE_SENSITIVE_DATA,
+                'content_filtering': DEBUG_CONTENT_FILTERING,
+                'privacy_mode': DEBUG_PRIVACY_MODE,
+                'secure_log_handling': DEBUG_SECURE_LOG_HANDLING
+            }
         }
     }
 
