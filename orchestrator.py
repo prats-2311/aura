@@ -1393,19 +1393,116 @@ class Orchestrator:
     
     def _handle_conversational_query(self, execution_id: str, query: str) -> Dict[str, Any]:
         """
-        Handle conversational queries (placeholder for future implementation).
+        Handle conversational queries using natural language processing.
+        
+        Processes natural language conversations using the reasoning module with
+        conversational prompts, extracts responses, and provides audio feedback.
         
         Args:
             execution_id (str): Unique execution identifier
             query (str): User's conversational query
             
         Returns:
-            Dict[str, Any]: Execution result
+            Dict[str, Any]: Execution result with conversational response
         """
-        logger.info(f"[{execution_id}] Conversational handler not yet implemented, falling back to GUI interaction")
-        # For now, fall back to GUI interaction processing
-        # This will be implemented in a future task
-        return self._handle_gui_interaction(execution_id, query)
+        start_time = time.time()
+        
+        # Initialize execution context for conversational query
+        execution_context = {
+            "execution_id": execution_id,
+            "command": query,
+            "start_time": start_time,
+            "status": CommandStatus.PROCESSING,
+            "mode": "conversational_chat",
+            "steps_completed": [],
+            "errors": [],
+            "warnings": [],
+            "response": None,
+            "audio_feedback_provided": False
+        }
+        
+        try:
+            logger.info(f"[{execution_id}] Processing conversational query: '{query}'")
+            
+            # Update progress
+            self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.REASONING, 30)
+            
+            # Check if reasoning module is available
+            if not self.reasoning_module or not self.module_availability.get('reasoning', False):
+                error_msg = "Reasoning module unavailable for conversational processing"
+                execution_context["errors"].append(error_msg)
+                logger.warning(f"[{execution_id}] {error_msg}")
+                
+                # Provide fallback response
+                fallback_response = "I'm sorry, I'm having trouble processing conversations right now. Please try again later."
+                execution_context["response"] = fallback_response
+                
+                # Provide audio feedback if available
+                if self.feedback_module:
+                    self.feedback_module.speak(fallback_response, FeedbackPriority.NORMAL)
+                    execution_context["audio_feedback_provided"] = True
+                
+                execution_context["status"] = CommandStatus.COMPLETED
+                execution_context["warnings"].append("Used fallback response due to reasoning module unavailability")
+                
+            else:
+                # Process conversational query using reasoning module
+                response = self._process_conversational_query_with_reasoning(execution_id, query)
+                execution_context["response"] = response
+                
+                # Provide audio feedback
+                if self.feedback_module and response:
+                    logger.info(f"[{execution_id}] Providing audio feedback for conversational response")
+                    self.feedback_module.speak(response, FeedbackPriority.NORMAL)
+                    execution_context["audio_feedback_provided"] = True
+                
+                execution_context["status"] = CommandStatus.COMPLETED
+                logger.info(f"[{execution_id}] Conversational query processed successfully")
+            
+            # Update conversation history for context
+            with self.conversation_lock:
+                self._update_conversation_history(query, execution_context.get("response", ""))
+            
+            # Final progress update
+            self._update_progress(execution_id, CommandStatus.COMPLETED, None, 100)
+            
+            # Calculate execution time
+            execution_context["end_time"] = time.time()
+            execution_context["total_duration"] = execution_context["end_time"] - start_time
+            execution_context["steps_completed"].append(ExecutionStep.REASONING)
+            
+            # Add to command history
+            self.command_history.append(execution_context.copy())
+            
+            logger.info(f"[{execution_id}] Conversational query completed in {execution_context['total_duration']:.2f}s")
+            
+            return self._format_execution_result(execution_context)
+            
+        except Exception as e:
+            # Handle conversational query failure
+            execution_context["status"] = CommandStatus.FAILED
+            execution_context["end_time"] = time.time()
+            execution_context["total_duration"] = execution_context["end_time"] - start_time
+            execution_context["errors"].append(str(e))
+            
+            logger.error(f"[{execution_id}] Conversational query failed: {e}")
+            
+            # Provide error feedback
+            error_message = "I'm sorry, I encountered an error while processing your message. Please try again."
+            execution_context["response"] = error_message
+            
+            if self.feedback_module:
+                self.feedback_module.play("failure", FeedbackPriority.HIGH)
+                self.feedback_module.speak(error_message, FeedbackPriority.HIGH)
+                execution_context["audio_feedback_provided"] = True
+            
+            # Update progress with failure
+            self._update_progress(execution_id, CommandStatus.FAILED, error=str(e))
+            
+            # Add to command history
+            self.command_history.append(execution_context.copy())
+            
+            return self._format_execution_result(execution_context)
     
     def _handle_deferred_action_request(self, execution_id: str, intent_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -1423,6 +1520,116 @@ class Orchestrator:
         # This will be implemented in a future task
         command = intent_data.get('original_command', '')
         return self._handle_gui_interaction(execution_id, command)
+    
+    def _process_conversational_query_with_reasoning(self, execution_id: str, query: str) -> str:
+        """
+        Process conversational query using the reasoning module with conversational prompts.
+        
+        Args:
+            execution_id (str): Unique execution identifier
+            query (str): User's conversational query
+            
+        Returns:
+            str: Generated conversational response
+            
+        Raises:
+            Exception: If reasoning module processing fails
+        """
+        try:
+            # Import conversational prompt from config
+            from config import CONVERSATIONAL_PROMPT
+            
+            # Prepare conversational prompt with user query
+            conversational_prompt = CONVERSATIONAL_PROMPT.format(query=query)
+            
+            logger.debug(f"[{execution_id}] Sending conversational query to reasoning module")
+            
+            # Make API request using reasoning module's internal method
+            api_response = self.reasoning_module._make_api_request(conversational_prompt)
+            
+            # Extract response text from API response
+            response_text = self._extract_conversational_response(api_response)
+            
+            if not response_text or not response_text.strip():
+                raise Exception("Empty response received from reasoning module")
+            
+            logger.info(f"[{execution_id}] Received conversational response: {response_text[:100]}...")
+            
+            return response_text.strip()
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Failed to process conversational query with reasoning module: {e}")
+            raise Exception(f"Conversational processing failed: {str(e)}")
+    
+    def _extract_conversational_response(self, api_response: Dict[str, Any]) -> str:
+        """
+        Extract conversational response text from API response.
+        
+        Args:
+            api_response (Dict[str, Any]): Raw API response from reasoning module
+            
+        Returns:
+            str: Extracted response text
+            
+        Raises:
+            Exception: If response extraction fails
+        """
+        try:
+            # Handle different API response formats
+            if 'message' in api_response and 'content' in api_response['message']:
+                # Ollama format
+                response_text = api_response['message']['content']
+            elif 'choices' in api_response and len(api_response['choices']) > 0:
+                # OpenAI format
+                choice = api_response['choices'][0]
+                if 'message' in choice and 'content' in choice['message']:
+                    response_text = choice['message']['content']
+                elif 'text' in choice:
+                    response_text = choice['text']
+                else:
+                    raise Exception("Unexpected API response format in choices")
+            elif 'response' in api_response:
+                # Direct response format
+                response_text = api_response['response']
+            elif 'content' in api_response:
+                # Simple content format
+                response_text = api_response['content']
+            else:
+                raise Exception(f"Unrecognized API response format: {list(api_response.keys())}")
+            
+            if not isinstance(response_text, str):
+                raise Exception(f"Response text is not a string: {type(response_text)}")
+            
+            return response_text
+            
+        except Exception as e:
+            logger.error(f"Failed to extract conversational response: {e}")
+            raise Exception(f"Response extraction failed: {str(e)}")
+    
+    def _update_conversation_history(self, user_query: str, assistant_response: str) -> None:
+        """
+        Update conversation history for context preservation.
+        
+        Args:
+            user_query (str): User's input query
+            assistant_response (str): Assistant's response
+        """
+        try:
+            # Import conversation context size from config
+            from config import CONVERSATION_CONTEXT_SIZE
+            
+            # Add new exchange to history
+            exchange = (user_query, assistant_response)
+            self.conversation_history.append(exchange)
+            
+            # Maintain context size limit
+            if len(self.conversation_history) > CONVERSATION_CONTEXT_SIZE:
+                self.conversation_history = self.conversation_history[-CONVERSATION_CONTEXT_SIZE:]
+            
+            logger.debug(f"Updated conversation history. Current size: {len(self.conversation_history)}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to update conversation history: {e}")
     
     def _reset_deferred_action_state(self) -> None:
         """
@@ -2096,6 +2303,15 @@ class Orchestrator:
         if execution_context["warnings"]:
             result["warnings"] = execution_context["warnings"]
         
+        # Add conversational response if available
+        if execution_context.get("response"):
+            result["response"] = execution_context["response"]
+            result["audio_feedback_provided"] = execution_context.get("audio_feedback_provided", False)
+        
+        # Add mode-specific information
+        if execution_context.get("mode"):
+            result["mode"] = execution_context["mode"]
+        
         # Add metadata
         screen_context = execution_context.get("screen_context") or {}
         action_plan = execution_context.get("action_plan") or {}
@@ -2108,7 +2324,7 @@ class Orchestrator:
             "command_validation": {
                 "command_type": validation_result.command_type if validation_result else "unknown",
                 "confidence": validation_result.confidence if validation_result else 0.0,
-                "normalized_command": validation_result.normalized_command if validation_result else command
+                "normalized_command": validation_result.normalized_command if validation_result else execution_context["command"]
             } if validation_result else None
         }
         
