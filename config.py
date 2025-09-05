@@ -279,6 +279,56 @@ LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG_FILE = "aura.log"
 
+# -- Debug Logging Configuration --
+# Debug levels for enhanced logging and debugging output
+DEBUG_LEVELS = {
+    "BASIC": 1,      # Essential failure information and timing
+    "DETAILED": 2,   # Element attributes, search parameters, and match scores
+    "VERBOSE": 3     # Complete accessibility tree dumps and all API interactions
+}
+
+# Current debug level setting
+DEBUG_LEVEL = os.getenv("AURA_DEBUG_LEVEL", "BASIC")  # BASIC, DETAILED, VERBOSE
+
+# Debug output configuration
+DEBUG_OUTPUT_FORMAT = "structured"  # structured, json, plain
+DEBUG_INCLUDE_TIMESTAMPS = True
+DEBUG_INCLUDE_CONTEXT = True
+DEBUG_INCLUDE_STACK_TRACE = False  # Only for VERBOSE level
+
+# Debug logging categories - can be enabled/disabled individually
+DEBUG_CATEGORIES = {
+    "accessibility": True,      # Accessibility tree and element detection
+    "permissions": True,        # Permission validation and requests
+    "element_search": True,     # Element search and matching operations
+    "performance": True,        # Performance metrics and timing
+    "error_recovery": True,     # Error recovery attempts and results
+    "application_detection": True,  # Application type detection
+    "fuzzy_matching": True,     # Fuzzy text matching operations
+    "tree_inspection": True,    # Accessibility tree inspection
+    "failure_analysis": True,   # Detailed failure analysis
+    "diagnostic_tools": True    # Diagnostic tool execution
+}
+
+# Debug file output settings
+DEBUG_LOG_TO_FILE = True
+DEBUG_LOG_TO_CONSOLE = True
+DEBUG_LOG_FILE = "aura_debug.log"
+DEBUG_LOG_MAX_SIZE = 10 * 1024 * 1024  # 10MB max file size
+DEBUG_LOG_BACKUP_COUNT = 3  # Keep 3 backup files
+
+# Structured logging format for debug output
+DEBUG_STRUCTURED_FORMAT = {
+    "timestamp": "%(asctime)s",
+    "level": "%(levelname)s",
+    "module": "%(name)s",
+    "message": "%(message)s",
+    "context": "%(context)s",
+    "category": "%(category)s",
+    "thread": "%(thread)d",
+    "process": "%(process)d"
+}
+
 # -- Development Settings --
 DEBUG_MODE = os.getenv("AURA_DEBUG", "false").lower() == "true"
 MOCK_APIS = os.getenv("AURA_MOCK_APIS", "false").lower() == "true"
