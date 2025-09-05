@@ -1574,7 +1574,7 @@ class AccessibilityModule:
             return []
     
     def _element_matches_criteria(self, element_info: Dict[str, Any], role: str, label: str) -> bool:
-        """Check if element matches the search criteria with enhanced role detection."""
+        """Check if element matches the search criteria with enhanced role detection and multi-attribute text matching."""
         element_role = element_info.get('role', '')
         
         # Enhanced role matching logic
@@ -1595,9 +1595,23 @@ class AccessibilityModule:
             if not self.is_clickable_element_role(element_role):
                 return False
         
-        # Check label match using fuzzy matching
-        element_title = element_info.get('title', '')
-        return self.fuzzy_match_label(element_title, label)
+        # Use multi-attribute text matching instead of single attribute matching
+        element = element_info.get('element')
+        if element:
+            # Use the new multi-attribute checking method
+            match_found, confidence_score, matched_attribute = self._check_element_text_match(element, label)
+            
+            if match_found:
+                self.logger.debug(f"Multi-attribute match found: {matched_attribute}='{element_info.get('title', '')}' matches '{label}' (score: {confidence_score:.2f})")
+                return True
+            else:
+                self.logger.debug(f"No multi-attribute match for '{label}' in element with role '{element_role}'")
+                return False
+        else:
+            # Fallback to original single-attribute matching if element is not available
+            self.logger.debug(f"Element not available for multi-attribute checking, falling back to title-only matching")
+            element_title = element_info.get('title', '')
+            return self.fuzzy_match_label(element_title, label)
     
     def _calculate_element_coordinates(self, element) -> Optional[List[int]]:
         """Calculate coordinates and size for an accessibility element."""
@@ -1680,6 +1694,9 @@ class AccessibilityModule:
         'AXLink', 'AXCheckBox', 'AXRadioButton', 'AXTab',
         'AXToolbarButton', 'AXPopUpButton', 'AXComboBox'
     }
+    
+    # Accessibility attributes to check in priority order for multi-attribute text searching
+    ACCESSIBILITY_ATTRIBUTES = ['AXTitle', 'AXDescription', 'AXValue']
     
     ACTIONABLE_ROLES = {
         'AXButton', 'AXMenuButton', 'AXMenuItem', 'AXMenuBarItem',
@@ -1953,6 +1970,58 @@ class AccessibilityModule:
         union = len(title_words.union(search_words))
         
         return intersection / union if union > 0 else 0.0
+    
+    def _check_element_text_match(self, element, target_text: str) -> tuple[bool, float, str]:
+        """
+        Check if element text matches target using multi-attribute checking.
+        
+        Examines multiple accessibility attributes in priority order:
+        AXTitle, AXDescription, AXValue. Returns on first successful match.
+        
+        Args:
+            element: Accessibility element to check
+            target_text: Text to match against
+        
+        Returns:
+            Tuple of (match_found, confidence_score, matched_attribute)
+        """
+        if not element or not target_text:
+            return False, 0.0, ""
+        
+        target_normalized = self._normalize_text(target_text)
+        if not target_normalized:
+            return False, 0.0, ""
+        
+        # Check each attribute in priority order
+        for attribute in self.ACCESSIBILITY_ATTRIBUTES:
+            try:
+                # Get attribute value from element
+                attribute_result = AppKit.AXUIElementCopyAttributeValue(
+                    element, attribute, None
+                )
+                
+                if attribute_result[0] == 0 and attribute_result[1]:
+                    attribute_value = str(attribute_result[1])
+                    
+                    if attribute_value:
+                        # Calculate match score for this attribute
+                        match_score = self._calculate_match_score(attribute_value, target_text)
+                        
+                        # Return first successful match (score > 0.5)
+                        if match_score > 0.5:
+                            self.logger.debug(f"Multi-attribute match found: {attribute}='{attribute_value}' matches '{target_text}' (score: {match_score:.2f})")
+                            return True, match_score, attribute
+                        
+                        self.logger.debug(f"Attribute {attribute}='{attribute_value}' low match score: {match_score:.2f}")
+                
+            except Exception as e:
+                # Log attribute access error but continue with next attribute
+                self.logger.debug(f"Error accessing attribute {attribute}: {e}")
+                continue
+        
+        # No successful matches found
+        self.logger.debug(f"No multi-attribute matches found for '{target_text}'")
+        return False, 0.0, ""
     
     def _is_text_field_editable(self, element) -> bool:
         """Check if a text field is editable."""
