@@ -3220,6 +3220,14 @@ Focus on being helpful while being honest about what information is actually vis
             "Type in the search box" -> "search box"
         """
         try:
+            # Check cache first if accessibility module is available
+            if self.accessibility_module:
+                cached_result = self.accessibility_module._get_cached_target_extraction(command)
+                if cached_result is not None:
+                    target, action_type, confidence = cached_result
+                    logger.debug(f"Target extraction cache hit: '{command}' -> '{target}' (confidence: {confidence:.2f})")
+                    return target
+            
             # Convert to lowercase for processing
             processed_command = command.lower().strip()
             
@@ -3290,13 +3298,49 @@ Focus on being helpful while being honest about what information is actually vis
                 removed_words=removed_words
             )
             
-            logger.debug(f"Target extraction: '{command}' -> '{target}' (confidence: {confidence:.2f})")
+            # Determine action type from removed words
+            action_type = self._determine_action_type(removed_words)
+            
+            # Cache the result if accessibility module is available
+            if self.accessibility_module:
+                self.accessibility_module._cache_target_extraction_result(command, target, action_type, confidence)
+            
+            logger.debug(f"Target extraction: '{command}' -> '{target}' (confidence: {confidence:.2f}, action: {action_type})")
             
             return target
             
         except Exception as e:
             logger.error(f"Error extracting target from command '{command}': {e}")
             return command.strip()  # Fallback to original command
+    
+    def _determine_action_type(self, removed_words: List[str]) -> str:
+        """
+        Determine the primary action type from removed words.
+        
+        Args:
+            removed_words: List of words that were removed during target extraction
+            
+        Returns:
+            Primary action type ('click', 'type', 'scroll', etc.)
+        """
+        # Define action type mappings
+        action_mappings = {
+            'click': ['click', 'tap', 'select', 'choose', 'press', 'hit'],
+            'type': ['type', 'enter', 'input', 'write', 'fill'],
+            'scroll': ['scroll', 'swipe'],
+            'drag': ['drag', 'move'],
+            'open': ['open'],
+            'close': ['close', 'minimize', 'maximize']
+        }
+        
+        # Find the first matching action type
+        for action_type, action_words in action_mappings.items():
+            for word in removed_words:
+                if word in action_words:
+                    return action_type
+        
+        # Default to 'click' if no specific action found
+        return 'click'
     
     def _calculate_target_extraction_confidence(self, original_command: str, extracted_target: str, removed_words: List[str]) -> float:
         """

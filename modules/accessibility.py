@@ -15,6 +15,7 @@ from collections import defaultdict
 import concurrent.futures
 import asyncio
 from functools import partial
+from contextlib import contextmanager
 
 # Import fuzzy matching library with error handling
 try:
@@ -159,6 +160,74 @@ class TargetExtractionResult:
         }
 
 
+@dataclass
+class PerformanceMetrics:
+    """Performance metrics for accessibility operations."""
+    operation_name: str
+    start_time: float
+    end_time: Optional[float] = None
+    duration_ms: Optional[float] = None
+    timeout_ms: Optional[float] = None
+    timed_out: bool = False
+    success: bool = True
+    error_message: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+    def finish(self, success: bool = True, error_message: Optional[str] = None):
+        """Mark the operation as finished and calculate duration."""
+        self.end_time = time.time()
+        self.duration_ms = (self.end_time - self.start_time) * 1000
+        self.success = success
+        self.error_message = error_message
+        
+        # Check if operation timed out
+        if self.timeout_ms and self.duration_ms > self.timeout_ms:
+            self.timed_out = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging."""
+        return {
+            'operation': self.operation_name,
+            'duration_ms': self.duration_ms,
+            'timeout_ms': self.timeout_ms,
+            'timed_out': self.timed_out,
+            'success': self.success,
+            'error_message': self.error_message,
+            'metadata': self.metadata or {}
+        }
+
+
+@dataclass
+class FastPathPerformanceReport:
+    """Comprehensive performance report for fast path execution."""
+    total_duration_ms: float
+    target_extraction_ms: float
+    element_search_ms: float
+    fuzzy_matching_ms: float
+    attribute_checking_ms: float
+    cache_operations_ms: float
+    success: bool
+    fallback_triggered: bool
+    timeout_warnings: List[str]
+    performance_warnings: List[str]
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging."""
+        return {
+            'total_duration_ms': self.total_duration_ms,
+            'target_extraction_ms': self.target_extraction_ms,
+            'element_search_ms': self.element_search_ms,
+            'fuzzy_matching_ms': self.fuzzy_matching_ms,
+            'attribute_checking_ms': self.attribute_checking_ms,
+            'cache_operations_ms': self.cache_operations_ms,
+            'success': self.success,
+            'fallback_triggered': self.fallback_triggered,
+            'timeout_warnings': self.timeout_warnings,
+            'performance_warnings': self.performance_warnings,
+            'meets_performance_target': self.total_duration_ms < 2000
+        }
+
+
 class AccessibilityPermissionError(Exception):
     """Raised when accessibility permissions are not granted."""
     def __init__(self, message: str, recovery_suggestion: Optional[str] = None):
@@ -273,6 +342,50 @@ class AccessibilityModule:
             {'role': 'AXTextField', 'labels': ['Search', 'Username', 'Password', 'Email']},
             {'role': 'AXLink', 'labels': ['Home', 'About', 'Contact', 'Login', 'Sign Up']}
         ]
+        
+        # Performance monitoring configuration (load from config)
+        try:
+            from config import (
+                PERFORMANCE_MONITORING_ENABLED, PERFORMANCE_WARNING_THRESHOLD,
+                PERFORMANCE_HISTORY_SIZE, FAST_PATH_TIMEOUT, FUZZY_MATCHING_TIMEOUT,
+                ATTRIBUTE_CHECK_TIMEOUT
+            )
+            self.performance_monitoring_enabled = PERFORMANCE_MONITORING_ENABLED
+            self.max_performance_history = PERFORMANCE_HISTORY_SIZE
+            self.fast_path_timeout_ms = FAST_PATH_TIMEOUT
+            self.fuzzy_matching_timeout_ms = FUZZY_MATCHING_TIMEOUT
+            self.attribute_check_timeout_ms = ATTRIBUTE_CHECK_TIMEOUT
+            self.performance_warning_threshold_ms = PERFORMANCE_WARNING_THRESHOLD
+        except ImportError:
+            # Fallback defaults if config is not available
+            self.performance_monitoring_enabled = True
+            self.max_performance_history = 100
+            self.fast_path_timeout_ms = 2000
+            self.fuzzy_matching_timeout_ms = 200
+            self.attribute_check_timeout_ms = 500
+            self.performance_warning_threshold_ms = 1500
+        
+        self.performance_metrics: List[PerformanceMetrics] = []
+        self.performance_lock = threading.RLock()
+        
+        # Performance statistics
+        self.performance_stats = {
+            'total_operations': 0,
+            'successful_operations': 0,
+            'timed_out_operations': 0,
+            'average_duration_ms': 0.0,
+            'fastest_operation_ms': float('inf'),
+            'slowest_operation_ms': 0.0,
+            'performance_warnings': 0
+        }
+        
+        # Enhanced feature caching
+        self.fuzzy_match_cache: Dict[str, Tuple[bool, float, float]] = {}  # key -> (match_found, confidence, timestamp)
+        self.target_extraction_cache: Dict[str, Tuple[str, str, float, float]] = {}  # command -> (target, action_type, confidence, timestamp)
+        self.cache_ttl_seconds = 300  # 5 minutes cache TTL
+        self.max_cache_entries = 1000  # Maximum cache entries per type
+        self.cache_cleanup_interval = 60  # Cleanup every 60 seconds
+        self.last_cache_cleanup = time.time()
         
         try:
             self._initialize_accessibility_api()
@@ -636,6 +749,365 @@ class AccessibilityModule:
         }
         self.logger.debug("Cache statistics cleared")
     
+    # Performance Monitoring Methods
+    
+    @contextmanager
+    def _performance_timer(self, operation_name: str, timeout_ms: Optional[float] = None, metadata: Optional[Dict[str, Any]] = None):
+        """Context manager for timing operations with performance monitoring."""
+        if not self.performance_monitoring_enabled:
+            yield None
+            return
+        
+        metrics = PerformanceMetrics(
+            operation_name=operation_name,
+            start_time=time.time(),
+            timeout_ms=timeout_ms,
+            metadata=metadata or {}
+        )
+        
+        try:
+            yield metrics
+        except Exception as e:
+            metrics.finish(success=False, error_message=str(e))
+            self._record_performance_metrics(metrics)
+            raise
+        else:
+            metrics.finish(success=True)
+            self._record_performance_metrics(metrics)
+    
+    def _record_performance_metrics(self, metrics: PerformanceMetrics):
+        """Record performance metrics and update statistics."""
+        with self.performance_lock:
+            # Add to history
+            self.performance_metrics.append(metrics)
+            
+            # Maintain history size limit
+            if len(self.performance_metrics) > self.max_performance_history:
+                self.performance_metrics = self.performance_metrics[-self.max_performance_history:]
+            
+            # Update statistics
+            self.performance_stats['total_operations'] += 1
+            if metrics.success:
+                self.performance_stats['successful_operations'] += 1
+            
+            if metrics.timed_out:
+                self.performance_stats['timed_out_operations'] += 1
+            
+            if metrics.duration_ms is not None:
+                # Update duration statistics
+                self.performance_stats['fastest_operation_ms'] = min(
+                    self.performance_stats['fastest_operation_ms'], 
+                    metrics.duration_ms
+                )
+                self.performance_stats['slowest_operation_ms'] = max(
+                    self.performance_stats['slowest_operation_ms'], 
+                    metrics.duration_ms
+                )
+                
+                # Calculate running average
+                total_ops = self.performance_stats['total_operations']
+                current_avg = self.performance_stats['average_duration_ms']
+                self.performance_stats['average_duration_ms'] = (
+                    (current_avg * (total_ops - 1) + metrics.duration_ms) / total_ops
+                )
+                
+                # Check for performance warnings
+                warning_triggered = False
+                
+                # Check timeout-based warnings
+                if metrics.timeout_ms and metrics.duration_ms > metrics.timeout_ms:
+                    self.performance_stats['performance_warnings'] += 1
+                    self.logger.warning(
+                        f"Performance warning: {metrics.operation_name} took {metrics.duration_ms:.1f}ms "
+                        f"(timeout: {metrics.timeout_ms}ms)"
+                    )
+                    warning_triggered = True
+                
+                # Check general performance threshold warnings
+                if (hasattr(self, 'performance_warning_threshold_ms') and 
+                    metrics.duration_ms > self.performance_warning_threshold_ms):
+                    if not warning_triggered:  # Don't double-count warnings
+                        self.performance_stats['performance_warnings'] += 1
+                    self.logger.warning(
+                        f"Performance warning: {metrics.operation_name} took {metrics.duration_ms:.1f}ms "
+                        f"(threshold: {self.performance_warning_threshold_ms}ms)"
+                    )
+        
+        # Log performance details if debug logging is enabled
+        if hasattr(self, 'accessibility_debug_logging') and self.accessibility_debug_logging:
+            self.logger.debug(f"Performance: {metrics.to_dict()}")
+    
+    def get_performance_statistics(self) -> Dict[str, Any]:
+        """Get comprehensive performance statistics."""
+        with self.performance_lock:
+            stats = self.performance_stats.copy()
+            
+            # Add recent performance data
+            recent_metrics = self.performance_metrics[-10:] if self.performance_metrics else []
+            stats['recent_operations'] = [m.to_dict() for m in recent_metrics]
+            
+            # Calculate success rate
+            total_ops = stats['total_operations']
+            if total_ops > 0:
+                stats['success_rate_percent'] = (stats['successful_operations'] / total_ops) * 100
+                stats['timeout_rate_percent'] = (stats['timed_out_operations'] / total_ops) * 100
+            else:
+                stats['success_rate_percent'] = 0.0
+                stats['timeout_rate_percent'] = 0.0
+            
+            # Fix infinite values for JSON serialization
+            if stats['fastest_operation_ms'] == float('inf'):
+                stats['fastest_operation_ms'] = 0.0
+            
+            return stats
+    
+    def clear_performance_statistics(self):
+        """Reset performance statistics and metrics history."""
+        with self.performance_lock:
+            self.performance_metrics.clear()
+            self.performance_stats = {
+                'total_operations': 0,
+                'successful_operations': 0,
+                'timed_out_operations': 0,
+                'average_duration_ms': 0.0,
+                'fastest_operation_ms': float('inf'),
+                'slowest_operation_ms': 0.0,
+                'performance_warnings': 0
+            }
+        self.logger.debug("Performance statistics cleared")
+    
+    def configure_performance_monitoring(self, 
+                                       enabled: Optional[bool] = None,
+                                       fast_path_timeout_ms: Optional[float] = None,
+                                       fuzzy_matching_timeout_ms: Optional[float] = None,
+                                       attribute_check_timeout_ms: Optional[float] = None,
+                                       max_history: Optional[int] = None):
+        """Configure performance monitoring settings."""
+        if enabled is not None:
+            self.performance_monitoring_enabled = enabled
+            self.logger.info(f"Performance monitoring {'enabled' if enabled else 'disabled'}")
+        
+        if fast_path_timeout_ms is not None:
+            self.fast_path_timeout_ms = fast_path_timeout_ms
+            self.logger.info(f"Fast path timeout set to {fast_path_timeout_ms}ms")
+        
+        if fuzzy_matching_timeout_ms is not None:
+            self.fuzzy_matching_timeout_ms = fuzzy_matching_timeout_ms
+            self.logger.info(f"Fuzzy matching timeout set to {fuzzy_matching_timeout_ms}ms")
+        
+        if attribute_check_timeout_ms is not None:
+            self.attribute_check_timeout_ms = attribute_check_timeout_ms
+            self.logger.info(f"Attribute check timeout set to {attribute_check_timeout_ms}ms")
+        
+        if max_history is not None:
+            with self.performance_lock:
+                self.max_performance_history = max_history
+                # Trim existing history if needed
+                if len(self.performance_metrics) > max_history:
+                    self.performance_metrics = self.performance_metrics[-max_history:]
+            self.logger.info(f"Performance history limit set to {max_history}")
+    
+    def _check_performance_thresholds(self, operation_name: str, duration_ms: float, threshold_ms: float) -> List[str]:
+        """Check if operation duration exceeds performance thresholds and return warnings."""
+        warnings = []
+        
+        if duration_ms > threshold_ms:
+            warning_msg = f"{operation_name} exceeded threshold: {duration_ms:.1f}ms > {threshold_ms}ms"
+            warnings.append(warning_msg)
+            
+            # Log performance warning
+            self.logger.warning(f"Performance threshold exceeded: {warning_msg}")
+        
+        return warnings
+    
+    # Enhanced Feature Caching Methods
+    
+    def _generate_fuzzy_match_cache_key(self, element_text: str, target_text: str, confidence_threshold: int) -> str:
+        """Generate cache key for fuzzy matching results."""
+        # Normalize texts for consistent caching
+        element_norm = self._normalize_text(element_text)
+        target_norm = self._normalize_text(target_text)
+        return f"{element_norm}|{target_norm}|{confidence_threshold}"
+    
+    def _get_cached_fuzzy_match(self, element_text: str, target_text: str, confidence_threshold: int) -> Optional[Tuple[bool, float]]:
+        """Get cached fuzzy matching result if available and not expired."""
+        cache_key = self._generate_fuzzy_match_cache_key(element_text, target_text, confidence_threshold)
+        
+        if cache_key in self.fuzzy_match_cache:
+            match_found, confidence, timestamp = self.fuzzy_match_cache[cache_key]
+            
+            # Check if cache entry is still valid
+            if time.time() - timestamp < self.cache_ttl_seconds:
+                self.logger.debug(f"Fuzzy match cache hit: {cache_key}")
+                return match_found, confidence
+            else:
+                # Remove expired entry
+                del self.fuzzy_match_cache[cache_key]
+                self.logger.debug(f"Fuzzy match cache expired: {cache_key}")
+        
+        return None
+    
+    def _cache_fuzzy_match_result(self, element_text: str, target_text: str, confidence_threshold: int, 
+                                 match_found: bool, confidence: float):
+        """Cache fuzzy matching result."""
+        cache_key = self._generate_fuzzy_match_cache_key(element_text, target_text, confidence_threshold)
+        
+        # Enforce cache size limit
+        if len(self.fuzzy_match_cache) >= self.max_cache_entries:
+            self._cleanup_fuzzy_match_cache()
+        
+        self.fuzzy_match_cache[cache_key] = (match_found, confidence, time.time())
+        self.logger.debug(f"Cached fuzzy match result: {cache_key} -> {match_found}, {confidence}")
+    
+    def _cleanup_fuzzy_match_cache(self):
+        """Remove expired entries from fuzzy match cache."""
+        current_time = time.time()
+        expired_keys = []
+        
+        for cache_key, (match_found, confidence, timestamp) in self.fuzzy_match_cache.items():
+            if current_time - timestamp >= self.cache_ttl_seconds:
+                expired_keys.append(cache_key)
+        
+        for key in expired_keys:
+            del self.fuzzy_match_cache[key]
+        
+        # If still too many entries, remove oldest ones
+        if len(self.fuzzy_match_cache) >= self.max_cache_entries:
+            # Sort by timestamp and keep only the newest entries
+            sorted_items = sorted(self.fuzzy_match_cache.items(), 
+                                key=lambda x: x[1][2], reverse=True)  # Sort by timestamp descending
+            
+            # Keep only the newest 80% of max entries
+            keep_count = int(self.max_cache_entries * 0.8)
+            self.fuzzy_match_cache = dict(sorted_items[:keep_count])
+        
+        self.logger.debug(f"Cleaned up fuzzy match cache, {len(expired_keys)} expired entries removed")
+    
+    def _generate_target_extraction_cache_key(self, command: str) -> str:
+        """Generate cache key for target extraction results."""
+        # Normalize command for consistent caching
+        return self._normalize_text(command)
+    
+    def _get_cached_target_extraction(self, command: str) -> Optional[Tuple[str, str, float]]:
+        """Get cached target extraction result if available and not expired."""
+        cache_key = self._generate_target_extraction_cache_key(command)
+        
+        if cache_key in self.target_extraction_cache:
+            target, action_type, confidence, timestamp = self.target_extraction_cache[cache_key]
+            
+            # Check if cache entry is still valid
+            if time.time() - timestamp < self.cache_ttl_seconds:
+                self.logger.debug(f"Target extraction cache hit: {cache_key}")
+                return target, action_type, confidence
+            else:
+                # Remove expired entry
+                del self.target_extraction_cache[cache_key]
+                self.logger.debug(f"Target extraction cache expired: {cache_key}")
+        
+        return None
+    
+    def _cache_target_extraction_result(self, command: str, target: str, action_type: str, confidence: float):
+        """Cache target extraction result."""
+        cache_key = self._generate_target_extraction_cache_key(command)
+        
+        # Enforce cache size limit
+        if len(self.target_extraction_cache) >= self.max_cache_entries:
+            self._cleanup_target_extraction_cache()
+        
+        self.target_extraction_cache[cache_key] = (target, action_type, confidence, time.time())
+        self.logger.debug(f"Cached target extraction result: {cache_key} -> {target}, {action_type}, {confidence}")
+    
+    def _cleanup_target_extraction_cache(self):
+        """Remove expired entries from target extraction cache."""
+        current_time = time.time()
+        expired_keys = []
+        
+        for cache_key, (target, action_type, confidence, timestamp) in self.target_extraction_cache.items():
+            if current_time - timestamp >= self.cache_ttl_seconds:
+                expired_keys.append(cache_key)
+        
+        for key in expired_keys:
+            del self.target_extraction_cache[key]
+        
+        # If still too many entries, remove oldest ones
+        if len(self.target_extraction_cache) >= self.max_cache_entries:
+            # Sort by timestamp and keep only the newest entries
+            sorted_items = sorted(self.target_extraction_cache.items(), 
+                                key=lambda x: x[1][3], reverse=True)  # Sort by timestamp descending
+            
+            # Keep only the newest 80% of max entries
+            keep_count = int(self.max_cache_entries * 0.8)
+            self.target_extraction_cache = dict(sorted_items[:keep_count])
+        
+        self.logger.debug(f"Cleaned up target extraction cache, {len(expired_keys)} expired entries removed")
+    
+    def _periodic_cache_cleanup(self):
+        """Perform periodic cleanup of all caches."""
+        current_time = time.time()
+        
+        if current_time - self.last_cache_cleanup > self.cache_cleanup_interval:
+            self._cleanup_fuzzy_match_cache()
+            self._cleanup_target_extraction_cache()
+            self.last_cache_cleanup = current_time
+            
+            self.logger.debug("Performed periodic cache cleanup")
+    
+    def get_cache_statistics(self) -> Dict[str, Any]:
+        """Get comprehensive cache statistics including enhanced feature caches."""
+        base_stats = super().get_cache_statistics() if hasattr(super(), 'get_cache_statistics') else {}
+        
+        enhanced_stats = {
+            'fuzzy_match_cache': {
+                'entries': len(self.fuzzy_match_cache),
+                'max_entries': self.max_cache_entries,
+                'ttl_seconds': self.cache_ttl_seconds
+            },
+            'target_extraction_cache': {
+                'entries': len(self.target_extraction_cache),
+                'max_entries': self.max_cache_entries,
+                'ttl_seconds': self.cache_ttl_seconds
+            },
+            'cache_cleanup': {
+                'last_cleanup': self.last_cache_cleanup,
+                'cleanup_interval': self.cache_cleanup_interval
+            }
+        }
+        
+        # Merge with base cache statistics
+        if base_stats:
+            base_stats['enhanced_caches'] = enhanced_stats
+            return base_stats
+        else:
+            return {'enhanced_caches': enhanced_stats}
+    
+    def clear_enhanced_caches(self):
+        """Clear all enhanced feature caches."""
+        self.fuzzy_match_cache.clear()
+        self.target_extraction_cache.clear()
+        self.logger.debug("Cleared all enhanced feature caches")
+    
+    def configure_enhanced_caching(self, 
+                                 ttl_seconds: Optional[int] = None,
+                                 max_entries: Optional[int] = None,
+                                 cleanup_interval: Optional[int] = None):
+        """Configure enhanced feature caching settings."""
+        if ttl_seconds is not None:
+            self.cache_ttl_seconds = ttl_seconds
+            self.logger.info(f"Enhanced cache TTL set to {ttl_seconds} seconds")
+        
+        if max_entries is not None:
+            self.max_cache_entries = max_entries
+            # Cleanup existing caches if they exceed new limit
+            if len(self.fuzzy_match_cache) > max_entries:
+                self._cleanup_fuzzy_match_cache()
+            if len(self.target_extraction_cache) > max_entries:
+                self._cleanup_target_extraction_cache()
+            self.logger.info(f"Enhanced cache max entries set to {max_entries}")
+        
+        if cleanup_interval is not None:
+            self.cache_cleanup_interval = cleanup_interval
+            self.logger.info(f"Enhanced cache cleanup interval set to {cleanup_interval} seconds")
+    
     def _handle_accessibility_error(self, error: Exception, operation: str) -> None:
         """Handle accessibility errors with appropriate recovery logic."""
         self.error_count += 1
@@ -825,11 +1297,17 @@ class AccessibilityModule:
         Returns:
             ElementMatchResult with detailed matching metadata
         """
-        start_time = time.time()
-        roles_checked = []
-        attributes_checked = []
-        fuzzy_matches = []
-        fallback_triggered = False
+        with self._performance_timer(
+            "find_element_enhanced", 
+            timeout_ms=self.fast_path_timeout_ms,
+            metadata={'role': role, 'label': label, 'app_name': app_name}
+        ) as perf_metrics:
+            
+            start_time = time.time()
+            roles_checked = []
+            attributes_checked = []
+            fuzzy_matches = []
+            fallback_triggered = False
         
         # Check if enhanced features are available
         if not self.is_enhanced_role_detection_available():
@@ -2119,6 +2597,14 @@ class AccessibilityModule:
         if timeout_ms is None:
             timeout_ms = self.FUZZY_MATCHING_TIMEOUT
         
+        # Perform periodic cache cleanup
+        self._periodic_cache_cleanup()
+        
+        # Check cache first
+        cached_result = self._get_cached_fuzzy_match(element_text, target_text, confidence_threshold)
+        if cached_result is not None:
+            return cached_result
+        
         # Check if fuzzy matching is enabled and available
         if not self.FUZZY_MATCHING_ENABLED or not FUZZY_MATCHING_AVAILABLE:
             self.logger.debug("Fuzzy matching disabled or unavailable, falling back to exact matching")
@@ -2126,7 +2612,12 @@ class AccessibilityModule:
             normalized_element = self._normalize_text(element_text)
             normalized_target = self._normalize_text(target_text)
             exact_match = normalized_element == normalized_target or normalized_target in normalized_element
-            return exact_match, 100.0 if exact_match else 0.0
+            fallback_confidence = 100.0 if exact_match else 0.0
+            
+            # Cache the fallback result
+            self._cache_fuzzy_match_result(element_text, target_text, confidence_threshold, exact_match, fallback_confidence)
+            
+            return exact_match, fallback_confidence
         
         if not element_text or not target_text:
             return False, 0.0
@@ -2160,6 +2651,9 @@ class AccessibilityModule:
                                f"({'MATCH' if match_found else 'NO MATCH'}, threshold: {confidence_threshold}%, "
                                f"time: {elapsed_ms:.1f}ms)")
             
+            # Cache the successful result
+            self._cache_fuzzy_match_result(element_text, target_text, confidence_threshold, match_found, float(confidence_score))
+            
             return match_found, float(confidence_score)
             
         except Exception as e:
@@ -2172,9 +2666,18 @@ class AccessibilityModule:
                 normalized_target = self._normalize_text(target_text)
                 exact_match = normalized_element == normalized_target or normalized_target in normalized_element
                 self.logger.debug(f"Fuzzy matching failed, exact match fallback: {exact_match}")
-                return exact_match, 100.0 if exact_match else 0.0
+                
+                # Cache the fallback result
+                fallback_confidence = 100.0 if exact_match else 0.0
+                self._cache_fuzzy_match_result(element_text, target_text, confidence_threshold, exact_match, fallback_confidence)
+                
+                return exact_match, fallback_confidence
             except Exception as fallback_error:
                 self.logger.error(f"Both fuzzy and exact matching failed: {fallback_error}")
+                
+                # Cache the failure result
+                self._cache_fuzzy_match_result(element_text, target_text, confidence_threshold, False, 0.0)
+                
                 return False, 0.0
     
     def filter_elements_by_criteria(self, elements: List[Dict[str, Any]], 
@@ -2299,12 +2802,18 @@ class AccessibilityModule:
         Returns:
             Tuple of (match_found, confidence_score, matched_attribute)
         """
-        if not element or not target_text:
-            return False, 0.0, ""
-        
-        target_normalized = self._normalize_text(target_text)
-        if not target_normalized:
-            return False, 0.0, ""
+        with self._performance_timer(
+            "attribute_text_matching",
+            timeout_ms=self.attribute_check_timeout_ms,
+            metadata={'target_text': target_text}
+        ) as perf_metrics:
+            
+            if not element or not target_text:
+                return False, 0.0, ""
+            
+            target_normalized = self._normalize_text(target_text)
+            if not target_normalized:
+                return False, 0.0, ""
         
         # Check each attribute in priority order
         for attribute in self.ACCESSIBILITY_ATTRIBUTES:

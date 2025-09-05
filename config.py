@@ -204,6 +204,12 @@ ACCESSIBILITY_ATTRIBUTES = ["AXTitle", "AXDescription", "AXValue"]
 FAST_PATH_TIMEOUT = 2000         # Maximum time in milliseconds for fast path execution
 ATTRIBUTE_CHECK_TIMEOUT = 500    # Maximum time in milliseconds for attribute checking
 
+# Performance monitoring settings
+PERFORMANCE_MONITORING_ENABLED = True
+PERFORMANCE_WARNING_THRESHOLD = 1500  # Warn if operations take longer than this (ms)
+PERFORMANCE_HISTORY_SIZE = 100         # Number of recent operations to keep in memory
+PERFORMANCE_LOGGING_ENABLED = True     # Enable detailed performance logging
+
 # Debugging settings for accessibility enhancements
 ACCESSIBILITY_DEBUG_LOGGING = False
 LOG_FUZZY_MATCH_SCORES = False
@@ -472,6 +478,19 @@ def validate_config():
     if not isinstance(LOG_FUZZY_MATCH_SCORES, bool):
         errors.append("LOG_FUZZY_MATCH_SCORES must be a boolean")
     
+    # Check performance monitoring settings
+    if not isinstance(PERFORMANCE_MONITORING_ENABLED, bool):
+        errors.append("PERFORMANCE_MONITORING_ENABLED must be a boolean")
+    
+    if PERFORMANCE_WARNING_THRESHOLD < 100 or PERFORMANCE_WARNING_THRESHOLD > 10000:
+        warnings.append("PERFORMANCE_WARNING_THRESHOLD should be between 100-10000 milliseconds")
+    
+    if PERFORMANCE_HISTORY_SIZE < 10 or PERFORMANCE_HISTORY_SIZE > 1000:
+        warnings.append("PERFORMANCE_HISTORY_SIZE should be between 10-1000")
+    
+    if not isinstance(PERFORMANCE_LOGGING_ENABLED, bool):
+        errors.append("PERFORMANCE_LOGGING_ENABLED must be a boolean")
+    
     # Check automation settings
     if MOUSE_MOVE_DURATION < 0:
         errors.append("MOUSE_MOVE_DURATION cannot be negative")
@@ -555,6 +574,12 @@ def get_config_summary():
             'attribute_check_timeout_ms': ATTRIBUTE_CHECK_TIMEOUT,
             'debug_logging': ACCESSIBILITY_DEBUG_LOGGING,
             'log_match_scores': LOG_FUZZY_MATCH_SCORES
+        },
+        'performance_monitoring': {
+            'enabled': PERFORMANCE_MONITORING_ENABLED,
+            'warning_threshold_ms': PERFORMANCE_WARNING_THRESHOLD,
+            'history_size': PERFORMANCE_HISTORY_SIZE,
+            'logging_enabled': PERFORMANCE_LOGGING_ENABLED
         }
     }
 
