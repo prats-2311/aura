@@ -1372,6 +1372,151 @@ class AdvancedDiagnosticReporter:
         
         return max(0.0, min(100.0, score))
     
+    def run_quick_accessibility_check(self) -> Dict[str, Any]:
+        """Run a quick accessibility check for immediate feedback."""
+        try:
+            # Check basic accessibility status
+            permission_status = self._check_accessibility_permissions()
+            accessibility_health = self._check_accessibility_api_health()
+            
+            issues = []
+            if not permission_status or not permission_status.is_sufficient_for_fast_path():
+                issues.append("Accessibility permissions insufficient")
+            
+            if not accessibility_health.get('api_available', False):
+                issues.append("Accessibility API not available")
+            
+            if accessibility_health.get('degraded_mode', False):
+                issues.append("Accessibility module in degraded mode")
+            
+            return {
+                'status': 'GOOD' if not issues else 'DEGRADED',
+                'issues': issues,
+                'permission_level': permission_status.permission_level if permission_status else 'NONE'
+            }
+            
+        except Exception as e:
+            self.logger.debug(f"Quick accessibility check failed: {e}")
+            return {
+                'status': 'ERROR',
+                'issues': [f"Check failed: {str(e)}"],
+                'permission_level': 'UNKNOWN'
+            }
+    
+    def run_targeted_diagnostics(self, failure_reason: str, command: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Run targeted diagnostics based on specific failure reason."""
+        try:
+            issues = []
+            recommendations = []
+            
+            # Analyze failure reason and provide targeted diagnostics
+            if failure_reason == 'element_not_found':
+                issues.extend([
+                    "Target element could not be located in accessibility tree",
+                    "Element may not be accessible or may have different attributes"
+                ])
+                recommendations.extend([
+                    "Try using more specific element text or attributes",
+                    "Verify the target application is in focus and fully loaded",
+                    "Check if the element is visible on screen"
+                ])
+            
+            elif failure_reason == 'accessibility_degraded':
+                issues.extend([
+                    "Accessibility module is in degraded mode",
+                    "Fast path element detection is not available"
+                ])
+                recommendations.extend([
+                    "Check accessibility permissions in System Preferences",
+                    "Restart the application to refresh accessibility connections"
+                ])
+            
+            elif failure_reason == 'action_failed':
+                issues.extend([
+                    "Element was found but action execution failed",
+                    "Element may not be clickable or may be obscured"
+                ])
+                recommendations.extend([
+                    "Verify the element is enabled and clickable",
+                    "Check if any dialogs or overlays are blocking the element"
+                ])
+            
+            else:
+                issues.append(f"Unspecified failure: {failure_reason}")
+                recommendations.append("Run comprehensive diagnostics for detailed analysis")
+            
+            return {
+                'failure_reason': failure_reason,
+                'command': command,
+                'issues': issues,
+                'recommendations': recommendations,
+                'context': context
+            }
+            
+        except Exception as e:
+            self.logger.debug(f"Targeted diagnostics failed: {e}")
+            return {
+                'failure_reason': failure_reason,
+                'issues': [f"Diagnostic analysis failed: {str(e)}"],
+                'recommendations': ["Run manual troubleshooting"],
+                'context': context
+            }
+    
+    def analyze_performance_comparison(self, fast_path_time: float, vision_time: float, 
+                                     fallback_reason: str, enhanced_search_result: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Analyze performance comparison between fast path and vision fallback."""
+        try:
+            time_difference = vision_time - fast_path_time
+            performance_ratio = vision_time / fast_path_time if fast_path_time > 0 else float('inf')
+            
+            insights = []
+            optimization_suggestions = []
+            
+            # Generate insights based on performance comparison
+            if time_difference > 2.0:
+                insights.append(f"Vision fallback was {time_difference:.1f}s slower than fast path attempt")
+                optimization_suggestions.append("Consider improving accessibility element detection accuracy")
+            
+            if performance_ratio > 10:
+                insights.append(f"Vision fallback took {performance_ratio:.1f}x longer than fast path")
+                optimization_suggestions.append("Fast path optimization could provide significant performance gains")
+            
+            # Analyze enhanced search results if available
+            if enhanced_search_result:
+                confidence = enhanced_search_result.get('confidence_score', 0)
+                if confidence < 50:
+                    insights.append(f"Low confidence score ({confidence:.1f}) in element detection")
+                    optimization_suggestions.append("Improve element matching criteria or fuzzy matching thresholds")
+                
+                roles_checked = len(enhanced_search_result.get('roles_checked', []))
+                if roles_checked > 5:
+                    insights.append(f"Many roles checked ({roles_checked}) during search")
+                    optimization_suggestions.append("Consider more specific role targeting")
+            
+            # Analyze fallback reason
+            if fallback_reason == 'element_not_found':
+                optimization_suggestions.append("Improve element detection algorithms or expand search criteria")
+            elif fallback_reason == 'accessibility_degraded':
+                optimization_suggestions.append("Address accessibility permission or API issues")
+            
+            return {
+                'fast_path_time': fast_path_time,
+                'vision_time': vision_time,
+                'time_difference': time_difference,
+                'performance_ratio': performance_ratio,
+                'insights': " | ".join(insights) if insights else "Performance comparison completed",
+                'optimization_suggestions': optimization_suggestions,
+                'fallback_reason': fallback_reason
+            }
+            
+        except Exception as e:
+            self.logger.debug(f"Performance analysis failed: {e}")
+            return {
+                'insights': f"Performance analysis failed: {str(e)}",
+                'optimization_suggestions': ["Manual performance review recommended"],
+                'fallback_reason': fallback_reason
+            }
+    
     def export_detailed_report(self, report: DiagnosticReport, 
                              format: str = 'JSON',
                              include_metadata: bool = True) -> str:

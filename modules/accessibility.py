@@ -20,6 +20,10 @@ from contextlib import contextmanager
 # Import the new PermissionValidator
 from .permission_validator import PermissionValidator, PermissionStatus, AccessibilityPermissionError as PermissionValidatorError
 
+# Import debugging tools
+from .accessibility_debugger import AccessibilityDebugger
+from .diagnostic_tools import AccessibilityHealthChecker
+
 # Import fuzzy matching library with error handling
 try:
     from thefuzz import fuzz
@@ -356,6 +360,10 @@ class AccessibilityModule:
         # Initialize permission validator
         self.permission_validator = None
         
+        # Initialize debugging tools
+        self.accessibility_debugger = None
+        self.debug_mode_enabled = False
+        
         # Element caching system
         self.element_cache: Dict[str, CachedElementTree] = {}
         self.cache_lock = threading.RLock()
@@ -485,6 +493,9 @@ class AccessibilityModule:
             # Initialize permission validator first
             self._initialize_permission_validator()
             
+            # Initialize debugging tools
+            self._initialize_debugging_tools()
+            
             # Then initialize accessibility API
             self._initialize_accessibility_api()
             self._log_initialization_success()
@@ -560,6 +571,57 @@ class AccessibilityModule:
             # Continue without permission validator - use fallback permission checking
             self.permission_validator = None
             self.current_permission_status = None
+
+    def _initialize_debugging_tools(self):
+        """Initialize debugging tools and diagnostic capabilities."""
+        try:
+            # Check if debug mode is enabled from config
+            debug_config = {
+                'debug_level': getattr(self, 'debug_logging', False) and 'DETAILED' or 'BASIC',
+                'output_format': 'STRUCTURED',
+                'auto_diagnostics': True,
+                'performance_tracking': getattr(self, 'performance_monitoring_enabled', True),
+                'max_tree_depth': 10,
+                'max_elements_per_level': 100,
+                'include_invisible_elements': False,
+                'cache_ttl_seconds': 60
+            }
+            
+            # Initialize accessibility debugger
+            self.accessibility_debugger = AccessibilityDebugger(debug_config)
+            
+            # Initialize diagnostic tools
+            self.diagnostic_tools = AccessibilityHealthChecker(debug_config)
+            
+            # Initialize error recovery manager (import here to avoid circular dependency)
+            try:
+                from .error_recovery import ErrorRecoveryManager
+                recovery_config = {
+                    'max_retries': self.max_retries,
+                    'retry_delay': self.retry_delay,
+                    'backoff_multiplier': self.backoff_multiplier,
+                    'timeout_threshold': getattr(self, 'fast_path_timeout_ms', 5000) / 1000.0
+                }
+                self.error_recovery_manager = ErrorRecoveryManager(recovery_config)
+            except ImportError as e:
+                self.logger.debug(f"Error recovery manager not available: {e}")
+                self.error_recovery_manager = None
+            
+            # Enable debug mode if debugging tools are available
+            self.debug_mode_enabled = True
+            
+            self.logger.info("Debugging tools initialized successfully")
+            
+            if self.debug_logging:
+                self.logger.debug(f"Debug configuration: {debug_config}")
+                
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize debugging tools: {e}")
+            # Continue without debugging tools - they are optional
+            self.accessibility_debugger = None
+            self.diagnostic_tools = None
+            self.error_recovery_manager = None
+            self.debug_mode_enabled = False
     
     def _on_permission_change(self, old_status: PermissionStatus, new_status: PermissionStatus):
         """Handle permission status changes."""
@@ -596,7 +658,18 @@ class AccessibilityModule:
             # Use permission validator if available for enhanced permission checking
             if self.permission_validator:
                 permission_status = self.permission_validator.check_accessibility_permissions()
+                
+                # Log detailed permission status if debugging is enabled
+                if self.debug_mode_enabled and self.debug_logging:
+                    self.logger.debug(f"Permission validation result: {permission_status.get_summary()}")
+                    self.logger.debug(f"Permission details: {permission_status.to_dict()}")
+                
                 if not permission_status.is_sufficient_for_fast_path():
+                    # Log recommendations if debugging is enabled
+                    if self.debug_mode_enabled:
+                        for recommendation in permission_status.recommendations:
+                            self.logger.info(f"Permission recommendation: {recommendation}")
+                    
                     raise AccessibilityPermissionError(
                         f"Insufficient accessibility permissions: {permission_status.permission_level}",
                         "Use PermissionValidator.guide_permission_setup() for detailed instructions"
@@ -2534,6 +2607,10 @@ class AccessibilityModule:
         Returns:
             ElementMatchResult with detailed matching metadata
         """
+        # Debug logging for element search initiation
+        if self.debug_mode_enabled and self.debug_logging:
+            self.logger.debug(f"Starting enhanced element search: role='{role}', label='{label}', app='{app_name}'")
+        
         with self._performance_timer(
             "find_element_enhanced", 
             timeout_ms=self.fast_path_timeout_ms,
@@ -2668,10 +2745,40 @@ class AccessibilityModule:
                     self.logger.debug(f"Button-only fallback failed: {fallback_error}")
                     # Continue to final fallback
             
-            # No element found
+            # No element found - perform debugging analysis if enabled
             search_time_ms = (time.time() - start_time) * 1000
             if self.debug_logging:
                 self.logger.debug(f"Element not found for {role} '{label}' after {search_time_ms:.1f}ms")
+            
+            # Perform failure analysis if debugging is enabled
+            if self.debug_mode_enabled and self.accessibility_debugger:
+                try:
+                    # Create a command string for analysis
+                    command = f"click {label}" if role in ['AXButton', ''] else f"interact with {role} {label}"
+                    
+                    # Analyze the failure
+                    failure_analysis = self.accessibility_debugger.analyze_element_detection_failure(
+                        command=command,
+                        target=label,
+                        app_name=app_name
+                    )
+                    
+                    # Log detailed failure analysis
+                    if self.debug_logging:
+                        self.logger.debug(f"Failure analysis completed: {failure_analysis.matches_found} potential matches found")
+                        if failure_analysis.best_match:
+                            self.logger.debug(f"Best match: {failure_analysis.best_match.get('title', 'unknown')} "
+                                            f"(score: {failure_analysis.best_match.get('match_score', 0)})")
+                        
+                        # Log recommendations
+                        for recommendation in failure_analysis.recommendations:
+                            self.logger.debug(f"Recommendation: {recommendation}")
+                    
+                    # Update fuzzy matches with analysis results
+                    fuzzy_matches = failure_analysis.all_matches[:5]  # Top 5 matches
+                    
+                except Exception as debug_error:
+                    self.logger.debug(f"Debugging analysis failed: {debug_error}")
             
             return ElementMatchResult(
                 element=None,
@@ -2681,7 +2788,7 @@ class AccessibilityModule:
                 search_time_ms=search_time_ms,
                 roles_checked=match_details.get('roles_checked', [role] if role else []) if 'match_details' in locals() else [],
                 attributes_checked=match_details.get('attributes_checked', []) if 'match_details' in locals() else [],
-                fuzzy_matches=match_details.get('fuzzy_matches', []) if 'match_details' in locals() else [],
+                fuzzy_matches=fuzzy_matches,
                 fallback_triggered=fallback_triggered
             )
             
@@ -2710,6 +2817,29 @@ class AccessibilityModule:
                     )
                 else:
                     self.logger.debug(f"Original fallback also failed for {role} '{label}'")
+                    
+                    # Perform debugging analysis for final failure if enabled
+                    final_fuzzy_matches = []
+                    if self.debug_mode_enabled and self.accessibility_debugger:
+                        try:
+                            command = f"click {label}" if role in ['AXButton', ''] else f"interact with {role} {label}"
+                            failure_analysis = self.accessibility_debugger.analyze_element_detection_failure(
+                                command=command,
+                                target=label,
+                                app_name=app_name
+                            )
+                            
+                            if self.debug_logging:
+                                self.logger.debug(f"Final failure analysis: {failure_analysis.matches_found} matches, "
+                                                f"search_time: {failure_analysis.search_time_ms:.1f}ms")
+                                for recommendation in failure_analysis.recommendations[:3]:  # Top 3 recommendations
+                                    self.logger.debug(f"Final recommendation: {recommendation}")
+                            
+                            final_fuzzy_matches = failure_analysis.all_matches[:3]  # Top 3 matches
+                            
+                        except Exception as debug_error:
+                            self.logger.debug(f"Final debugging analysis failed: {debug_error}")
+                    
                     return ElementMatchResult(
                         element=None,
                         found=False,
@@ -2718,7 +2848,7 @@ class AccessibilityModule:
                         search_time_ms=search_time_ms,
                         roles_checked=[role] if role else [],
                         attributes_checked=[],
-                        fuzzy_matches=[],
+                        fuzzy_matches=final_fuzzy_matches,
                         fallback_triggered=fallback_triggered
                     )
             

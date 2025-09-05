@@ -37,6 +37,10 @@ from modules.performance import (
     performance_monitor
 )
 
+# Import debugging and diagnostic tools
+from modules.diagnostic_tools import AccessibilityHealthChecker
+from modules.error_recovery import ErrorRecoveryManager
+
 # Import enhanced fallback configuration
 from config import (
     ENHANCED_FALLBACK_ENABLED,
@@ -116,6 +120,11 @@ class Orchestrator:
         self.audio_module = None
         self.feedback_module = None
         self.accessibility_module = None
+        
+        # Debugging and diagnostic tools
+        self.diagnostic_tools = None
+        self.error_recovery_manager = None
+        self.debug_mode_enabled = False
         
         # Fast path configuration
         self.fast_path_enabled = True
@@ -812,6 +821,9 @@ class Orchestrator:
             # Disable fast path if accessibility module fails
             self.fast_path_enabled = False
         
+        # Initialize debugging and diagnostic tools
+        self._initialize_debugging_tools()
+        
         # Store module availability for graceful degradation
         self.module_availability = module_init_status.copy()
         
@@ -849,6 +861,43 @@ class Orchestrator:
             logger.warning(f"Module initialization completed with {len(initialization_errors)} errors")
         else:
             logger.info("All modules initialized successfully")
+    
+    def _initialize_debugging_tools(self) -> None:
+        """Initialize debugging and diagnostic tools for enhanced troubleshooting."""
+        try:
+            logger.info("Initializing debugging and diagnostic tools...")
+            
+            # Initialize diagnostic tools
+            diagnostic_config = {
+                'auto_diagnostics': True,
+                'performance_tracking': True,
+                'comprehensive_reporting': True,
+                'debug_level': 'DETAILED'
+            }
+            
+            self.diagnostic_tools = AccessibilityHealthChecker(diagnostic_config)
+            
+            # Initialize error recovery manager
+            recovery_config = {
+                'max_retries': self.max_retries,
+                'retry_delay': self.retry_delay,
+                'timeout_threshold': 5.0,  # 5 seconds
+                'enable_automatic_recovery': True
+            }
+            
+            self.error_recovery_manager = ErrorRecoveryManager(recovery_config)
+            
+            # Enable debug mode
+            self.debug_mode_enabled = True
+            
+            logger.info("Debugging tools initialized successfully")
+            
+        except Exception as e:
+            logger.warning(f"Failed to initialize debugging tools: {e}")
+            # Continue without debugging tools - they are optional
+            self.diagnostic_tools = None
+            self.error_recovery_manager = None
+            self.debug_mode_enabled = False
     
     def validate_command(self, command: str) -> CommandValidationResult:
         """
@@ -2704,6 +2753,16 @@ Focus on being helpful while being honest about what information is actually vis
         """
         if not self.fast_path_enabled or not self.accessibility_module:
             logger.debug("Fast path disabled or accessibility module unavailable")
+            
+            # Run diagnostics if debugging is enabled
+            if self.debug_mode_enabled and self.diagnostic_tools:
+                try:
+                    diagnostic_result = self.diagnostic_tools.run_quick_accessibility_check()
+                    if diagnostic_result.get('issues'):
+                        logger.debug(f"Accessibility diagnostic issues: {diagnostic_result['issues']}")
+                except Exception as e:
+                    logger.debug(f"Diagnostic check failed: {e}")
+            
             return self._create_fast_path_failure_result("fast_path_disabled", command)
         
         # Check accessibility module status
@@ -2890,8 +2949,31 @@ Focus on being helpful while being honest about what information is actually vis
                 
                 logger.warning(f"Fast path execution failed on attempt {attempt + 1}: {error_info.message}")
                 
-                # Determine if we should retry based on error type
-                should_retry = self._should_retry_fast_path_error(e, attempt, max_retries)
+                # Use error recovery manager if available
+                should_retry = False
+                if self.debug_mode_enabled and self.error_recovery_manager:
+                    try:
+                        recovery_result = self.error_recovery_manager.attempt_recovery(
+                            error=e,
+                            context={
+                                'command': command,
+                                'attempt': attempt + 1,
+                                'max_retries': max_retries,
+                                'gui_elements': gui_elements if 'gui_elements' in locals() else None
+                            }
+                        )
+                        
+                        should_retry = recovery_result.get('should_retry', False)
+                        if recovery_result.get('actions_taken'):
+                            logger.info(f"Recovery actions taken: {recovery_result['actions_taken']}")
+                            
+                    except Exception as recovery_error:
+                        logger.debug(f"Error recovery failed: {recovery_error}")
+                        # Fall back to original retry logic
+                        should_retry = self._should_retry_fast_path_error(e, attempt, max_retries)
+                else:
+                    # Use original retry logic
+                    should_retry = self._should_retry_fast_path_error(e, attempt, max_retries)
                 
                 if should_retry and attempt < max_retries:
                     logger.info(f"Retrying fast path execution after error (attempt {attempt + 1})")
@@ -3063,6 +3145,35 @@ Focus on being helpful while being honest about what information is actually vis
         execution_context["fallback_timestamp"] = fallback_start_time
         execution_context["fast_path_execution_time"] = fast_path_execution_time
         
+        # Run comprehensive diagnostics if debugging is enabled
+        if self.debug_mode_enabled and self.diagnostic_tools:
+            try:
+                logger.debug(f"[{execution_id}] Running automatic troubleshooting diagnostics")
+                
+                # Run targeted diagnostics based on failure reason
+                diagnostic_result = self.diagnostic_tools.run_targeted_diagnostics(
+                    failure_reason=failure_reason,
+                    command=command,
+                    context=failure_context
+                )
+                
+                # Log diagnostic findings
+                if diagnostic_result.get('issues'):
+                    logger.info(f"[{execution_id}] Diagnostic issues found: {len(diagnostic_result['issues'])}")
+                    for issue in diagnostic_result['issues'][:3]:  # Top 3 issues
+                        logger.debug(f"[{execution_id}] Issue: {issue}")
+                
+                if diagnostic_result.get('recommendations'):
+                    logger.info(f"[{execution_id}] Diagnostic recommendations: {len(diagnostic_result['recommendations'])}")
+                    for recommendation in diagnostic_result['recommendations'][:2]:  # Top 2 recommendations
+                        logger.info(f"[{execution_id}] Recommendation: {recommendation}")
+                
+                # Store diagnostic results for analysis
+                execution_context["diagnostic_result"] = diagnostic_result
+                
+            except Exception as e:
+                logger.debug(f"[{execution_id}] Automatic diagnostics failed: {e}")
+        
         # Log accessibility diagnostics if available
         if self.accessibility_module:
             try:
@@ -3203,6 +3314,26 @@ Focus on being helpful while being honest about what information is actually vis
             elif time_difference < -1.0:  # Fast path was actually slower (shouldn't happen often)
                 logger.info(f"[{execution_id}] Enhanced fast path was slower than expected. "
                            f"Vision fallback was more efficient by {abs(time_difference):.1f}s.")
+            
+            # Run performance analysis if debugging is enabled
+            if self.debug_mode_enabled and self.diagnostic_tools:
+                try:
+                    performance_analysis = self.diagnostic_tools.analyze_performance_comparison(
+                        fast_path_time=fast_path_time,
+                        vision_time=vision_execution_time,
+                        fallback_reason=fallback_reason,
+                        enhanced_search_result=enhanced_search_result
+                    )
+                    
+                    if performance_analysis.get('insights'):
+                        logger.info(f"[{execution_id}] Performance insights: {performance_analysis['insights']}")
+                    
+                    if performance_analysis.get('optimization_suggestions'):
+                        for suggestion in performance_analysis['optimization_suggestions'][:2]:
+                            logger.info(f"[{execution_id}] Optimization suggestion: {suggestion}")
+                            
+                except Exception as debug_error:
+                    logger.debug(f"[{execution_id}] Performance analysis failed: {debug_error}")
             
         except Exception as e:
             logger.warning(f"[{execution_id}] Failed to log fallback performance comparison: {e}")
