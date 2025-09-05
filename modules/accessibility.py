@@ -17,6 +17,9 @@ import asyncio
 from functools import partial
 from contextlib import contextmanager
 
+# Import the new PermissionValidator
+from .permission_validator import PermissionValidator, PermissionStatus, AccessibilityPermissionError as PermissionValidatorError
+
 # Import fuzzy matching library with error handling
 try:
     from thefuzz import fuzz
@@ -350,6 +353,9 @@ class AccessibilityModule:
         self.max_recovery_attempts = 5
         self.backoff_multiplier = 2.0
         
+        # Initialize permission validator
+        self.permission_validator = None
+        
         # Element caching system
         self.element_cache: Dict[str, CachedElementTree] = {}
         self.cache_lock = threading.RLock()
@@ -476,17 +482,107 @@ class AccessibilityModule:
         }
         
         try:
+            # Initialize permission validator first
+            self._initialize_permission_validator()
+            
+            # Then initialize accessibility API
             self._initialize_accessibility_api()
             self._log_initialization_success()
         except AccessibilityPermissionError as e:
             self.logger.warning(f"Accessibility permissions not granted: {e}")
             self._enter_degraded_mode("permission_denied", str(e))
+        except PermissionValidatorError as e:
+            self.logger.warning(f"Permission validation failed: {e}")
+            self._enter_degraded_mode("permission_validation_failed", str(e))
         except AccessibilityAPIUnavailableError as e:
             self.logger.error(f"Accessibility API unavailable: {e}")
             self._enter_degraded_mode("api_unavailable", str(e))
         except Exception as e:
             self.logger.error(f"Unexpected error initializing AccessibilityModule: {e}")
             self._enter_degraded_mode("initialization_failed", str(e))
+    
+    def _initialize_permission_validator(self):
+        """Initialize the permission validator with configuration."""
+        try:
+            # Create permission validator configuration
+            permission_config = {
+                'permission_check_timeout_ms': getattr(self, 'fast_path_timeout_ms', 5000),
+                'auto_request_permissions': True,
+                'monitor_permission_changes': True,
+                'debug_logging': getattr(self, 'debug_logging', False)
+            }
+            
+            # Initialize permission validator
+            self.permission_validator = PermissionValidator(permission_config)
+            
+            # Check initial permission status
+            permission_status = self.permission_validator.check_accessibility_permissions()
+            
+            # Log permission status
+            self.logger.info(f"Permission validation: {permission_status.get_summary()}")
+            
+            if self.debug_logging:
+                self.logger.debug(f"Permission details: {permission_status.to_dict()}")
+            
+            # If permissions are insufficient, provide guidance
+            if not permission_status.is_sufficient_for_fast_path():
+                self.logger.warning("Insufficient accessibility permissions for optimal performance")
+                
+                # Log recommendations
+                for recommendation in permission_status.recommendations:
+                    self.logger.info(f"Recommendation: {recommendation}")
+                
+                # If we can request permissions, try to do so
+                if permission_status.can_request_permissions and self.permission_validator.auto_request_permissions:
+                    self.logger.info("Attempting to request accessibility permissions...")
+                    try:
+                        if self.permission_validator.attempt_permission_request():
+                            self.logger.info("Permission request successful")
+                            # Re-check permissions after request
+                            permission_status = self.permission_validator.check_accessibility_permissions()
+                        else:
+                            self.logger.warning("Permission request was denied or cancelled")
+                    except Exception as e:
+                        self.logger.warning(f"Permission request failed: {e}")
+            
+            # Start permission monitoring if enabled
+            if self.permission_validator.monitor_permission_changes_enabled:
+                self.permission_validator.monitor_permission_changes()
+                
+                # Add callback for permission changes
+                self.permission_validator.add_permission_change_callback(self._on_permission_change)
+            
+            # Store current permission status
+            self.current_permission_status = permission_status
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize permission validator: {e}")
+            # Continue without permission validator - use fallback permission checking
+            self.permission_validator = None
+            self.current_permission_status = None
+    
+    def _on_permission_change(self, old_status: PermissionStatus, new_status: PermissionStatus):
+        """Handle permission status changes."""
+        self.logger.info(f"Accessibility permissions changed: {old_status.permission_level} -> {new_status.permission_level}")
+        
+        # Update current status
+        self.current_permission_status = new_status
+        
+        # If permissions were granted, try to exit degraded mode
+        if new_status.is_sufficient_for_fast_path() and self.degraded_mode:
+            self.logger.info("Permissions granted - attempting to exit degraded mode")
+            try:
+                self._initialize_accessibility_api()
+                if self.accessibility_enabled:
+                    self.degraded_mode = False
+                    self.logger.info("Successfully exited degraded mode")
+            except Exception as e:
+                self.logger.warning(f"Failed to exit degraded mode: {e}")
+        
+        # If permissions were revoked, enter degraded mode
+        elif not new_status.is_sufficient_for_fast_path() and not self.degraded_mode:
+            self.logger.warning("Permissions revoked - entering degraded mode")
+            self._enter_degraded_mode("permissions_revoked", "Accessibility permissions were revoked")
     
     def _initialize_accessibility_api(self):
         """Initialize the accessibility API and check permissions."""
@@ -497,6 +593,15 @@ class AccessibilityModule:
             )
         
         try:
+            # Use permission validator if available for enhanced permission checking
+            if self.permission_validator:
+                permission_status = self.permission_validator.check_accessibility_permissions()
+                if not permission_status.is_sufficient_for_fast_path():
+                    raise AccessibilityPermissionError(
+                        f"Insufficient accessibility permissions: {permission_status.permission_level}",
+                        "Use PermissionValidator.guide_permission_setup() for detailed instructions"
+                    )
+            
             # Initialize NSWorkspace for application management
             self.workspace = NSWorkspace.sharedWorkspace()
             if self.workspace is None:
@@ -4534,9 +4639,105 @@ class AccessibilityModule:
         except Exception as e:
             self.logger.warning(f"Error shutting down thread pools: {e}")
     
+    def get_permission_status(self) -> Optional[PermissionStatus]:
+        """
+        Get current accessibility permission status.
+        
+        Returns:
+            Current permission status or None if permission validator is not available
+        """
+        if self.permission_validator:
+            return self.permission_validator.check_accessibility_permissions()
+        else:
+            return self.current_permission_status
+    
+    def get_permission_guidance(self) -> List[str]:
+        """
+        Get step-by-step permission setup guidance.
+        
+        Returns:
+            List of instructions for setting up accessibility permissions
+        """
+        if self.permission_validator:
+            return self.permission_validator.guide_permission_setup()
+        else:
+            return [
+                "Permission validator not available",
+                "Please ensure accessibility permissions are granted in System Preferences",
+                "Go to System Preferences > Security & Privacy > Privacy > Accessibility",
+                "Add your application to the list and ensure it's checked"
+            ]
+    
+    def request_permissions(self) -> bool:
+        """
+        Attempt to request accessibility permissions.
+        
+        Returns:
+            True if permissions were granted, False otherwise
+        """
+        if self.permission_validator:
+            try:
+                return self.permission_validator.attempt_permission_request()
+            except Exception as e:
+                self.logger.error(f"Permission request failed: {e}")
+                return False
+        else:
+            self.logger.warning("Permission validator not available - cannot request permissions")
+            return False
+    
+    def validate_permissions_for_fast_path(self) -> bool:
+        """
+        Check if current permissions are sufficient for fast path execution.
+        
+        Returns:
+            True if permissions are sufficient for fast path, False otherwise
+        """
+        status = self.get_permission_status()
+        if status:
+            return status.is_sufficient_for_fast_path()
+        else:
+            # Fallback: assume permissions are sufficient if we're not in degraded mode
+            return not self.degraded_mode
+    
+    def get_permission_diagnostics(self) -> Dict[str, Any]:
+        """
+        Get comprehensive permission diagnostics.
+        
+        Returns:
+            Dictionary containing permission diagnostics and recommendations
+        """
+        diagnostics = {
+            'permission_validator_available': self.permission_validator is not None,
+            'accessibility_enabled': self.accessibility_enabled,
+            'degraded_mode': self.degraded_mode,
+            'last_error_time': self.last_error_time,
+            'recovery_attempts': self.recovery_attempts
+        }
+        
+        if self.permission_validator:
+            status = self.permission_validator.check_accessibility_permissions()
+            diagnostics.update({
+                'permission_status': status.to_dict(),
+                'recommendations': status.recommendations,
+                'can_request_permissions': status.can_request_permissions
+            })
+        else:
+            diagnostics.update({
+                'permission_status': None,
+                'recommendations': ['Install and configure PermissionValidator for detailed diagnostics'],
+                'can_request_permissions': False
+            })
+        
+        return diagnostics
+
     def __del__(self):
         """Cleanup when module is destroyed."""
         try:
+            # Stop permission monitoring
+            if self.permission_validator:
+                self.permission_validator.stop_permission_monitoring()
+            
+            # Shutdown parallel processing
             self.shutdown_parallel_processing()
         except Exception:
             pass  # Ignore errors during cleanup

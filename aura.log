@@ -16425,3 +16425,1032 @@ Screen Context: Co...'
 2025-09-05 10:58:33,578 - __main__ - INFO - Step 2: Running cleanup handlers...
 2025-09-05 10:58:33,578 - __main__ - INFO - Running 5 cleanup handlers...
 2025-09-05 10:58:33,587 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
+2025-09-05 11:13:34,392 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-09-05 11:13:34,392 - __main__ - INFO - Starting AURA application...
+2025-09-05 11:13:34,392 - __main__ - INFO - Step 1: Validating configuration...
+2025-09-05 11:13:34,447 - config - INFO - Detected active model in LM Studio: google/gemma-3-4b
+2025-09-05 11:13:34,447 - __main__ - INFO - Step 2: Running startup checks...
+2025-09-05 11:13:34,447 - __main__ - INFO - Running 5 startup checks...
+2025-09-05 11:13:37,861 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-09-05 11:13:37,862 - __main__ - INFO - Step 3: Initializing core modules...
+2025-09-05 11:13:37,862 - modules.audio - INFO - Loading Whisper model...
+2025-09-05 11:13:39,851 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-05 11:13:39,852 - modules.audio - INFO - Initializing TTS engine...
+2025-09-05 11:13:40,486 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-05 11:13:40,486 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-05 11:13:40,495 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-05 11:13:40,495 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-05 11:13:40,495 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-05 11:13:40,495 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-05 11:13:40,495 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-05 11:13:40,710 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-05 11:13:40,710 - modules.feedback - INFO - Loading sound files...
+2025-09-05 11:13:40,711 - modules.feedback - INFO - Loaded 0 sound files
+2025-09-05 11:13:40,711 - modules.feedback - INFO - Feedback processing loop started
+2025-09-05 11:13:40,711 - modules.feedback - INFO - Feedback processing thread started
+2025-09-05 11:13:40,712 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-05 11:13:40,712 - orchestrator - INFO - Initializing AURA modules...
+2025-09-05 11:13:40,712 - orchestrator - INFO - Initializing Vision Module...
+2025-09-05 11:13:40,718 - modules.vision - INFO - VisionModule initialized
+2025-09-05 11:13:40,719 - orchestrator - INFO - Vision Module initialized successfully
+2025-09-05 11:13:40,719 - orchestrator - INFO - Initializing Reasoning Module...
+2025-09-05 11:13:40,737 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-09-05 11:13:40,738 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-09-05 11:13:40,738 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-09-05 11:13:40,738 - orchestrator - INFO - Initializing Automation Module...
+2025-09-05 11:13:41,094 - modules.automation - INFO - AutomationModule initialized. Screen size: 2560x1600
+2025-09-05 11:13:41,094 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-09-05 11:13:41,094 - modules.automation - INFO - macOS detected - using cliclick as PRIMARY automation method
+2025-09-05 11:13:41,094 - modules.automation - INFO - AppleScript available as fallback only
+2025-09-05 11:13:41,094 - orchestrator - INFO - Automation Module initialized successfully
+2025-09-05 11:13:41,094 - orchestrator - INFO - Initializing Audio Module...
+2025-09-05 11:13:41,094 - modules.audio - INFO - Loading Whisper model...
+2025-09-05 11:13:43,144 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-05 11:13:43,145 - modules.audio - INFO - Initializing TTS engine...
+2025-09-05 11:13:43,676 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-05 11:13:43,677 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-05 11:13:43,681 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-05 11:13:43,681 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-05 11:13:43,681 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-05 11:13:43,681 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-05 11:13:43,681 - orchestrator - INFO - Audio Module initialized successfully
+2025-09-05 11:13:43,681 - orchestrator - INFO - Initializing Feedback Module...
+2025-09-05 11:13:43,681 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-05 11:13:43,681 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-05 11:13:43,681 - modules.feedback - INFO - Loading sound files...
+2025-09-05 11:13:43,682 - modules.feedback - INFO - Loaded 0 sound files
+2025-09-05 11:13:43,682 - modules.feedback - INFO - Feedback processing loop started
+2025-09-05 11:13:43,682 - modules.feedback - INFO - Feedback processing thread started
+2025-09-05 11:13:43,682 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-05 11:13:43,682 - orchestrator - INFO - Feedback Module initialized successfully
+2025-09-05 11:13:43,682 - orchestrator - INFO - Initializing Accessibility Module...
+2025-09-05 11:13:43,714 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-05 11:13:43,714 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-05 11:13:43,714 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-05 11:13:43,714 - orchestrator - INFO - Accessibility Module initialized successfully
+2025-09-05 11:13:43,714 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback, accessibility
+2025-09-05 11:13:43,714 - orchestrator - INFO - All modules initialized successfully
+2025-09-05 11:13:43,714 - orchestrator - INFO - System health monitoring initialized
+2025-09-05 11:13:43,715 - orchestrator - INFO - Orchestrator initialized successfully
+2025-09-05 11:13:43,715 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-09-05 11:13:43,715 - __main__ - INFO - All modules verified successfully
+2025-09-05 11:13:43,715 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-09-05 11:13:43,715 - __main__ - INFO - Health monitoring started
+2025-09-05 11:13:43,715 - __main__ - INFO - Step 6: Startup completed successfully
+2025-09-05 11:13:43,716 - __main__ - INFO - AURA application startup completed in 9.32s
+2025-09-05 11:13:43,716 - modules.audio - INFO - Converting text to speech: 'AURA is ready. Say 'computer' to activate....'
+2025-09-05 11:13:43,717 - __main__ - INFO - Starting main application loop...
+2025-09-05 11:13:43,718 - __main__ - INFO - Wake word monitoring started
+2025-09-05 11:13:43,728 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:13:46,774 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-05 11:13:48,850 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:13:48,989 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:13:49,180 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-05 11:13:49,181 - modules.audio - INFO - Providing wake word confirmation
+2025-09-05 11:13:49,314 - __main__ - INFO - Wake word detected (#1)
+2025-09-05 11:13:49,314 - __main__ - INFO - Processing voice command...
+2025-09-05 11:13:49,316 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:13:49,317 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-05 11:13:49,317 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-05 11:13:57,503 - modules.audio - INFO - Audio recording completed:
+2025-09-05 11:13:57,508 - modules.audio - INFO -   Duration: 8.00s
+2025-09-05 11:13:57,508 - modules.audio - INFO -   Samples: 128000
+2025-09-05 11:13:57,508 - modules.audio - INFO -   RMS volume: 0.1037
+2025-09-05 11:13:57,508 - modules.audio - INFO -   Max volume: 0.8179
+2025-09-05 11:13:57,508 - modules.audio - INFO - Good audio level detected (RMS: 0.1037)
+2025-09-05 11:13:57,510 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-05 11:13:57,577 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp69wpyzxu.wav
+2025-09-05 11:13:57,577 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-05 11:13:57,577 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-05 11:13:57,577 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-05 11:13:57,577 - modules.audio - INFO -   Channels: 1
+2025-09-05 11:13:57,577 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-05 11:13:57,577 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-05 11:13:57,578 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp69wpyzxu.wav
+2025-09-05 11:13:57,579 - modules.audio - INFO - Running Whisper transcription...
+2025-09-05 11:14:02,711 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-05 11:14:02,712 - modules.audio - INFO - Whisper transcription completed
+2025-09-05 11:14:02,712 - modules.audio - INFO - Whisper result details:
+2025-09-05 11:14:02,712 - modules.audio - INFO -   Text: 'Click on the Gmail link.'
+2025-09-05 11:14:02,712 - modules.audio - INFO -   Language: en
+2025-09-05 11:14:02,712 - modules.audio - INFO -   Segments: 1
+2025-09-05 11:14:02,712 - modules.audio - INFO -     Segment 1: 'Click on the Gmail link.' (0.00-5.00s, prob: -0.537)
+2025-09-05 11:14:02,712 - modules.audio - INFO - Transcription result: 'Click on the Gmail link.'
+2025-09-05 11:14:02,713 - __main__ - INFO - Command received: 'Click on the Gmail link.'
+2025-09-05 11:14:02,713 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:14:02,713 - orchestrator - INFO - Starting command execution [cmd_1757051042713]: 'Click on the Gmail link.'
+2025-09-05 11:14:02,713 - orchestrator - INFO - [cmd_1757051042713] Step 1: Command validation
+2025-09-05 11:14:02,715 - orchestrator - INFO - [cmd_1757051042713] Command validated and normalized: 'click on gmail link.'
+2025-09-05 11:14:02,715 - orchestrator - INFO - [cmd_1757051042713] Attempting fast path execution for GUI command
+2025-09-05 11:14:02,722 - orchestrator - INFO - Attempting fast path execution (attempt 1/3)
+2025-09-05 11:14:02,723 - modules.accessibility - INFO - Enhanced role detection failed, falling back to button-only detection for 'gmail link.'
+2025-09-05 11:14:02,723 - modules.accessibility - INFO - Using original fallback detection for role 'AXButton', label 'gmail link.'
+2025-09-05 11:14:02,723 - orchestrator - INFO - Enhanced element search completed: found=False, confidence=0.00, search_time=0.3ms, matched_attribute='', roles_checked=5, attributes_checked=3
+2025-09-05 11:14:02,724 - orchestrator - INFO - Fast path failure: element_not_found for command: 'click on gmail link.'
+2025-09-05 11:14:02,724 - orchestrator - INFO - [cmd_1757051042713] Enhanced fast path failed, falling back to vision workflow
+2025-09-05 11:14:02,724 - orchestrator - INFO - [cmd_1757051042713] Fallback reason: element_not_found
+2025-09-05 11:14:02,724 - orchestrator - INFO - [cmd_1757051042713] Fast path execution time: 0.000s
+2025-09-05 11:14:02,724 - orchestrator - INFO - [cmd_1757051042713] Enhanced search attempted: confidence=0.00, roles_checked=5, attributes_checked=3, fuzzy_matches=0
+2025-09-05 11:14:02,724 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:14:02,724 - orchestrator - INFO - [cmd_1757051042713] Element not found via enhanced fast detection, using visual analysis
+2025-09-05 11:14:02,724 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-09-05 11:14:02,725 - orchestrator - INFO - [cmd_1757051042713] Using parallel processing for perception and reasoning
+2025-09-05 11:14:02,725 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:14:02,725 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:14:02,725 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:14:02,949 - modules.vision - INFO - Screenshot captured and encoded: 71248 characters
+2025-09-05 11:14:03,009 - config - INFO - Detected active model in LM Studio: google/gemma-3-4b
+2025-09-05 11:14:03,010 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:14:20,373 - modules.vision - INFO - Vision API response received in 17.36s (status: 200)
+2025-09-05 11:14:20,376 - modules.vision - WARNING - No JSON found in response, created fallback response from plain text
+2025-09-05 11:14:20,377 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-09-05 11:14:20,380 - orchestrator - INFO - [cmd_1757051042713] Screen perception successful: 3 elements found
+2025-09-05 11:14:20,384 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:14:20,384 - modules.reasoning - INFO - Generating action plan for command: 'click on gmail link....'
+2025-09-05 11:14:22,716 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-05 11:14:22,720 - modules.reasoning - INFO - Generated action plan with 2 steps
+2025-09-05 11:14:22,720 - orchestrator - INFO - [cmd_1757051042713] Command reasoning successful: 2 actions planned
+2025-09-05 11:14:22,720 - orchestrator - INFO - [cmd_1757051042713] Parallel processing completed successfully
+2025-09-05 11:14:22,721 - orchestrator - INFO - [cmd_1757051042713] Step 3: Action execution
+2025-09-05 11:14:22,721 - orchestrator - INFO - [cmd_1757051042713] Executing 2 actions
+2025-09-05 11:14:22,722 - orchestrator - INFO - [cmd_1757051042713] Task completion marker reached
+2025-09-05 11:14:22,722 - modules.audio - INFO - Converting text to speech: 'I couldn't find a Gmail link on the current screen...'
+2025-09-05 11:14:22,723 - orchestrator - INFO - [cmd_1757051042713] Action execution completed: 2/2 successful
+2025-09-05 11:14:22,725 - orchestrator - INFO - [cmd_1757051042713] Performance Comparison - Enhanced Fast Path vs Vision Fallback:
+2025-09-05 11:14:22,725 - orchestrator - INFO - [cmd_1757051042713]   Enhanced Fast Path: 0.000s (failed: element_not_found)
+2025-09-05 11:14:22,726 - orchestrator - INFO - [cmd_1757051042713]   Vision Fallback: 20.011s
+2025-09-05 11:14:22,733 - orchestrator - INFO - [cmd_1757051042713]   Time Difference: +20.011s
+2025-09-05 11:14:22,734 - orchestrator - INFO - [cmd_1757051042713]   Performance Ratio: infx
+2025-09-05 11:14:22,734 - orchestrator - WARNING - [cmd_1757051042713] Vision fallback took significantly longer than fast path (20.0s difference). Consider optimizing accessibility detection.
+2025-09-05 11:14:22,734 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:14:22,736 - orchestrator - INFO - [cmd_1757051042713] Command completed successfully in 20.01s
+2025-09-05 11:14:22,736 - __main__ - INFO - Command executed successfully: Click on the Gmail link.
+2025-09-05 11:14:22,736 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:14:27,923 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:14:28,059 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:14:28,282 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-09-05 11:14:28,282 - __main__ - INFO - Initiating AURA shutdown...
+2025-09-05 11:14:28,282 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-09-05 11:14:28,285 - modules.audio - ERROR - TTS playback failed: macOS 'say' command failed: 
+2025-09-05 11:14:28,290 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-05 11:14:28,290 - modules.feedback - WARNING - Sound 'success' not available
+2025-09-05 11:14:33,136 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:14:33,275 - __main__ - INFO - Wake word monitoring stopped
+2025-09-05 11:14:33,276 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-09-05 11:14:33,276 - __main__ - INFO - Running 5 cleanup handlers...
+2025-09-05 11:14:33,278 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
+2025-09-05 11:39:44,331 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-09-05 11:39:44,331 - __main__ - INFO - Starting AURA application...
+2025-09-05 11:39:44,331 - __main__ - INFO - Step 1: Validating configuration...
+2025-09-05 11:39:44,337 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5
+2025-09-05 11:39:44,337 - __main__ - INFO - Step 2: Running startup checks...
+2025-09-05 11:39:44,337 - __main__ - INFO - Running 5 startup checks...
+2025-09-05 11:39:46,548 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-09-05 11:39:46,549 - __main__ - INFO - Step 3: Initializing core modules...
+2025-09-05 11:39:46,549 - modules.audio - INFO - Loading Whisper model...
+2025-09-05 11:39:48,479 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-05 11:39:48,479 - modules.audio - INFO - Initializing TTS engine...
+2025-09-05 11:39:48,821 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-05 11:39:48,821 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-05 11:39:48,880 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-05 11:39:48,880 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-05 11:39:48,880 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-05 11:39:48,880 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-05 11:39:48,881 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-05 11:39:49,156 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-05 11:39:49,156 - modules.feedback - INFO - Loading sound files...
+2025-09-05 11:39:49,157 - modules.feedback - INFO - Loaded 0 sound files
+2025-09-05 11:39:49,157 - modules.feedback - INFO - Feedback processing loop started
+2025-09-05 11:39:49,157 - modules.feedback - INFO - Feedback processing thread started
+2025-09-05 11:39:49,157 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-05 11:39:49,158 - orchestrator - INFO - Initializing AURA modules...
+2025-09-05 11:39:49,158 - orchestrator - INFO - Initializing Vision Module...
+2025-09-05 11:39:49,160 - modules.vision - INFO - VisionModule initialized
+2025-09-05 11:39:49,161 - orchestrator - INFO - Vision Module initialized successfully
+2025-09-05 11:39:49,161 - orchestrator - INFO - Initializing Reasoning Module...
+2025-09-05 11:39:49,185 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-09-05 11:39:49,185 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-09-05 11:39:49,185 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-09-05 11:39:49,185 - orchestrator - INFO - Initializing Automation Module...
+2025-09-05 11:39:49,492 - modules.automation - INFO - AutomationModule initialized. Screen size: 2560x1600
+2025-09-05 11:39:49,492 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-09-05 11:39:49,492 - modules.automation - INFO - macOS detected - using cliclick as PRIMARY automation method
+2025-09-05 11:39:49,492 - modules.automation - INFO - AppleScript available as fallback only
+2025-09-05 11:39:49,492 - orchestrator - INFO - Automation Module initialized successfully
+2025-09-05 11:39:49,492 - orchestrator - INFO - Initializing Audio Module...
+2025-09-05 11:39:49,492 - modules.audio - INFO - Loading Whisper model...
+2025-09-05 11:39:51,640 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-05 11:39:51,647 - modules.audio - INFO - Initializing TTS engine...
+2025-09-05 11:39:51,984 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-05 11:39:51,984 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-05 11:39:51,988 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-05 11:39:51,988 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-05 11:39:51,988 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-05 11:39:51,988 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-05 11:39:51,988 - orchestrator - INFO - Audio Module initialized successfully
+2025-09-05 11:39:51,988 - orchestrator - INFO - Initializing Feedback Module...
+2025-09-05 11:39:51,988 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-05 11:39:51,988 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-05 11:39:51,989 - modules.feedback - INFO - Loading sound files...
+2025-09-05 11:39:51,989 - modules.feedback - INFO - Loaded 0 sound files
+2025-09-05 11:39:51,990 - modules.feedback - INFO - Feedback processing loop started
+2025-09-05 11:39:51,990 - modules.feedback - INFO - Feedback processing thread started
+2025-09-05 11:39:51,990 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-05 11:39:51,990 - orchestrator - INFO - Feedback Module initialized successfully
+2025-09-05 11:39:51,990 - orchestrator - INFO - Initializing Accessibility Module...
+2025-09-05 11:39:51,993 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-05 11:39:51,993 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-05 11:39:51,994 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-05 11:39:51,994 - orchestrator - INFO - Accessibility Module initialized successfully
+2025-09-05 11:39:51,994 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback, accessibility
+2025-09-05 11:39:51,994 - orchestrator - INFO - All modules initialized successfully
+2025-09-05 11:39:51,994 - orchestrator - INFO - System health monitoring initialized
+2025-09-05 11:39:51,994 - orchestrator - INFO - Orchestrator initialized successfully
+2025-09-05 11:39:51,994 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-09-05 11:39:51,994 - __main__ - INFO - All modules verified successfully
+2025-09-05 11:39:51,994 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-09-05 11:39:51,994 - __main__ - INFO - Health monitoring started
+2025-09-05 11:39:51,994 - __main__ - INFO - Step 6: Startup completed successfully
+2025-09-05 11:39:51,994 - __main__ - INFO - AURA application startup completed in 7.66s
+2025-09-05 11:39:51,994 - modules.audio - INFO - Converting text to speech: 'AURA is ready. Say 'computer' to activate....'
+2025-09-05 11:39:51,994 - __main__ - INFO - Starting main application loop...
+2025-09-05 11:39:51,994 - __main__ - INFO - Wake word monitoring started
+2025-09-05 11:39:52,006 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:39:54,785 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-05 11:39:56,947 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-05 11:39:56,947 - modules.audio - INFO - Providing wake word confirmation
+2025-09-05 11:39:57,067 - __main__ - INFO - Wake word detected (#1)
+2025-09-05 11:39:57,067 - __main__ - INFO - Processing voice command...
+2025-09-05 11:39:57,067 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:39:57,067 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-05 11:39:57,068 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-05 11:40:00,015 - __main__ - INFO - AURA Status Report - Uptime: 15.7s, Wake words: 1 (229.6/hr), Commands: 0 (0.0/hr), Errors: 0, Threads: 5 (Wake: Running, Health: Stopped), Memory: 0.0MB, CPU: 0.0%, Cache: 0.0% hit rate, Health: excellent
+2025-09-05 11:40:05,252 - modules.audio - INFO - Audio recording completed:
+2025-09-05 11:40:05,253 - modules.audio - INFO -   Duration: 8.00s
+2025-09-05 11:40:05,253 - modules.audio - INFO -   Samples: 128000
+2025-09-05 11:40:05,253 - modules.audio - INFO -   RMS volume: 0.0317
+2025-09-05 11:40:05,253 - modules.audio - INFO -   Max volume: 0.4166
+2025-09-05 11:40:05,253 - modules.audio - INFO - Good audio level detected (RMS: 0.0317)
+2025-09-05 11:40:05,254 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-05 11:40:05,325 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmputlhp3yi.wav
+2025-09-05 11:40:05,325 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-05 11:40:05,325 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-05 11:40:05,325 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-05 11:40:05,325 - modules.audio - INFO -   Channels: 1
+2025-09-05 11:40:05,325 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-05 11:40:05,325 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-05 11:40:05,325 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmputlhp3yi.wav
+2025-09-05 11:40:05,326 - modules.audio - INFO - Running Whisper transcription...
+2025-09-05 11:40:07,334 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-05 11:40:07,334 - modules.audio - INFO - Whisper transcription completed
+2025-09-05 11:40:07,334 - modules.audio - INFO - Whisper result details:
+2025-09-05 11:40:07,334 - modules.audio - INFO -   Text: 'Yes, click on the Gmail link.'
+2025-09-05 11:40:07,334 - modules.audio - INFO -   Language: en
+2025-09-05 11:40:07,334 - modules.audio - INFO -   Segments: 1
+2025-09-05 11:40:07,334 - modules.audio - INFO -     Segment 1: 'Yes, click on the Gmail link.' (0.00-3.00s, prob: -0.537)
+2025-09-05 11:40:07,334 - modules.audio - INFO - Transcription result: 'Yes, click on the Gmail link.'
+2025-09-05 11:40:07,334 - __main__ - INFO - Command received: 'Yes, click on the Gmail link.'
+2025-09-05 11:40:07,334 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:07,334 - orchestrator - INFO - Starting command execution [cmd_1757052607334]: 'Yes, click on the Gmail link.'
+2025-09-05 11:40:07,334 - orchestrator - INFO - [cmd_1757052607334] Step 1: Command validation
+2025-09-05 11:40:07,336 - orchestrator - INFO - [cmd_1757052607334] Command validated and normalized: 'yes, click on gmail link.'
+2025-09-05 11:40:07,336 - orchestrator - INFO - [cmd_1757052607334] Attempting fast path execution for GUI command
+2025-09-05 11:40:07,340 - orchestrator - INFO - Attempting fast path execution (attempt 1/3)
+2025-09-05 11:40:07,340 - modules.accessibility - INFO - Enhanced role detection failed, falling back to button-only detection for 'yes, gmail link.'
+2025-09-05 11:40:07,340 - modules.accessibility - INFO - Using original fallback detection for role 'AXButton', label 'yes, gmail link.'
+2025-09-05 11:40:07,340 - orchestrator - INFO - Enhanced element search completed: found=False, confidence=0.00, search_time=0.2ms, matched_attribute='', roles_checked=5, attributes_checked=3
+2025-09-05 11:40:07,341 - orchestrator - INFO - Fast path failure: element_not_found for command: 'yes, click on gmail link.'
+2025-09-05 11:40:07,341 - orchestrator - INFO - [cmd_1757052607334] Enhanced fast path failed, falling back to vision workflow
+2025-09-05 11:40:07,341 - orchestrator - INFO - [cmd_1757052607334] Fallback reason: element_not_found
+2025-09-05 11:40:07,341 - orchestrator - INFO - [cmd_1757052607334] Fast path execution time: 0.000s
+2025-09-05 11:40:07,341 - orchestrator - INFO - [cmd_1757052607334] Enhanced search attempted: confidence=0.00, roles_checked=5, attributes_checked=3, fuzzy_matches=0
+2025-09-05 11:40:07,341 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:07,341 - orchestrator - INFO - [cmd_1757052607334] Element not found via enhanced fast detection, using visual analysis
+2025-09-05 11:40:07,341 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-09-05 11:40:07,341 - orchestrator - INFO - [cmd_1757052607334] Using parallel processing for perception and reasoning
+2025-09-05 11:40:07,342 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:07,342 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:40:07,342 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:07,513 - modules.vision - INFO - Screenshot captured and encoded: 105432 characters
+2025-09-05 11:40:07,547 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5
+2025-09-05 11:40:07,547 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:40:08,375 - modules.vision - INFO - Vision API response received in 0.83s (status: 404)
+2025-09-05 11:40:08,376 - modules.error_handler - WARNING - [vision_describe_screen_1757052608] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "Failed to load model \"text-embedding-nomic-embed-text-v1.5\". Error: Model is not llm.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:40:08,378 - modules.error_handler - INFO - [vision_describe_screen_1757052608] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:40:08,380 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757052608] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:40:08,380 - modules.error_handler - INFO - Attempting recovery for error modules.vision_describe_screen_1757052608
+2025-09-05 11:40:09,384 - modules.error_handler - INFO - Recovery successful for error modules.vision_describe_screen_1757052608
+2025-09-05 11:40:19,389 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:40:19,391 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:19,485 - modules.vision - INFO - Screenshot captured and encoded: 106124 characters
+2025-09-05 11:40:19,491 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5
+2025-09-05 11:40:19,491 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:40:19,907 - modules.vision - INFO - Vision API response received in 0.42s (status: 404)
+2025-09-05 11:40:19,907 - modules.error_handler - WARNING - [vision_describe_screen_1757052619] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "Failed to load model \"text-embedding-nomic-embed-text-v1.5\". Error: Model is not llm.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:40:19,909 - modules.error_handler - INFO - [vision_describe_screen_1757052619] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:40:19,909 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757052619] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:40:19,910 - orchestrator - WARNING - [cmd_1757052607334] Screen perception attempt 1 failed: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:40:19,910 - orchestrator - INFO - [cmd_1757052607334] Retrying screen perception in 1.0s...
+2025-09-05 11:40:20,916 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:20,916 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:40:20,916 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:20,972 - modules.vision - INFO - Screenshot captured and encoded: 229252 characters
+2025-09-05 11:40:20,977 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:40:20,978 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:40:20,989 - modules.vision - INFO - Vision API response received in 0.01s (status: 404)
+2025-09-05 11:40:20,989 - modules.error_handler - WARNING - [vision_describe_screen_1757052620] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "No models loaded. Please load a model in the developer page or use the `lms load` command.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:40:20,989 - modules.error_handler - INFO - [vision_describe_screen_1757052620] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:40:20,990 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757052620] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:40:20,990 - modules.error_handler - INFO - Attempting recovery for error modules.vision_describe_screen_1757052620
+2025-09-05 11:40:21,995 - modules.error_handler - INFO - Recovery successful for error modules.vision_describe_screen_1757052620
+2025-09-05 11:40:31,999 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:40:32,002 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:32,094 - modules.vision - INFO - Screenshot captured and encoded: 378968 characters
+2025-09-05 11:40:32,106 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:40:32,106 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:40:32,124 - modules.vision - INFO - Vision API response received in 0.02s (status: 404)
+2025-09-05 11:40:32,124 - modules.error_handler - WARNING - [vision_describe_screen_1757052632] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "No models loaded. Please load a model in the developer page or use the `lms load` command.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:40:32,124 - modules.error_handler - INFO - [vision_describe_screen_1757052632] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:40:32,125 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757052632] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:40:32,125 - orchestrator - WARNING - [cmd_1757052607334] Screen perception attempt 2 failed: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:40:32,125 - orchestrator - INFO - [cmd_1757052607334] Retrying screen perception in 1.0s...
+2025-09-05 11:40:33,131 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:33,131 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:40:33,131 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:33,187 - modules.vision - INFO - Screenshot captured and encoded: 381456 characters
+2025-09-05 11:40:33,192 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:40:33,192 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:40:33,204 - modules.vision - INFO - Vision API response received in 0.01s (status: 404)
+2025-09-05 11:40:33,204 - modules.error_handler - WARNING - [vision_describe_screen_1757052633] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "No models loaded. Please load a model in the developer page or use the `lms load` command.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:40:33,204 - modules.error_handler - INFO - [vision_describe_screen_1757052633] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:40:33,204 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757052633] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:40:33,204 - modules.error_handler - INFO - Attempting recovery for error modules.vision_describe_screen_1757052633
+2025-09-05 11:40:34,209 - modules.error_handler - INFO - Recovery successful for error modules.vision_describe_screen_1757052633
+2025-09-05 11:40:37,348 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:37,350 - orchestrator - ERROR - [cmd_1757052607334] Command execution failed: Parallel processing timed out: 
+2025-09-05 11:40:37,350 - modules.feedback - WARNING - Sound 'failure' not available
+2025-09-05 11:40:37,351 - __main__ - WARNING - Command execution had issues: ['Parallel processing timed out: ', 'Parallel processing timed out: ']
+2025-09-05 11:40:37,351 - modules.audio - INFO - Converting text to speech: 'I encountered an error while executing your comman...'
+2025-09-05 11:40:37,351 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:40:41,717 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-05 11:40:42,491 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:40:42,609 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:40:44,212 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:40:44,214 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:40:44,328 - modules.vision - INFO - Screenshot captured and encoded: 207276 characters
+2025-09-05 11:40:44,351 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:40:44,351 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:40:44,366 - modules.vision - INFO - Vision API response received in 0.01s (status: 404)
+2025-09-05 11:40:44,366 - modules.error_handler - WARNING - [vision_describe_screen_1757052644] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "No models loaded. Please load a model in the developer page or use the `lms load` command.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:40:44,367 - modules.error_handler - INFO - [vision_describe_screen_1757052644] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:40:44,367 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757052644] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:40:44,367 - orchestrator - WARNING - [cmd_1757052607334] Screen perception attempt 3 failed: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:40:47,708 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:40:47,825 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:40:52,924 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:40:53,034 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:40:58,119 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:40:58,231 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:03,320 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:03,441 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:08,536 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:08,644 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:13,738 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:13,855 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:18,958 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:19,069 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:24,165 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:24,284 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:29,384 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:29,503 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:34,605 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:34,721 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:39,822 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:39,943 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:45,049 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:45,164 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:50,264 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:50,379 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:41:55,479 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:41:55,596 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:00,692 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:00,818 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:05,925 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:06,030 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:11,132 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:11,251 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:16,352 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:16,471 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:21,568 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:21,686 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:26,784 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:26,895 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:31,978 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:32,102 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:37,200 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:37,319 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:42,421 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:42,546 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:47,647 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:47,762 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:52,856 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:52,977 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:42:58,072 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:42:58,192 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:43:03,269 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:43:03,382 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:43:08,473 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:43:08,597 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:43:13,693 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:43:13,812 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:43:18,883 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:43:18,996 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:43:24,083 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:43:24,192 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:43:28,912 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-09-05 11:43:28,912 - __main__ - INFO - Initiating AURA shutdown...
+2025-09-05 11:43:28,912 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-09-05 11:43:29,283 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:43:29,404 - __main__ - INFO - Wake word monitoring stopped
+2025-09-05 11:43:29,405 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-09-05 11:43:29,405 - __main__ - INFO - Running 5 cleanup handlers...
+2025-09-05 11:43:29,407 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
+2025-09-05 11:47:06,761 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-09-05 11:47:06,761 - __main__ - INFO - Starting AURA application...
+2025-09-05 11:47:06,761 - __main__ - INFO - Step 1: Validating configuration...
+2025-09-05 11:47:06,775 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:47:06,776 - __main__ - INFO - Step 2: Running startup checks...
+2025-09-05 11:47:06,776 - __main__ - INFO - Running 5 startup checks...
+2025-09-05 11:47:08,698 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-09-05 11:47:08,698 - __main__ - INFO - Step 3: Initializing core modules...
+2025-09-05 11:47:08,698 - modules.audio - INFO - Loading Whisper model...
+2025-09-05 11:47:10,463 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-05 11:47:10,463 - modules.audio - INFO - Initializing TTS engine...
+2025-09-05 11:47:10,772 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-05 11:47:10,772 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-05 11:47:10,781 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-05 11:47:10,781 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-05 11:47:10,781 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-05 11:47:10,781 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-05 11:47:10,781 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-05 11:47:10,922 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-05 11:47:10,922 - modules.feedback - INFO - Loading sound files...
+2025-09-05 11:47:10,923 - modules.feedback - INFO - Loaded 0 sound files
+2025-09-05 11:47:10,923 - modules.feedback - INFO - Feedback processing loop started
+2025-09-05 11:47:10,923 - modules.feedback - INFO - Feedback processing thread started
+2025-09-05 11:47:10,924 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-05 11:47:10,924 - orchestrator - INFO - Initializing AURA modules...
+2025-09-05 11:47:10,924 - orchestrator - INFO - Initializing Vision Module...
+2025-09-05 11:47:10,926 - modules.vision - INFO - VisionModule initialized
+2025-09-05 11:47:10,926 - orchestrator - INFO - Vision Module initialized successfully
+2025-09-05 11:47:10,926 - orchestrator - INFO - Initializing Reasoning Module...
+2025-09-05 11:47:10,947 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-09-05 11:47:10,947 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-09-05 11:47:10,947 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-09-05 11:47:10,947 - orchestrator - INFO - Initializing Automation Module...
+2025-09-05 11:47:11,259 - modules.automation - INFO - AutomationModule initialized. Screen size: 2560x1600
+2025-09-05 11:47:11,259 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-09-05 11:47:11,259 - modules.automation - INFO - macOS detected - using cliclick as PRIMARY automation method
+2025-09-05 11:47:11,259 - modules.automation - INFO - AppleScript available as fallback only
+2025-09-05 11:47:11,259 - orchestrator - INFO - Automation Module initialized successfully
+2025-09-05 11:47:11,259 - orchestrator - INFO - Initializing Audio Module...
+2025-09-05 11:47:11,259 - modules.audio - INFO - Loading Whisper model...
+2025-09-05 11:47:12,863 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-05 11:47:12,863 - modules.audio - INFO - Initializing TTS engine...
+2025-09-05 11:47:13,112 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-05 11:47:13,112 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-05 11:47:13,115 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-05 11:47:13,115 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-05 11:47:13,115 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-05 11:47:13,115 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-05 11:47:13,115 - orchestrator - INFO - Audio Module initialized successfully
+2025-09-05 11:47:13,115 - orchestrator - INFO - Initializing Feedback Module...
+2025-09-05 11:47:13,115 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-05 11:47:13,115 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-05 11:47:13,115 - modules.feedback - INFO - Loading sound files...
+2025-09-05 11:47:13,115 - modules.feedback - INFO - Loaded 0 sound files
+2025-09-05 11:47:13,116 - modules.feedback - INFO - Feedback processing loop started
+2025-09-05 11:47:13,116 - modules.feedback - INFO - Feedback processing thread started
+2025-09-05 11:47:13,116 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-05 11:47:13,116 - orchestrator - INFO - Feedback Module initialized successfully
+2025-09-05 11:47:13,116 - orchestrator - INFO - Initializing Accessibility Module...
+2025-09-05 11:47:13,121 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-05 11:47:13,121 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-05 11:47:13,121 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-05 11:47:13,121 - orchestrator - INFO - Accessibility Module initialized successfully
+2025-09-05 11:47:13,121 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback, accessibility
+2025-09-05 11:47:13,121 - orchestrator - INFO - All modules initialized successfully
+2025-09-05 11:47:13,121 - orchestrator - INFO - System health monitoring initialized
+2025-09-05 11:47:13,122 - orchestrator - INFO - Orchestrator initialized successfully
+2025-09-05 11:47:13,122 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-09-05 11:47:13,122 - __main__ - INFO - All modules verified successfully
+2025-09-05 11:47:13,122 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-09-05 11:47:13,122 - __main__ - INFO - Health monitoring started
+2025-09-05 11:47:13,122 - __main__ - INFO - Step 6: Startup completed successfully
+2025-09-05 11:47:13,122 - __main__ - INFO - AURA application startup completed in 6.36s
+2025-09-05 11:47:13,122 - modules.audio - INFO - Converting text to speech: 'AURA is ready. Say 'computer' to activate....'
+2025-09-05 11:47:13,122 - __main__ - INFO - Starting main application loop...
+2025-09-05 11:47:13,122 - __main__ - INFO - Wake word monitoring started
+2025-09-05 11:47:13,133 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:47:15,881 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-05 11:47:18,235 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:47:18,357 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:47:23,450 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:47:23,570 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:47:28,669 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:47:28,789 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:47:33,893 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:47:34,006 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:47:39,085 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:47:39,199 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:47:44,291 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:47:44,407 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:47:49,509 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:47:49,630 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:47:53,451 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-05 11:47:53,452 - modules.audio - INFO - Providing wake word confirmation
+2025-09-05 11:47:53,570 - __main__ - INFO - Wake word detected (#1)
+2025-09-05 11:47:53,570 - __main__ - INFO - Processing voice command...
+2025-09-05 11:47:53,571 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:47:53,571 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-05 11:47:53,571 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-05 11:48:01,751 - modules.audio - INFO - Audio recording completed:
+2025-09-05 11:48:01,752 - modules.audio - INFO -   Duration: 8.00s
+2025-09-05 11:48:01,752 - modules.audio - INFO -   Samples: 128000
+2025-09-05 11:48:01,752 - modules.audio - INFO -   RMS volume: 0.0298
+2025-09-05 11:48:01,752 - modules.audio - INFO -   Max volume: 0.3825
+2025-09-05 11:48:01,752 - modules.audio - INFO - Good audio level detected (RMS: 0.0298)
+2025-09-05 11:48:01,753 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-05 11:48:01,823 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpsdzaykkl.wav
+2025-09-05 11:48:01,823 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-05 11:48:01,823 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-05 11:48:01,823 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-05 11:48:01,823 - modules.audio - INFO -   Channels: 1
+2025-09-05 11:48:01,825 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-05 11:48:01,825 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-05 11:48:01,825 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpsdzaykkl.wav
+2025-09-05 11:48:01,825 - modules.audio - INFO - Running Whisper transcription...
+2025-09-05 11:48:03,209 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-05 11:48:03,209 - modules.audio - INFO - Whisper transcription completed
+2025-09-05 11:48:03,209 - modules.audio - INFO - Whisper result details:
+2025-09-05 11:48:03,209 - modules.audio - INFO -   Text: 'Yes? Click on Gmail'
+2025-09-05 11:48:03,210 - modules.audio - INFO -   Language: en
+2025-09-05 11:48:03,210 - modules.audio - INFO -   Segments: 2
+2025-09-05 11:48:03,210 - modules.audio - INFO -     Segment 1: 'Yes?' (0.00-1.00s, prob: -0.781)
+2025-09-05 11:48:03,210 - modules.audio - INFO -     Segment 2: 'Click on Gmail' (2.00-3.00s, prob: -0.781)
+2025-09-05 11:48:03,210 - modules.audio - INFO - Transcription result: 'Yes? Click on Gmail'
+2025-09-05 11:48:03,210 - __main__ - INFO - Command received: 'Yes? Click on Gmail'
+2025-09-05 11:48:03,210 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:03,210 - orchestrator - INFO - Starting command execution [cmd_1757053083210]: 'Yes? Click on Gmail'
+2025-09-05 11:48:03,210 - orchestrator - INFO - [cmd_1757053083210] Step 1: Command validation
+2025-09-05 11:48:03,211 - orchestrator - INFO - [cmd_1757053083210] Command validated and normalized: 'yes? click on gmail'
+2025-09-05 11:48:03,211 - orchestrator - INFO - [cmd_1757053083210] Attempting fast path execution for GUI command
+2025-09-05 11:48:03,215 - orchestrator - INFO - Attempting fast path execution (attempt 1/3)
+2025-09-05 11:48:03,215 - modules.accessibility - INFO - Enhanced role detection failed, falling back to button-only detection for 'yes? gmail'
+2025-09-05 11:48:03,215 - modules.accessibility - INFO - Using original fallback detection for role 'AXButton', label 'yes? gmail'
+2025-09-05 11:48:03,215 - orchestrator - INFO - Enhanced element search completed: found=False, confidence=0.00, search_time=0.2ms, matched_attribute='', roles_checked=5, attributes_checked=3
+2025-09-05 11:48:03,215 - orchestrator - INFO - Fast path failure: element_not_found for command: 'yes? click on gmail'
+2025-09-05 11:48:03,215 - orchestrator - INFO - [cmd_1757053083210] Enhanced fast path failed, falling back to vision workflow
+2025-09-05 11:48:03,215 - orchestrator - INFO - [cmd_1757053083210] Fallback reason: element_not_found
+2025-09-05 11:48:03,215 - orchestrator - INFO - [cmd_1757053083210] Fast path execution time: 0.000s
+2025-09-05 11:48:03,215 - orchestrator - INFO - [cmd_1757053083210] Enhanced search attempted: confidence=0.00, roles_checked=5, attributes_checked=3, fuzzy_matches=0
+2025-09-05 11:48:03,215 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:03,215 - orchestrator - INFO - [cmd_1757053083210] Element not found via enhanced fast detection, using visual analysis
+2025-09-05 11:48:03,215 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-09-05 11:48:03,215 - orchestrator - INFO - [cmd_1757053083210] Using parallel processing for perception and reasoning
+2025-09-05 11:48:03,216 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:03,216 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:48:03,216 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:03,337 - modules.vision - INFO - Screenshot captured and encoded: 77832 characters
+2025-09-05 11:48:03,357 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:48:03,357 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:48:03,368 - modules.vision - INFO - Vision API response received in 0.01s (status: 404)
+2025-09-05 11:48:03,369 - modules.error_handler - WARNING - [vision_describe_screen_1757053083] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "No models loaded. Please load a model in the developer page or use the `lms load` command.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:48:03,369 - modules.error_handler - INFO - [vision_describe_screen_1757053083] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:48:03,370 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757053083] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:48:03,370 - modules.error_handler - INFO - Attempting recovery for error modules.vision_describe_screen_1757053083
+2025-09-05 11:48:04,375 - modules.error_handler - INFO - Recovery successful for error modules.vision_describe_screen_1757053083
+2025-09-05 11:48:14,378 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:48:14,380 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:14,442 - modules.vision - INFO - Screenshot captured and encoded: 502632 characters
+2025-09-05 11:48:14,447 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:48:14,447 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:48:14,465 - modules.vision - INFO - Vision API response received in 0.02s (status: 404)
+2025-09-05 11:48:14,465 - modules.error_handler - WARNING - [vision_describe_screen_1757053094] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "No models loaded. Please load a model in the developer page or use the `lms load` command.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:48:14,465 - modules.error_handler - INFO - [vision_describe_screen_1757053094] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:48:14,465 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757053094] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:48:14,465 - orchestrator - WARNING - [cmd_1757053083210] Screen perception attempt 1 failed: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:48:14,465 - orchestrator - INFO - [cmd_1757053083210] Retrying screen perception in 1.0s...
+2025-09-05 11:48:15,471 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:15,471 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:48:15,471 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:15,528 - modules.vision - INFO - Screenshot captured and encoded: 495412 characters
+2025-09-05 11:48:15,532 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:48:15,532 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:48:15,549 - modules.vision - INFO - Vision API response received in 0.02s (status: 404)
+2025-09-05 11:48:15,549 - modules.error_handler - WARNING - [vision_describe_screen_1757053095] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "No models loaded. Please load a model in the developer page or use the `lms load` command.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:48:15,549 - modules.error_handler - INFO - [vision_describe_screen_1757053095] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:48:15,550 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757053095] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:48:15,550 - modules.error_handler - INFO - Attempting recovery for error modules.vision_describe_screen_1757053095
+2025-09-05 11:48:16,555 - modules.error_handler - INFO - Recovery successful for error modules.vision_describe_screen_1757053095
+2025-09-05 11:48:26,560 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:48:26,562 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:26,640 - modules.vision - INFO - Screenshot captured and encoded: 496620 characters
+2025-09-05 11:48:26,645 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:48:26,645 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:48:26,656 - modules.vision - INFO - Vision API response received in 0.01s (status: 404)
+2025-09-05 11:48:26,656 - modules.error_handler - WARNING - [vision_describe_screen_1757053106] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "No models loaded. Please load a model in the developer page or use the `lms load` command.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:48:26,657 - modules.error_handler - INFO - [vision_describe_screen_1757053106] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:48:26,658 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757053106] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:48:26,658 - orchestrator - WARNING - [cmd_1757053083210] Screen perception attempt 2 failed: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:48:26,658 - orchestrator - INFO - [cmd_1757053083210] Retrying screen perception in 1.0s...
+2025-09-05 11:48:27,660 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:27,660 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:48:27,660 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:27,717 - modules.vision - INFO - Screenshot captured and encoded: 495248 characters
+2025-09-05 11:48:27,720 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:48:27,720 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:48:27,730 - modules.vision - INFO - Vision API response received in 0.01s (status: 404)
+2025-09-05 11:48:27,730 - modules.error_handler - WARNING - [vision_describe_screen_1757053107] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "No models loaded. Please load a model in the developer page or use the `lms load` command.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:48:27,730 - modules.error_handler - INFO - [vision_describe_screen_1757053107] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:48:27,731 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757053107] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:48:27,731 - modules.error_handler - INFO - Attempting recovery for error modules.vision_describe_screen_1757053107
+2025-09-05 11:48:28,736 - modules.error_handler - INFO - Recovery successful for error modules.vision_describe_screen_1757053107
+2025-09-05 11:48:28,876 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-09-05 11:48:28,877 - __main__ - INFO - Initiating AURA shutdown...
+2025-09-05 11:48:28,877 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-09-05 11:48:33,220 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:33,221 - orchestrator - ERROR - [cmd_1757053083210] Command execution failed: Parallel processing timed out: 
+2025-09-05 11:48:33,221 - modules.feedback - WARNING - Sound 'failure' not available
+2025-09-05 11:48:33,221 - __main__ - WARNING - Command execution had issues: ['Parallel processing timed out: ', 'Parallel processing timed out: ']
+2025-09-05 11:48:33,222 - modules.audio - INFO - Converting text to speech: 'I encountered an error while executing your comman...'
+2025-09-05 11:48:33,222 - __main__ - INFO - Wake word monitoring stopped
+2025-09-05 11:48:33,223 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-09-05 11:48:33,251 - __main__ - INFO - Running 5 cleanup handlers...
+2025-09-05 11:48:33,252 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
+2025-09-05 11:48:37,252 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-05 11:48:38,737 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:48:38,738 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:48:38,822 - modules.vision - INFO - Screenshot captured and encoded: 497556 characters
+2025-09-05 11:48:38,827 - config - INFO - Detected active model in LM Studio: text-embedding-nomic-embed-text-v1.5:2
+2025-09-05 11:48:38,827 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:48:38,834 - modules.vision - INFO - Vision API response received in 0.01s (status: 404)
+2025-09-05 11:48:38,835 - modules.error_handler - WARNING - [vision_describe_screen_1757053118] API_ERROR in vision.describe_screen: API error: 404 - {
+    "error": {
+        "message": "No models loaded. Please load a model in the developer page or use the `lms load` command.",
+        "type": "invalid_request_error",
+        "param": "model",
+        "code": "model_not_found"
+    }
+}
+2025-09-05 11:48:38,835 - modules.error_handler - INFO - [vision_describe_screen_1757053118] PROCESSING_ERROR in vision.describe_screen: Vision API error: I'm having trouble communicating with my services. Please try again in a moment.
+2025-09-05 11:48:38,835 - modules.error_handler - WARNING - [modules.vision_describe_screen_1757053118] API_ERROR in modules.vision.describe_screen: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:48:38,835 - orchestrator - WARNING - [cmd_1757053083210] Screen perception attempt 3 failed: Screen analysis failed: I encountered an error while processing your request. Please try again.
+2025-09-05 11:55:26,131 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-09-05 11:55:26,132 - __main__ - INFO - Starting AURA application...
+2025-09-05 11:55:26,132 - __main__ - INFO - Step 1: Validating configuration...
+2025-09-05 11:55:26,150 - config - INFO - Detected active model in LM Studio: google/gemma-3-4b
+2025-09-05 11:55:26,151 - __main__ - INFO - Step 2: Running startup checks...
+2025-09-05 11:55:26,151 - __main__ - INFO - Running 5 startup checks...
+2025-09-05 11:55:28,378 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-09-05 11:55:28,379 - __main__ - INFO - Step 3: Initializing core modules...
+2025-09-05 11:55:28,379 - modules.audio - INFO - Loading Whisper model...
+2025-09-05 11:55:30,537 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-05 11:55:30,545 - modules.audio - INFO - Initializing TTS engine...
+2025-09-05 11:55:30,919 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-05 11:55:30,919 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-05 11:55:30,943 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-05 11:55:30,943 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-05 11:55:30,943 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-05 11:55:30,943 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-05 11:55:30,943 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-05 11:55:31,088 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-05 11:55:31,089 - modules.feedback - INFO - Loading sound files...
+2025-09-05 11:55:31,089 - modules.feedback - INFO - Loaded 0 sound files
+2025-09-05 11:55:31,090 - modules.feedback - INFO - Feedback processing loop started
+2025-09-05 11:55:31,090 - modules.feedback - INFO - Feedback processing thread started
+2025-09-05 11:55:31,090 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-05 11:55:31,090 - orchestrator - INFO - Initializing AURA modules...
+2025-09-05 11:55:31,090 - orchestrator - INFO - Initializing Vision Module...
+2025-09-05 11:55:31,097 - modules.vision - INFO - VisionModule initialized
+2025-09-05 11:55:31,097 - orchestrator - INFO - Vision Module initialized successfully
+2025-09-05 11:55:31,097 - orchestrator - INFO - Initializing Reasoning Module...
+2025-09-05 11:55:31,126 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-09-05 11:55:31,126 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-09-05 11:55:31,126 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-09-05 11:55:31,126 - orchestrator - INFO - Initializing Automation Module...
+2025-09-05 11:55:31,436 - modules.automation - INFO - AutomationModule initialized. Screen size: 2560x1600
+2025-09-05 11:55:31,436 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-09-05 11:55:31,436 - modules.automation - INFO - macOS detected - using cliclick as PRIMARY automation method
+2025-09-05 11:55:31,436 - modules.automation - INFO - AppleScript available as fallback only
+2025-09-05 11:55:31,436 - orchestrator - INFO - Automation Module initialized successfully
+2025-09-05 11:55:31,436 - orchestrator - INFO - Initializing Audio Module...
+2025-09-05 11:55:31,436 - modules.audio - INFO - Loading Whisper model...
+2025-09-05 11:55:33,275 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-05 11:55:33,276 - modules.audio - INFO - Initializing TTS engine...
+2025-09-05 11:55:33,541 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-05 11:55:33,541 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-05 11:55:33,545 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-05 11:55:33,545 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-05 11:55:33,545 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-05 11:55:33,545 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-05 11:55:33,545 - orchestrator - INFO - Audio Module initialized successfully
+2025-09-05 11:55:33,545 - orchestrator - INFO - Initializing Feedback Module...
+2025-09-05 11:55:33,545 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-05 11:55:33,545 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-05 11:55:33,545 - modules.feedback - INFO - Loading sound files...
+2025-09-05 11:55:33,546 - modules.feedback - INFO - Loaded 0 sound files
+2025-09-05 11:55:33,546 - modules.feedback - INFO - Feedback processing loop started
+2025-09-05 11:55:33,546 - modules.feedback - INFO - Feedback processing thread started
+2025-09-05 11:55:33,546 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-05 11:55:33,546 - orchestrator - INFO - Feedback Module initialized successfully
+2025-09-05 11:55:33,547 - orchestrator - INFO - Initializing Accessibility Module...
+2025-09-05 11:55:33,551 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-05 11:55:33,551 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-05 11:55:33,551 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-05 11:55:33,551 - orchestrator - INFO - Accessibility Module initialized successfully
+2025-09-05 11:55:33,551 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback, accessibility
+2025-09-05 11:55:33,551 - orchestrator - INFO - All modules initialized successfully
+2025-09-05 11:55:33,551 - orchestrator - INFO - System health monitoring initialized
+2025-09-05 11:55:33,551 - orchestrator - INFO - Orchestrator initialized successfully
+2025-09-05 11:55:33,552 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-09-05 11:55:33,552 - __main__ - INFO - All modules verified successfully
+2025-09-05 11:55:33,552 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-09-05 11:55:33,552 - __main__ - INFO - Health monitoring started
+2025-09-05 11:55:33,552 - __main__ - INFO - Step 6: Startup completed successfully
+2025-09-05 11:55:33,552 - __main__ - INFO - AURA application startup completed in 7.42s
+2025-09-05 11:55:33,552 - modules.audio - INFO - Converting text to speech: 'AURA is ready. Say 'computer' to activate....'
+2025-09-05 11:55:33,552 - __main__ - INFO - Starting main application loop...
+2025-09-05 11:55:33,552 - __main__ - INFO - Wake word monitoring started
+2025-09-05 11:55:33,552 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:55:36,393 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-05 11:55:38,663 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:55:38,783 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:55:40,569 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-05 11:55:40,569 - modules.audio - INFO - Providing wake word confirmation
+2025-09-05 11:55:40,691 - __main__ - INFO - Wake word detected (#1)
+2025-09-05 11:55:40,692 - __main__ - INFO - Processing voice command...
+2025-09-05 11:55:40,692 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:55:40,692 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-05 11:55:40,692 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-05 11:55:48,871 - modules.audio - INFO - Audio recording completed:
+2025-09-05 11:55:48,871 - modules.audio - INFO -   Duration: 8.00s
+2025-09-05 11:55:48,871 - modules.audio - INFO -   Samples: 128000
+2025-09-05 11:55:48,872 - modules.audio - INFO -   RMS volume: 0.0323
+2025-09-05 11:55:48,872 - modules.audio - INFO -   Max volume: 0.3547
+2025-09-05 11:55:48,872 - modules.audio - INFO - Good audio level detected (RMS: 0.0323)
+2025-09-05 11:55:48,872 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-05 11:55:48,944 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpigj5pmbw.wav
+2025-09-05 11:55:48,944 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-05 11:55:48,944 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-05 11:55:48,944 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-05 11:55:48,944 - modules.audio - INFO -   Channels: 1
+2025-09-05 11:55:48,945 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-05 11:55:48,945 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-05 11:55:48,945 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpigj5pmbw.wav
+2025-09-05 11:55:48,945 - modules.audio - INFO - Running Whisper transcription...
+2025-09-05 11:55:50,398 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-05 11:55:50,399 - modules.audio - INFO - Whisper transcription completed
+2025-09-05 11:55:50,399 - modules.audio - INFO - Whisper result details:
+2025-09-05 11:55:50,399 - modules.audio - INFO -   Text: 'Yes? Click on Google search'
+2025-09-05 11:55:50,399 - modules.audio - INFO -   Language: en
+2025-09-05 11:55:50,399 - modules.audio - INFO -   Segments: 2
+2025-09-05 11:55:50,399 - modules.audio - INFO -     Segment 1: 'Yes?' (0.00-1.00s, prob: -0.759)
+2025-09-05 11:55:50,399 - modules.audio - INFO -     Segment 2: 'Click on Google search' (1.00-4.00s, prob: -0.759)
+2025-09-05 11:55:50,399 - modules.audio - INFO - Transcription result: 'Yes? Click on Google search'
+2025-09-05 11:55:50,399 - __main__ - INFO - Command received: 'Yes? Click on Google search'
+2025-09-05 11:55:50,399 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:55:50,399 - orchestrator - INFO - Starting command execution [cmd_1757053550399]: 'Yes? Click on Google search'
+2025-09-05 11:55:50,399 - orchestrator - INFO - [cmd_1757053550399] Step 1: Command validation
+2025-09-05 11:55:50,400 - orchestrator - INFO - [cmd_1757053550399] Command validated and normalized: 'yes? click on google search'
+2025-09-05 11:55:50,400 - orchestrator - INFO - [cmd_1757053550399] Attempting fast path execution for GUI command
+2025-09-05 11:55:50,403 - orchestrator - INFO - Attempting fast path execution (attempt 1/3)
+2025-09-05 11:55:50,404 - modules.accessibility - INFO - Enhanced role detection failed, falling back to button-only detection for 'yes? google search'
+2025-09-05 11:55:50,404 - modules.accessibility - INFO - Using original fallback detection for role 'AXButton', label 'yes? google search'
+2025-09-05 11:55:50,404 - orchestrator - INFO - Enhanced element search completed: found=False, confidence=0.00, search_time=0.2ms, matched_attribute='', roles_checked=5, attributes_checked=3
+2025-09-05 11:55:50,404 - orchestrator - INFO - Fast path failure: element_not_found for command: 'yes? click on google search'
+2025-09-05 11:55:50,404 - orchestrator - INFO - [cmd_1757053550399] Enhanced fast path failed, falling back to vision workflow
+2025-09-05 11:55:50,404 - orchestrator - INFO - [cmd_1757053550399] Fallback reason: element_not_found
+2025-09-05 11:55:50,404 - orchestrator - INFO - [cmd_1757053550399] Fast path execution time: 0.000s
+2025-09-05 11:55:50,404 - orchestrator - INFO - [cmd_1757053550399] Enhanced search attempted: confidence=0.00, roles_checked=5, attributes_checked=3, fuzzy_matches=0
+2025-09-05 11:55:50,404 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:55:50,404 - orchestrator - INFO - [cmd_1757053550399] Element not found via enhanced fast detection, using visual analysis
+2025-09-05 11:55:50,404 - modules.feedback - WARNING - Sound 'thinking' not available
+2025-09-05 11:55:50,404 - orchestrator - INFO - [cmd_1757053550399] Using parallel processing for perception and reasoning
+2025-09-05 11:55:50,405 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:55:50,405 - modules.vision - INFO - Starting screen analysis (type: simple)
+2025-09-05 11:55:50,405 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:55:50,514 - modules.vision - INFO - Screenshot captured and encoded: 79152 characters
+2025-09-05 11:55:50,535 - config - INFO - Detected active model in LM Studio: google/gemma-3-4b
+2025-09-05 11:55:50,535 - modules.vision - INFO - Sending vision request to LM Studio (attempt 1, timeout: 180s)
+2025-09-05 11:56:14,961 - modules.vision - INFO - Vision API response received in 24.42s (status: 200)
+2025-09-05 11:56:14,967 - modules.vision - WARNING - No JSON found in response, created fallback response from plain text
+2025-09-05 11:56:14,967 - modules.vision - INFO - Screen analysis completed: 0 elements found
+2025-09-05 11:56:14,972 - orchestrator - INFO - [cmd_1757053550399] Screen perception successful: 5 elements found
+2025-09-05 11:56:14,976 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:56:14,977 - modules.reasoning - INFO - Generating action plan for command: 'yes? click on google search...'
+2025-09-05 11:56:18,265 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-05 11:56:18,269 - modules.reasoning - INFO - Generated action plan with 3 steps
+2025-09-05 11:56:18,269 - orchestrator - INFO - [cmd_1757053550399] Command reasoning successful: 3 actions planned
+2025-09-05 11:56:18,269 - orchestrator - INFO - [cmd_1757053550399] Parallel processing completed successfully
+2025-09-05 11:56:18,270 - orchestrator - INFO - [cmd_1757053550399] Step 3: Action execution
+2025-09-05 11:56:18,270 - orchestrator - INFO - [cmd_1757053550399] Executing 3 actions
+2025-09-05 11:56:18,271 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:56:18,272 - modules.automation - INFO - Executing action: click (attempt 1/4)
+2025-09-05 11:56:18,554 - modules.automation - INFO - cliclick SLOW PATH: Click succeeded at (860, 450) on 'unknown' in 0.283s
+2025-09-05 11:56:18,555 - modules.automation - INFO - Successfully executed action: click
+2025-09-05 11:56:18,556 - orchestrator - INFO - [cmd_1757053550399] Task completion marker reached
+2025-09-05 11:56:18,556 - modules.audio - INFO - Converting text to speech: 'Clicked on the Google search bar....'
+2025-09-05 11:56:18,556 - orchestrator - INFO - [cmd_1757053550399] Action execution completed: 3/3 successful
+2025-09-05 11:56:18,557 - orchestrator - INFO - [cmd_1757053550399] Performance Comparison - Enhanced Fast Path vs Vision Fallback:
+2025-09-05 11:56:18,559 - orchestrator - INFO - [cmd_1757053550399]   Enhanced Fast Path: 0.000s (failed: element_not_found)
+2025-09-05 11:56:18,559 - orchestrator - INFO - [cmd_1757053550399]   Vision Fallback: 28.157s
+2025-09-05 11:56:18,559 - orchestrator - INFO - [cmd_1757053550399]   Time Difference: +28.157s
+2025-09-05 11:56:18,560 - orchestrator - INFO - [cmd_1757053550399]   Performance Ratio: infx
+2025-09-05 11:56:18,560 - orchestrator - WARNING - [cmd_1757053550399] Vision fallback took significantly longer than fast path (28.2s difference). Consider optimizing accessibility detection.
+2025-09-05 11:56:18,561 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-05 11:56:18,561 - orchestrator - INFO - [cmd_1757053550399] Command completed successfully in 28.16s
+2025-09-05 11:56:18,562 - __main__ - INFO - Command executed successfully: Yes? Click on Google search
+2025-09-05 11:56:18,562 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:56:20,502 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-05 11:56:20,502 - modules.feedback - WARNING - Sound 'success' not available
+2025-09-05 11:56:23,692 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:56:23,814 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:56:28,914 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:56:29,021 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:56:34,090 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:56:34,207 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:56:39,299 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:56:39,405 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:56:44,505 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:56:44,629 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:56:49,725 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:56:49,847 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:56:54,951 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:56:55,073 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:00,169 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:00,289 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:05,385 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:05,503 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:10,595 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:10,718 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:15,815 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:15,937 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:21,023 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:21,137 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:26,220 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:26,337 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:31,407 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:31,531 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:36,629 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:36,737 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:41,819 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:41,929 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:47,009 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:47,134 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:52,228 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:52,336 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:57:57,413 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:57:57,531 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:02,635 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:02,754 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:07,848 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:07,965 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:13,054 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:13,167 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:18,247 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:18,371 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:23,483 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:23,601 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:28,679 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:28,850 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:33,955 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:34,072 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:39,176 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:39,294 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:44,396 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:44,522 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:49,629 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:49,748 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:58:54,844 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:58:54,974 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:00,075 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:00,229 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:05,334 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:05,461 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:10,568 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:10,682 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:15,775 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:15,926 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:21,035 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:21,187 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:26,286 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:26,440 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:31,545 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:31,744 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:36,950 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:37,119 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:42,244 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:42,375 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:47,472 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:47,593 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:52,705 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:52,822 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 11:59:57,920 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 11:59:58,035 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 12:00:00,607 - __main__ - INFO - AURA Status Report - Uptime: 274.5s, Wake words: 1 (13.1/hr), Commands: 1 (13.1/hr), Errors: 0, Threads: 7 (Wake: Running, Health: Stopped), Memory: 5247.5MB, CPU: 47.4%, Cache: 0.0% hit rate, Health: critical
+2025-09-05 12:00:03,142 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 12:00:03,295 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 12:00:08,400 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 12:00:08,558 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 12:00:13,645 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 12:00:13,807 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 12:00:18,911 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 12:00:19,040 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 12:00:24,144 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 12:00:24,265 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-05 12:00:29,369 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-05 12:02:57,678 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-09-05 12:02:57,680 - __main__ - INFO - Initiating AURA shutdown...
+2025-09-05 12:02:57,680 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-09-05 12:03:02,681 - __main__ - WARNING - Wake word thread did not stop gracefully
+2025-09-05 12:03:02,682 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-09-05 12:03:02,682 - __main__ - INFO - Running 5 cleanup handlers...
+2025-09-05 12:03:02,687 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
