@@ -24,16 +24,15 @@ except ImportError as e:
     FUZZY_MATCHING_AVAILABLE = False
     logging.warning(f"Fuzzy matching library not available: {e}. Install with: pip install thefuzz[speedup]")
 
+# Import AppKit for application management only (not accessibility functions)
 try:
-    import AppKit
     from AppKit import NSWorkspace, NSApplication
-    import Accessibility
-    ACCESSIBILITY_AVAILABLE = True
+    APPKIT_AVAILABLE = True
 except ImportError as e:
-    ACCESSIBILITY_AVAILABLE = False
-    logging.warning(f"Accessibility frameworks not available: {e}")
+    APPKIT_AVAILABLE = False
+    logging.warning(f"AppKit framework not available: {e}")
 
-# Import accessibility functions
+# Import ALL accessibility functions exclusively from ApplicationServices
 try:
     from ApplicationServices import (
         AXUIElementCreateSystemWide,
@@ -57,6 +56,9 @@ except ImportError:
         ACCESSIBILITY_FUNCTIONS_AVAILABLE = 'AXUIElementCreateSystemWide' in globals()
     except:
         ACCESSIBILITY_FUNCTIONS_AVAILABLE = False
+
+# Set overall availability flag
+ACCESSIBILITY_AVAILABLE = APPKIT_AVAILABLE and ACCESSIBILITY_FUNCTIONS_AVAILABLE
 
 
 @dataclass
@@ -625,9 +627,9 @@ class AccessibilityModule:
             system_wide = None
             if ACCESSIBILITY_FUNCTIONS_AVAILABLE:
                 system_wide = AXUIElementCreateSystemWide()
-            focused_app_ref = AppKit.AXUIElementCopyAttributeValue(
+            focused_app_ref = AXUIElementCopyAttributeValue(
                 system_wide, 
-                AppKit.kAXFocusedApplicationAttribute, 
+                kAXFocusedApplicationAttribute, 
                 None
             )
             return focused_app_ref[1] if focused_app_ref[0] == 0 else None
@@ -1521,7 +1523,7 @@ class AccessibilityModule:
             for app in running_apps:
                 if app.localizedName() == app_name:
                     pid = app.processIdentifier()
-                    return AppKit.AXUIElementCreateApplication(pid)
+                    return AXUIElementCreateApplication(pid)
         
         # Default to focused application
         return self._get_focused_application_element()
@@ -1532,30 +1534,30 @@ class AccessibilityModule:
             info = {'element': element}
             
             # Get role
-            role_result = AppKit.AXUIElementCopyAttributeValue(
-                element, AppKit.kAXRoleAttribute, None
+            role_result = AXUIElementCopyAttributeValue(
+                element, kAXRoleAttribute, None
             )
             if role_result[0] == 0:
                 info['role'] = role_result[1]
             
             # Get title/label
-            title_result = AppKit.AXUIElementCopyAttributeValue(
-                element, AppKit.kAXTitleAttribute, None
+            title_result = AXUIElementCopyAttributeValue(
+                element, kAXTitleAttribute, None
             )
             if title_result[0] == 0:
                 info['title'] = title_result[1]
             
             # Try alternative label attributes if title is empty
             if not info.get('title'):
-                label_result = AppKit.AXUIElementCopyAttributeValue(
-                    element, AppKit.kAXDescriptionAttribute, None
+                label_result = AXUIElementCopyAttributeValue(
+                    element, kAXDescriptionAttribute, None
                 )
                 if label_result[0] == 0:
                     info['title'] = label_result[1]
             
             # Get enabled state
-            enabled_result = AppKit.AXUIElementCopyAttributeValue(
-                element, AppKit.kAXEnabledAttribute, None
+            enabled_result = AXUIElementCopyAttributeValue(
+                element, kAXEnabledAttribute, None
             )
             if enabled_result[0] == 0:
                 info['enabled'] = bool(enabled_result[1])
@@ -1571,8 +1573,8 @@ class AccessibilityModule:
     def _get_element_children(self, element) -> List:
         """Get children of an accessibility element."""
         try:
-            children_result = AppKit.AXUIElementCopyAttributeValue(
-                element, AppKit.kAXChildrenAttribute, None
+            children_result = AXUIElementCopyAttributeValue(
+                element, kAXChildrenAttribute, None
             )
             if children_result[0] == 0 and children_result[1]:
                 return list(children_result[1])
@@ -1625,15 +1627,15 @@ class AccessibilityModule:
         """Calculate coordinates and size for an accessibility element."""
         try:
             # Get position
-            position_result = AppKit.AXUIElementCopyAttributeValue(
-                element, AppKit.kAXPositionAttribute, None
+            position_result = AXUIElementCopyAttributeValue(
+                element, kAXPositionAttribute, None
             )
             if position_result[0] != 0:
                 return None
             
             # Get size
-            size_result = AppKit.AXUIElementCopyAttributeValue(
-                element, AppKit.kAXSizeAttribute, None
+            size_result = AXUIElementCopyAttributeValue(
+                element, kAXSizeAttribute, None
             )
             if size_result[0] != 0:
                 return None
@@ -1662,8 +1664,8 @@ class AccessibilityModule:
     def _get_app_name_from_element(self, app_element) -> str:
         """Get application name from accessibility element."""
         try:
-            title_result = AppKit.AXUIElementCopyAttributeValue(
-                app_element, AppKit.kAXTitleAttribute, None
+            title_result = AXUIElementCopyAttributeValue(
+                app_element, kAXTitleAttribute, None
             )
             if title_result[0] == 0:
                 return title_result[1]
@@ -2091,7 +2093,7 @@ class AccessibilityModule:
         for attribute in self.ACCESSIBILITY_ATTRIBUTES:
             try:
                 # Get attribute value from element
-                attribute_result = AppKit.AXUIElementCopyAttributeValue(
+                attribute_result = AXUIElementCopyAttributeValue(
                     element, attribute, None
                 )
                 
@@ -2120,7 +2122,7 @@ class AccessibilityModule:
         for attribute in self.ACCESSIBILITY_ATTRIBUTES:
             try:
                 # Get attribute value from element
-                attribute_result = AppKit.AXUIElementCopyAttributeValue(
+                attribute_result = AXUIElementCopyAttributeValue(
                     element, attribute, None
                 )
                 
@@ -2151,7 +2153,7 @@ class AccessibilityModule:
         """Check if a text field is editable."""
         try:
             # Check if element has editable attribute
-            editable_result = AppKit.AXUIElementCopyAttributeValue(
+            editable_result = AXUIElementCopyAttributeValue(
                 element, 'AXEditable', None
             )
             if editable_result[0] == 0:
