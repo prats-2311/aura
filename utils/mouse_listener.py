@@ -104,6 +104,10 @@ class GlobalMouseListener:
             self.click_coordinates = None
             
             self.listener_thread.start()
+            
+            # Give the thread a moment to start
+            time.sleep(0.1)
+            
             logger.info("Global mouse listener started successfully")
             
         except Exception as e:
@@ -166,7 +170,8 @@ class GlobalMouseListener:
             logger.debug("Mouse listener thread started")
             
             if self.listener:
-                # This call blocks until the listener is stopped
+                # Start the pynput listener and join it - this blocks until the listener is stopped
+                self.listener.start()
                 self.listener.join()
             
             logger.debug("Mouse listener thread finished")
@@ -249,7 +254,10 @@ class GlobalMouseListener:
         Returns:
             True if listening for mouse events, False otherwise
         """
-        return self.is_listening and self.listener is not None
+        return (self.is_listening and 
+                self.listener is not None and 
+                self.listener_thread is not None and 
+                self.listener_thread.is_alive())
     
     def get_listening_duration(self) -> Optional[float]:
         """
