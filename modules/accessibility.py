@@ -105,6 +105,60 @@ class ElementIndex:
         self.normalized_title_index = defaultdict(list)
 
 
+@dataclass
+class ElementMatchResult:
+    """Enhanced result from element matching with detailed metadata."""
+    element: Optional[Dict[str, Any]]
+    found: bool
+    confidence_score: float
+    matched_attribute: str
+    search_time_ms: float
+    roles_checked: List[str]
+    attributes_checked: List[str]
+    fuzzy_matches: List[Dict[str, Any]]  # All fuzzy matches with scores
+    fallback_triggered: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging and debugging."""
+        return {
+            'found': self.found,
+            'confidence_score': self.confidence_score,
+            'matched_attribute': self.matched_attribute,
+            'search_time_ms': self.search_time_ms,
+            'roles_checked': self.roles_checked,
+            'attributes_checked': self.attributes_checked,
+            'fuzzy_match_count': len(self.fuzzy_matches),
+            'fallback_triggered': self.fallback_triggered,
+            'element_info': {
+                'role': self.element.get('role') if self.element else None,
+                'title': self.element.get('title') if self.element else None,
+                'coordinates': self.element.get('coordinates') if self.element else None
+            } if self.element else None
+        }
+
+
+@dataclass
+class TargetExtractionResult:
+    """Result from command target extraction."""
+    original_command: str
+    extracted_target: str
+    action_type: str
+    confidence: float
+    removed_words: List[str]
+    processing_time_ms: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging."""
+        return {
+            'original_command': self.original_command,
+            'extracted_target': self.extracted_target,
+            'action_type': self.action_type,
+            'confidence': self.confidence,
+            'removed_words': self.removed_words,
+            'processing_time_ms': self.processing_time_ms
+        }
+
+
 class AccessibilityPermissionError(Exception):
     """Raised when accessibility permissions are not granted."""
     def __init__(self, message: str, recovery_suggestion: Optional[str] = None):
@@ -759,9 +813,9 @@ class AccessibilityModule:
         
         return diagnostics
     
-    def find_element_enhanced(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def find_element_enhanced(self, role: str, label: str, app_name: Optional[str] = None) -> ElementMatchResult:
         """
-        Enhanced element finding with multi-role detection and backward compatibility.
+        Enhanced element finding with multi-role detection and comprehensive result tracking.
         
         Args:
             role: Accessibility role (e.g., 'AXButton', 'AXMenuItem') or empty for broader search
@@ -769,34 +823,144 @@ class AccessibilityModule:
             app_name: Optional application name to limit search scope
         
         Returns:
-            Dictionary with element details or None if not found
+            ElementMatchResult with detailed matching metadata
         """
+        start_time = time.time()
+        roles_checked = []
+        attributes_checked = []
+        fuzzy_matches = []
+        fallback_triggered = False
+        
         # Check if enhanced features are available
         if not self.is_enhanced_role_detection_available():
             self.logger.info("Enhanced role detection not available, falling back to original implementation")
-            return self._find_element_original_fallback(role, label, app_name)
+            fallback_triggered = True
+            
+            # Try original fallback and wrap result
+            original_result = self._find_element_original_fallback(role, label, app_name)
+            search_time_ms = (time.time() - start_time) * 1000
+            
+            if original_result:
+                roles_checked = [role] if role else ['AXButton']
+                attributes_checked = ['AXTitle']  # Original implementation typically checks AXTitle
+                
+                return ElementMatchResult(
+                    element=original_result,
+                    found=True,
+                    confidence_score=100.0,  # Original exact match
+                    matched_attribute='AXTitle',
+                    search_time_ms=search_time_ms,
+                    roles_checked=roles_checked,
+                    attributes_checked=attributes_checked,
+                    fuzzy_matches=[],
+                    fallback_triggered=fallback_triggered
+                )
+            else:
+                return ElementMatchResult(
+                    element=None,
+                    found=False,
+                    confidence_score=0.0,
+                    matched_attribute='',
+                    search_time_ms=search_time_ms,
+                    roles_checked=roles_checked,
+                    attributes_checked=attributes_checked,
+                    fuzzy_matches=[],
+                    fallback_triggered=fallback_triggered
+                )
         
         try:
-            # First attempt: Enhanced role detection
-            result = self._find_element_with_enhanced_roles(role, label, app_name)
+            # First attempt: Enhanced role detection with detailed tracking
+            result, match_details = self._find_element_with_enhanced_roles_tracked(role, label, app_name)
+            
             if result:
-                self.logger.debug(f"Enhanced role detection succeeded for {role} '{label}'")
-                return result
+                search_time_ms = (time.time() - start_time) * 1000
+                self.logger.debug(f"Enhanced role detection succeeded for {role} '{label}' in {search_time_ms:.1f}ms")
+                
+                return ElementMatchResult(
+                    element=result,
+                    found=True,
+                    confidence_score=match_details.get('confidence_score', 100.0),
+                    matched_attribute=match_details.get('matched_attribute', 'AXTitle'),
+                    search_time_ms=search_time_ms,
+                    roles_checked=match_details.get('roles_checked', [role] if role else []),
+                    attributes_checked=match_details.get('attributes_checked', []),
+                    fuzzy_matches=match_details.get('fuzzy_matches', []),
+                    fallback_triggered=False
+                )
             
             # Fallback: Original button-only detection for backward compatibility
             if not role or role.lower() in ['button', 'clickable']:
                 self.logger.debug(f"Falling back to button-only detection for '{label}'")
-                result = self._find_element_button_only_fallback(label, app_name)
-                if result:
-                    self.logger.debug(f"Button-only fallback succeeded for '{label}'")
-                    return result
+                fallback_triggered = True
+                
+                button_result = self._find_element_button_only_fallback(label, app_name)
+                search_time_ms = (time.time() - start_time) * 1000
+                
+                if button_result:
+                    self.logger.debug(f"Button-only fallback succeeded for '{label}' in {search_time_ms:.1f}ms")
+                    roles_checked = ['AXButton']
+                    attributes_checked = ['AXTitle']
+                    
+                    return ElementMatchResult(
+                        element=button_result,
+                        found=True,
+                        confidence_score=100.0,  # Exact match in fallback
+                        matched_attribute='AXTitle',
+                        search_time_ms=search_time_ms,
+                        roles_checked=roles_checked,
+                        attributes_checked=attributes_checked,
+                        fuzzy_matches=[],
+                        fallback_triggered=fallback_triggered
+                    )
             
-            return None
+            # No element found
+            search_time_ms = (time.time() - start_time) * 1000
+            self.logger.debug(f"Element not found for {role} '{label}' after {search_time_ms:.1f}ms")
+            
+            return ElementMatchResult(
+                element=None,
+                found=False,
+                confidence_score=0.0,
+                matched_attribute='',
+                search_time_ms=search_time_ms,
+                roles_checked=match_details.get('roles_checked', [role] if role else []) if 'match_details' in locals() else [],
+                attributes_checked=match_details.get('attributes_checked', []) if 'match_details' in locals() else [],
+                fuzzy_matches=match_details.get('fuzzy_matches', []) if 'match_details' in locals() else [],
+                fallback_triggered=fallback_triggered
+            )
             
         except Exception as e:
-            self.logger.warning(f"Enhanced element detection failed: {e}")
+            search_time_ms = (time.time() - start_time) * 1000
+            self.logger.warning(f"Enhanced element detection failed after {search_time_ms:.1f}ms: {e}")
+            
             # Final fallback to original method
-            return self._find_element_original_fallback(role, label, app_name)
+            fallback_triggered = True
+            original_result = self._find_element_original_fallback(role, label, app_name)
+            
+            if original_result:
+                return ElementMatchResult(
+                    element=original_result,
+                    found=True,
+                    confidence_score=100.0,
+                    matched_attribute='AXTitle',
+                    search_time_ms=search_time_ms,
+                    roles_checked=[role] if role else ['AXButton'],
+                    attributes_checked=['AXTitle'],
+                    fuzzy_matches=[],
+                    fallback_triggered=fallback_triggered
+                )
+            else:
+                return ElementMatchResult(
+                    element=None,
+                    found=False,
+                    confidence_score=0.0,
+                    matched_attribute='',
+                    search_time_ms=search_time_ms,
+                    roles_checked=[role] if role else [],
+                    attributes_checked=[],
+                    fuzzy_matches=[],
+                    fallback_triggered=fallback_triggered
+                )
     
     def find_element(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
@@ -820,9 +984,23 @@ class AccessibilityModule:
         """
         # Use enhanced element detection by default
         try:
-            result = self.find_element_enhanced(role, label, app_name)
-            if result:
-                return result
+            enhanced_result = self.find_element_enhanced(role, label, app_name)
+            
+            # Log detailed results for debugging
+            if enhanced_result.found:
+                self.logger.debug(f"Element found - Confidence: {enhanced_result.confidence_score:.1f}%, "
+                                f"Attribute: {enhanced_result.matched_attribute}, "
+                                f"Time: {enhanced_result.search_time_ms:.1f}ms, "
+                                f"Roles checked: {len(enhanced_result.roles_checked)}, "
+                                f"Fallback: {enhanced_result.fallback_triggered}")
+            else:
+                self.logger.debug(f"Element not found - Time: {enhanced_result.search_time_ms:.1f}ms, "
+                                f"Roles checked: {enhanced_result.roles_checked}, "
+                                f"Attributes checked: {enhanced_result.attributes_checked}")
+            
+            # Return the element dict for backward compatibility
+            return enhanced_result.element
+            
         except Exception as e:
             self.logger.debug(f"Enhanced element detection failed, using original logic: {e}")
         
@@ -1083,6 +1261,45 @@ class AccessibilityModule:
         except Exception as e:
             self._handle_accessibility_error(e, "find_element")
             return None
+    
+    def _find_element_with_enhanced_roles_tracked(self, role: str, label: str, app_name: Optional[str] = None) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Find element using enhanced role detection with detailed tracking.
+        
+        Args:
+            role: Target element role (can be empty for broader search)
+            label: Target element label/text
+            app_name: Optional application name for scoped search
+        
+        Returns:
+            Tuple of (element_info_dict, match_details_dict)
+        """
+        match_details = {
+            'roles_checked': [],
+            'attributes_checked': [],
+            'fuzzy_matches': [],
+            'confidence_score': 0.0,
+            'matched_attribute': ''
+        }
+        
+        # Get the original result
+        result = self._find_element_with_enhanced_roles(role, label, app_name)
+        
+        # For now, populate basic tracking info
+        # This will be enhanced when we implement the full fuzzy matching and multi-attribute search
+        if role:
+            match_details['roles_checked'] = [role]
+        else:
+            # Default clickable roles when no specific role provided
+            match_details['roles_checked'] = ['AXButton', 'AXLink', 'AXMenuItem', 'AXCheckBox', 'AXRadioButton']
+        
+        match_details['attributes_checked'] = ['AXTitle', 'AXDescription', 'AXValue']
+        
+        if result:
+            match_details['confidence_score'] = 100.0  # Exact match for now
+            match_details['matched_attribute'] = 'AXTitle'  # Default assumption
+        
+        return result, match_details
     
     def _find_element_with_enhanced_roles(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
