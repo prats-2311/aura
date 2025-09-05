@@ -7,7 +7,7 @@ using the Accessibility API, enabling near-instantaneous GUI automation.
 
 import logging
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
 import re
 import threading
@@ -15,6 +15,14 @@ from collections import defaultdict
 import concurrent.futures
 import asyncio
 from functools import partial
+
+# Import fuzzy matching library with error handling
+try:
+    from thefuzz import fuzz
+    FUZZY_MATCHING_AVAILABLE = True
+except ImportError as e:
+    FUZZY_MATCHING_AVAILABLE = False
+    logging.warning(f"Fuzzy matching library not available: {e}. Install with: pip install thefuzz[speedup]")
 
 try:
     import AppKit
@@ -1698,6 +1706,12 @@ class AccessibilityModule:
     # Accessibility attributes to check in priority order for multi-attribute text searching
     ACCESSIBILITY_ATTRIBUTES = ['AXTitle', 'AXDescription', 'AXValue']
     
+    # Fuzzy matching configuration
+    FUZZY_MATCHING_ENABLED = True
+    FUZZY_CONFIDENCE_THRESHOLD = 85  # Minimum confidence score (0-100) for fuzzy matches
+    FUZZY_MATCHING_TIMEOUT = 200     # Maximum time in milliseconds for fuzzy matching operations
+    LOG_FUZZY_MATCH_SCORES = False   # Enable detailed logging of fuzzy match scores
+    
     ACTIONABLE_ROLES = {
         'AXButton', 'AXMenuButton', 'AXMenuItem', 'AXMenuBarItem',
         'AXTextField', 'AXSecureTextField', 'AXTextArea',
@@ -1863,6 +1877,87 @@ class AccessibilityModule:
         similarity = intersection / union
         return similarity >= threshold
     
+    def fuzzy_match_text(self, element_text: str, target_text: str, 
+                        confidence_threshold: Optional[int] = None,
+                        timeout_ms: Optional[int] = None) -> Tuple[bool, float]:
+        """
+        Perform fuzzy string matching using thefuzz library with confidence threshold.
+        
+        Args:
+            element_text: Text from the accessibility element
+            target_text: Text to match against
+            confidence_threshold: Minimum confidence score (0-100), uses class default if None
+            timeout_ms: Timeout in milliseconds, uses class default if None
+        
+        Returns:
+            Tuple of (match_found, confidence_score)
+        """
+        start_time = time.time()
+        
+        # Use class defaults if not specified
+        if confidence_threshold is None:
+            confidence_threshold = self.FUZZY_CONFIDENCE_THRESHOLD
+        if timeout_ms is None:
+            timeout_ms = self.FUZZY_MATCHING_TIMEOUT
+        
+        # Check if fuzzy matching is enabled and available
+        if not self.FUZZY_MATCHING_ENABLED or not FUZZY_MATCHING_AVAILABLE:
+            self.logger.debug("Fuzzy matching disabled or unavailable, falling back to exact matching")
+            # Fallback to exact matching
+            normalized_element = self._normalize_text(element_text)
+            normalized_target = self._normalize_text(target_text)
+            exact_match = normalized_element == normalized_target or normalized_target in normalized_element
+            return exact_match, 100.0 if exact_match else 0.0
+        
+        if not element_text or not target_text:
+            return False, 0.0
+        
+        try:
+            # Check timeout
+            elapsed_ms = (time.time() - start_time) * 1000
+            if elapsed_ms > timeout_ms:
+                self.logger.warning(f"Fuzzy matching timeout exceeded: {elapsed_ms:.1f}ms > {timeout_ms}ms")
+                return False, 0.0
+            
+            # Use partial_ratio for better matching of substrings
+            confidence_score = fuzz.partial_ratio(element_text.lower(), target_text.lower())
+            
+            # Check timeout again after fuzzy matching
+            elapsed_ms = (time.time() - start_time) * 1000
+            if elapsed_ms > timeout_ms:
+                self.logger.warning(f"Fuzzy matching completed but exceeded timeout: {elapsed_ms:.1f}ms > {timeout_ms}ms")
+                return False, 0.0
+            
+            # Log performance monitoring
+            if elapsed_ms > timeout_ms * 0.8:  # Warn if using more than 80% of timeout
+                self.logger.warning(f"Fuzzy matching slow: {elapsed_ms:.1f}ms (threshold: {timeout_ms}ms)")
+            
+            match_found = confidence_score >= confidence_threshold
+            
+            # Log fuzzy match scores if enabled or in debug mode
+            if self.LOG_FUZZY_MATCH_SCORES or self.logger.isEnabledFor(logging.DEBUG):
+                log_level = logging.INFO if self.LOG_FUZZY_MATCH_SCORES else logging.DEBUG
+                self.logger.log(log_level, f"Fuzzy match: '{element_text}' vs '{target_text}' = {confidence_score}% "
+                               f"({'MATCH' if match_found else 'NO MATCH'}, threshold: {confidence_threshold}%, "
+                               f"time: {elapsed_ms:.1f}ms)")
+            
+            return match_found, float(confidence_score)
+            
+        except Exception as e:
+            elapsed_ms = (time.time() - start_time) * 1000
+            self.logger.warning(f"Fuzzy matching error after {elapsed_ms:.1f}ms: {e}")
+            
+            # Fallback to exact matching on error
+            try:
+                normalized_element = self._normalize_text(element_text)
+                normalized_target = self._normalize_text(target_text)
+                exact_match = normalized_element == normalized_target or normalized_target in normalized_element
+                self.logger.debug(f"Fuzzy matching failed, exact match fallback: {exact_match}")
+                return exact_match, 100.0 if exact_match else 0.0
+            except Exception as fallback_error:
+                self.logger.error(f"Both fuzzy and exact matching failed: {fallback_error}")
+                return False, 0.0
+    
     def filter_elements_by_criteria(self, elements: List[Dict[str, Any]], 
                                   role_filter: Optional[str] = None,
                                   actionable_only: bool = True,
@@ -2004,23 +2099,52 @@ class AccessibilityModule:
                     attribute_value = str(attribute_result[1])
                     
                     if attribute_value:
-                        # Calculate match score for this attribute
-                        match_score = self._calculate_match_score(attribute_value, target_text)
+                        # Use fuzzy matching for this attribute
+                        match_found, confidence_score = self.fuzzy_match_text(attribute_value, target_text)
                         
-                        # Return first successful match (score > 0.5)
-                        if match_score > 0.5:
-                            self.logger.debug(f"Multi-attribute match found: {attribute}='{attribute_value}' matches '{target_text}' (score: {match_score:.2f})")
-                            return True, match_score, attribute
+                        # Return first successful match
+                        if match_found:
+                            self.logger.debug(f"Multi-attribute fuzzy match found: {attribute}='{attribute_value}' matches '{target_text}' (confidence: {confidence_score:.1f}%)")
+                            return True, confidence_score / 100.0, attribute  # Convert to 0-1 scale for compatibility
                         
-                        self.logger.debug(f"Attribute {attribute}='{attribute_value}' low match score: {match_score:.2f}")
+                        self.logger.debug(f"Attribute {attribute}='{attribute_value}' low confidence: {confidence_score:.1f}%")
                 
             except Exception as e:
                 # Log attribute access error but continue with next attribute
                 self.logger.debug(f"Error accessing attribute {attribute}: {e}")
                 continue
         
-        # No successful matches found
-        self.logger.debug(f"No multi-attribute matches found for '{target_text}'")
+        # No successful fuzzy matches found, try fallback to exact matching
+        self.logger.debug(f"No multi-attribute fuzzy matches found for '{target_text}', trying exact matching fallback")
+        
+        for attribute in self.ACCESSIBILITY_ATTRIBUTES:
+            try:
+                # Get attribute value from element
+                attribute_result = AppKit.AXUIElementCopyAttributeValue(
+                    element, attribute, None
+                )
+                
+                if attribute_result[0] == 0 and attribute_result[1]:
+                    attribute_value = str(attribute_result[1])
+                    
+                    if attribute_value:
+                        # Fallback to exact matching
+                        normalized_attribute = self._normalize_text(attribute_value)
+                        normalized_target = self._normalize_text(target_text)
+                        
+                        # Exact match or contains match
+                        if (normalized_attribute == normalized_target or 
+                            normalized_target in normalized_attribute):
+                            self.logger.debug(f"Exact match fallback found: {attribute}='{attribute_value}' matches '{target_text}'")
+                            return True, 1.0, attribute
+                
+            except Exception as e:
+                # Log attribute access error but continue with next attribute
+                self.logger.debug(f"Error accessing attribute {attribute} in fallback: {e}")
+                continue
+        
+        # No matches found at all
+        self.logger.debug(f"No multi-attribute matches found for '{target_text}' (fuzzy or exact)")
         return False, 0.0, ""
     
     def _is_text_field_editable(self, element) -> bool:
