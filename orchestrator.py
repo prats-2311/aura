@@ -37,6 +37,15 @@ from modules.performance import (
     performance_monitor
 )
 
+# Import enhanced fallback configuration
+from config import (
+    ENHANCED_FALLBACK_ENABLED,
+    FALLBACK_PERFORMANCE_LOGGING,
+    FALLBACK_RETRY_DELAY,
+    MAX_FALLBACK_RETRIES,
+    FALLBACK_TIMEOUT_THRESHOLD
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -1243,6 +1252,14 @@ class Orchestrator:
             execution_context["status"] = CommandStatus.COMPLETED
             execution_context["end_time"] = time.time()
             execution_context["total_duration"] = execution_context["end_time"] - start_time
+            
+            # Log performance comparison if this was a fallback from enhanced fast path
+            if execution_context.get("fast_path_attempted") and execution_context.get("enhanced_fast_path_used"):
+                self._log_fallback_performance_comparison(
+                    execution_id, 
+                    execution_context, 
+                    execution_context["total_duration"]
+                )
             
             # Final progress update
             self._update_progress(execution_id, CommandStatus.COMPLETED, ExecutionStep.CLEANUP, 100)
@@ -2727,33 +2744,62 @@ Focus on being helpful while being honest about what information is actually vis
                 
                 logger.debug(f"Extracted GUI elements: {gui_elements}")
                 
-                # Attempt to find the element using accessibility API with parallel vision preparation
-                def prepare_vision_capture():
-                    """Prepare vision capture as fallback."""
-                    try:
-                        if self.vision_module and self.module_availability.get('vision', False):
-                            return self.vision_module.capture_screen()
-                        return None
-                    except Exception as e:
-                        logger.debug(f"Vision preparation failed: {e}")
-                        return None
+                # Use enhanced element finding with comprehensive result tracking
+                logger.debug(f"Using enhanced element finding for: role='{gui_elements.get('role', '')}', label='{gui_elements.get('label', '')}', app_name='{gui_elements.get('app_name')}'")
                 
-                element_result = self.accessibility_module.find_element_with_vision_preparation(
+                enhanced_result = self.accessibility_module.find_element_enhanced(
                     role=gui_elements.get('role', ''),
                     label=gui_elements.get('label', ''),
-                    app_name=gui_elements.get('app_name'),
-                    vision_callback=prepare_vision_capture if self.enable_parallel_processing else None
+                    app_name=gui_elements.get('app_name')
                 )
                 
-                if not element_result:
-                    logger.debug("Element not found via accessibility API")
-                    # For element not found, don't retry - it's likely a legitimate miss
-                    return self._create_fast_path_failure_result("element_not_found", command, {
-                        'gui_elements': gui_elements,
-                        'attempt': attempt + 1
-                    })
+                # Extract element from enhanced result
+                element_result = enhanced_result.element if enhanced_result and enhanced_result.found else None
                 
-                logger.info(f"Found element via accessibility API: {element_result}")
+                # Log enhanced search results for performance monitoring
+                if enhanced_result:
+                    logger.info(f"Enhanced element search completed: found={enhanced_result.found}, "
+                               f"confidence={enhanced_result.confidence_score:.2f}, "
+                               f"search_time={enhanced_result.search_time_ms:.1f}ms, "
+                               f"matched_attribute='{enhanced_result.matched_attribute}', "
+                               f"roles_checked={len(enhanced_result.roles_checked)}, "
+                               f"attributes_checked={len(enhanced_result.attributes_checked)}")
+                    
+                    # Record enhanced fast path performance metrics
+                    metric = PerformanceMetrics(
+                        operation="enhanced_fast_path_element_search",
+                        duration=enhanced_result.search_time_ms / 1000.0,  # Convert to seconds
+                        success=enhanced_result.found,
+                        parallel_execution=False,
+                        metadata={
+                            'confidence_score': enhanced_result.confidence_score,
+                            'matched_attribute': enhanced_result.matched_attribute,
+                            'roles_checked_count': len(enhanced_result.roles_checked),
+                            'attributes_checked_count': len(enhanced_result.attributes_checked),
+                            'fuzzy_matches_count': len(enhanced_result.fuzzy_matches),
+                            'fallback_triggered': enhanced_result.fallback_triggered,
+                            'element_role': element_result.get('role', '') if element_result else '',
+                            'element_title': element_result.get('title', '') if element_result else '',
+                            'app_name': gui_elements.get('app_name', ''),
+                            'attempt': attempt + 1
+                        }
+                    )
+                    performance_monitor.record_metric(metric)
+                
+                if not element_result:
+                    logger.debug("Element not found via enhanced accessibility search")
+                    
+                    # Create detailed failure context from enhanced result
+                    failure_context = {
+                        'gui_elements': gui_elements,
+                        'attempt': attempt + 1,
+                        'enhanced_search_details': enhanced_result.to_dict() if enhanced_result else None
+                    }
+                    
+                    # For element not found, don't retry - it's likely a legitimate miss
+                    return self._create_fast_path_failure_result("element_not_found", command, failure_context)
+                
+                logger.info(f"Found element via enhanced accessibility search: {element_result}")
                 
                 # Execute the action using automation module
                 action_type = gui_elements.get('action', 'click')
@@ -2763,7 +2809,7 @@ Focus on being helpful while being honest about what information is actually vis
                     logger.error("Automation module not available for fast path execution")
                     return self._create_fast_path_failure_result("automation_unavailable", command)
                 
-                # Execute fast path action
+                # Execute fast path action with enhanced element information
                 action_result = self.automation_module.execute_fast_path_action(
                     action_type=action_type,
                     coordinates=coordinates,
@@ -2788,9 +2834,9 @@ Focus on being helpful while being honest about what information is actually vis
                             'attempts': attempt + 1
                         })
                 
-                # Record successful performance metrics
+                # Record successful performance metrics with enhanced details
                 metric = PerformanceMetrics(
-                    operation="fast_path_execution_success",
+                    operation="enhanced_fast_path_execution_success",
                     duration=execution_time,
                     success=True,
                     parallel_execution=False,
@@ -2801,22 +2847,29 @@ Focus on being helpful while being honest about what information is actually vis
                         'app_name': element_result.get('app_name', ''),
                         'coordinates': coordinates,
                         'attempts': attempt + 1,
-                        'retry_used': attempt > 0
+                        'retry_used': attempt > 0,
+                        'enhanced_search_confidence': enhanced_result.confidence_score if enhanced_result else 0.0,
+                        'enhanced_search_time_ms': enhanced_result.search_time_ms if enhanced_result else 0.0,
+                        'matched_attribute': enhanced_result.matched_attribute if enhanced_result else '',
+                        'roles_checked': len(enhanced_result.roles_checked) if enhanced_result else 0,
+                        'attributes_checked': len(enhanced_result.attributes_checked) if enhanced_result else 0,
+                        'fuzzy_matches': len(enhanced_result.fuzzy_matches) if enhanced_result else 0
                     }
                 )
                 performance_monitor.record_metric(metric)
                 
-                logger.info(f"Fast path execution successful in {execution_time:.2f}s (attempt {attempt + 1})")
+                logger.info(f"Enhanced fast path execution successful in {execution_time:.2f}s (attempt {attempt + 1})")
                 
                 return {
                     'success': True,
                     'execution_time': execution_time,
-                    'path_used': 'fast',
+                    'path_used': 'enhanced_fast',
                     'element_found': element_result,
                     'action_result': action_result,
                     'attempts': attempt + 1,
                     'retry_used': attempt > 0,
-                    'message': f"Successfully executed {action_type} on {element_result.get('title', 'element')} using fast path"
+                    'enhanced_search_result': enhanced_result.to_dict() if enhanced_result else None,
+                    'message': f"Successfully executed {action_type} on {element_result.get('title', 'element')} using enhanced fast path"
                 }
                 
             except Exception as e:
@@ -2829,6 +2882,7 @@ Focus on being helpful while being honest about what information is actually vis
                     context={
                         "command": command, 
                         "gui_elements": gui_elements if 'gui_elements' in locals() else None,
+                        "enhanced_result": enhanced_result.to_dict() if 'enhanced_result' in locals() and enhanced_result else None,
                         "attempt": attempt + 1,
                         "max_retries": max_retries
                     }
@@ -2844,9 +2898,9 @@ Focus on being helpful while being honest about what information is actually vis
                     time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
                     continue
                 else:
-                    # Record failed performance metrics
+                    # Record failed performance metrics with enhanced details
                     metric = PerformanceMetrics(
-                        operation="fast_path_execution_failed",
+                        operation="enhanced_fast_path_execution_failed",
                         duration=time.time() - start_time if 'start_time' in locals() else 0,
                         success=False,
                         parallel_execution=False,
@@ -2854,7 +2908,10 @@ Focus on being helpful while being honest about what information is actually vis
                             'error_type': type(e).__name__,
                             'error_message': str(e),
                             'attempts': attempt + 1,
-                            'final_failure': True
+                            'final_failure': True,
+                            'enhanced_search_attempted': 'enhanced_result' in locals(),
+                            'enhanced_search_success': enhanced_result.found if 'enhanced_result' in locals() and enhanced_result else False,
+                            'enhanced_search_confidence': enhanced_result.confidence_score if 'enhanced_result' in locals() and enhanced_result else 0.0
                         }
                     )
                     performance_monitor.record_metric(metric)
@@ -2863,7 +2920,8 @@ Focus on being helpful while being honest about what information is actually vis
                         'error': str(e),
                         'error_type': type(e).__name__,
                         'attempts': attempt + 1,
-                        'error_info': error_info.__dict__ if error_info else None
+                        'error_info': error_info.__dict__ if error_info else None,
+                        'enhanced_search_result': enhanced_result.to_dict() if 'enhanced_result' in locals() and enhanced_result else None
                     })
         
         # Should not reach here, but just in case
@@ -2965,30 +3023,45 @@ Focus on being helpful while being honest about what information is actually vis
     def _handle_fast_path_fallback(self, execution_id: str, execution_context: Dict[str, Any], 
                                  fast_path_result: Dict[str, Any], command: str) -> None:
         """
-        Handle fallback from fast path to vision workflow with comprehensive logging and diagnostics.
+        Handle fallback from enhanced fast path to vision workflow with comprehensive logging and performance comparison.
         
         Args:
             execution_id: Unique execution identifier
             execution_context: Current execution context
-            fast_path_result: Result from failed fast path attempt
+            fast_path_result: Result from failed enhanced fast path attempt
             command: Original command
         """
         # Extract failure details
         failure_reason = fast_path_result.get('failure_reason', 'unknown')
         failure_context = fast_path_result.get('context', {})
+        fast_path_execution_time = fast_path_result.get('execution_time', 0)
         
-        # Log detailed fallback information
-        logger.info(f"[{execution_id}] Fast path failed, falling back to vision workflow")
+        # Record fallback start time for performance comparison
+        fallback_start_time = time.time()
+        
+        # Log detailed fallback information with enhanced context
+        logger.info(f"[{execution_id}] Enhanced fast path failed, falling back to vision workflow")
         logger.info(f"[{execution_id}] Fallback reason: {failure_reason}")
+        logger.info(f"[{execution_id}] Fast path execution time: {fast_path_execution_time:.3f}s")
         
         if failure_context:
             logger.debug(f"[{execution_id}] Fallback context: {failure_context}")
+            
+            # Log enhanced search details if available
+            enhanced_search_details = failure_context.get('enhanced_search_details')
+            if enhanced_search_details:
+                logger.info(f"[{execution_id}] Enhanced search attempted: confidence={enhanced_search_details.get('confidence_score', 0):.2f}, "
+                           f"roles_checked={len(enhanced_search_details.get('roles_checked', []))}, "
+                           f"attributes_checked={len(enhanced_search_details.get('attributes_checked', []))}, "
+                           f"fuzzy_matches={enhanced_search_details.get('fuzzy_match_count', 0)}")
         
-        # Update execution context with fallback information
+        # Update execution context with enhanced fallback information
         execution_context["fast_path_attempted"] = True
+        execution_context["enhanced_fast_path_used"] = True
         execution_context["fast_path_result"] = fast_path_result
         execution_context["fallback_reason"] = failure_reason
-        execution_context["fallback_timestamp"] = time.time()
+        execution_context["fallback_timestamp"] = fallback_start_time
+        execution_context["fast_path_execution_time"] = fast_path_execution_time
         
         # Log accessibility diagnostics if available
         if self.accessibility_module:
@@ -3018,9 +3091,9 @@ Focus on being helpful while being honest about what information is actually vis
         # Categorize fallback reason for metrics
         fallback_category = self._categorize_fallback_reason(failure_reason)
         
-        # Record fallback metrics
+        # Record enhanced fallback metrics with performance comparison
         metric = PerformanceMetrics(
-            operation="fast_path_fallback",
+            operation="enhanced_fast_path_fallback",
             duration=0,  # Fallback itself doesn't take time
             success=True,  # Fallback is successful if it happens
             parallel_execution=False,
@@ -3029,7 +3102,14 @@ Focus on being helpful while being honest about what information is actually vis
                 'fallback_category': fallback_category,
                 'command_type': getattr(execution_context.get('validation_result'), 'command_type', 'unknown'),
                 'accessibility_degraded': self.accessibility_module.degraded_mode if self.accessibility_module else False,
-                'has_context': bool(failure_context)
+                'has_context': bool(failure_context),
+                'fast_path_execution_time': fast_path_execution_time,
+                'enhanced_fast_path_used': True,
+                'enhanced_search_attempted': bool(failure_context.get('enhanced_search_details')),
+                'enhanced_search_confidence': failure_context.get('enhanced_search_details', {}).get('confidence_score', 0) if failure_context else 0,
+                'roles_checked_count': len(failure_context.get('enhanced_search_details', {}).get('roles_checked', [])) if failure_context else 0,
+                'attributes_checked_count': len(failure_context.get('enhanced_search_details', {}).get('attributes_checked', [])) if failure_context else 0,
+                'fuzzy_matches_count': failure_context.get('enhanced_search_details', {}).get('fuzzy_match_count', 0) if failure_context else 0
             }
         )
         performance_monitor.record_metric(metric)
@@ -3045,16 +3125,87 @@ Focus on being helpful while being honest about what information is actually vis
         
         # Log user-friendly fallback message
         fallback_messages = {
-            'element_not_found': f"Element not found via fast detection, using visual analysis",
+            'element_not_found': f"Element not found via enhanced fast detection, using visual analysis",
             'accessibility_degraded': f"Using visual analysis due to accessibility limitations",
             'accessibility_not_initialized': f"Using visual analysis (accessibility unavailable)",
             'no_gui_elements': f"Command requires visual analysis",
-            'action_failed': f"Fast action failed, retrying with visual analysis",
-            'execution_error': f"Fast path error, using visual analysis as backup"
+            'action_failed': f"Enhanced fast action failed, retrying with visual analysis",
+            'execution_error': f"Enhanced fast path error, using visual analysis as backup"
         }
         
         user_message = fallback_messages.get(failure_reason, f"Using visual analysis for command execution")
         logger.info(f"[{execution_id}] {user_message}")
+    
+    def _log_fallback_performance_comparison(self, execution_id: str, execution_context: Dict[str, Any], 
+                                           vision_execution_time: float) -> None:
+        """
+        Log performance comparison between enhanced fast path and vision fallback.
+        
+        Args:
+            execution_id: Unique execution identifier
+            execution_context: Current execution context with fast path results
+            vision_execution_time: Time taken by vision workflow in seconds
+        """
+        if not FALLBACK_PERFORMANCE_LOGGING:
+            return
+            
+        try:
+            fast_path_time = execution_context.get("fast_path_execution_time", 0)
+            fast_path_result = execution_context.get("fast_path_result", {})
+            fallback_reason = execution_context.get("fallback_reason", "unknown")
+            
+            # Calculate performance metrics
+            time_difference = vision_execution_time - fast_path_time
+            performance_ratio = vision_execution_time / fast_path_time if fast_path_time > 0 else float('inf')
+            
+            # Log detailed performance comparison
+            logger.info(f"[{execution_id}] Performance Comparison - Enhanced Fast Path vs Vision Fallback:")
+            logger.info(f"[{execution_id}]   Enhanced Fast Path: {fast_path_time:.3f}s (failed: {fallback_reason})")
+            logger.info(f"[{execution_id}]   Vision Fallback: {vision_execution_time:.3f}s")
+            logger.info(f"[{execution_id}]   Time Difference: {time_difference:+.3f}s")
+            logger.info(f"[{execution_id}]   Performance Ratio: {performance_ratio:.2f}x")
+            
+            # Log enhanced search details if available
+            enhanced_search_result = fast_path_result.get('enhanced_search_result')
+            if enhanced_search_result:
+                logger.info(f"[{execution_id}]   Enhanced Search Details:")
+                logger.info(f"[{execution_id}]     - Confidence: {enhanced_search_result.get('confidence_score', 0):.2f}")
+                logger.info(f"[{execution_id}]     - Roles Checked: {len(enhanced_search_result.get('roles_checked', []))}")
+                logger.info(f"[{execution_id}]     - Attributes Checked: {len(enhanced_search_result.get('attributes_checked', []))}")
+                logger.info(f"[{execution_id}]     - Fuzzy Matches: {enhanced_search_result.get('fuzzy_match_count', 0)}")
+                logger.info(f"[{execution_id}]     - Fallback Triggered: {enhanced_search_result.get('fallback_triggered', False)}")
+            
+            # Record performance comparison metrics
+            metric = PerformanceMetrics(
+                operation="enhanced_fast_path_vs_vision_comparison",
+                duration=vision_execution_time,
+                success=True,
+                parallel_execution=False,
+                metadata={
+                    'fast_path_time': fast_path_time,
+                    'vision_time': vision_execution_time,
+                    'time_difference': time_difference,
+                    'performance_ratio': performance_ratio,
+                    'fallback_reason': fallback_reason,
+                    'enhanced_search_confidence': enhanced_search_result.get('confidence_score', 0) if enhanced_search_result else 0,
+                    'enhanced_search_roles_checked': len(enhanced_search_result.get('roles_checked', [])) if enhanced_search_result else 0,
+                    'enhanced_search_attributes_checked': len(enhanced_search_result.get('attributes_checked', [])) if enhanced_search_result else 0,
+                    'enhanced_search_fuzzy_matches': enhanced_search_result.get('fuzzy_match_count', 0) if enhanced_search_result else 0,
+                    'enhanced_search_fallback_triggered': enhanced_search_result.get('fallback_triggered', False) if enhanced_search_result else False
+                }
+            )
+            performance_monitor.record_metric(metric)
+            
+            # Provide insights based on performance comparison
+            if time_difference > FALLBACK_TIMEOUT_THRESHOLD:
+                logger.warning(f"[{execution_id}] Vision fallback took significantly longer than fast path "
+                              f"({time_difference:.1f}s difference). Consider optimizing accessibility detection.")
+            elif time_difference < -1.0:  # Fast path was actually slower (shouldn't happen often)
+                logger.info(f"[{execution_id}] Enhanced fast path was slower than expected. "
+                           f"Vision fallback was more efficient by {abs(time_difference):.1f}s.")
+            
+        except Exception as e:
+            logger.warning(f"[{execution_id}] Failed to log fallback performance comparison: {e}")
     
     def _categorize_fallback_reason(self, failure_reason: str) -> str:
         """

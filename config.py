@@ -204,6 +204,13 @@ ACCESSIBILITY_ATTRIBUTES = ["AXTitle", "AXDescription", "AXValue"]
 FAST_PATH_TIMEOUT = 2000         # Maximum time in milliseconds for fast path execution
 ATTRIBUTE_CHECK_TIMEOUT = 500    # Maximum time in milliseconds for attribute checking
 
+# Enhanced fallback configuration
+ENHANCED_FALLBACK_ENABLED = True        # Enable enhanced fallback coordination
+FALLBACK_PERFORMANCE_LOGGING = True     # Log performance comparison between fast path and vision fallback
+FALLBACK_RETRY_DELAY = 0.5              # Delay in seconds before retrying after fallback
+MAX_FALLBACK_RETRIES = 1                # Maximum number of fallback retries before giving up
+FALLBACK_TIMEOUT_THRESHOLD = 3.0        # Seconds - trigger fallback if fast path exceeds this time
+
 # Performance monitoring settings
 PERFORMANCE_MONITORING_ENABLED = True
 PERFORMANCE_WARNING_THRESHOLD = 1500  # Warn if operations take longer than this (ms)
@@ -478,6 +485,22 @@ def validate_config():
     if not isinstance(LOG_FUZZY_MATCH_SCORES, bool):
         errors.append("LOG_FUZZY_MATCH_SCORES must be a boolean")
     
+    # Validate enhanced fallback configuration
+    if not isinstance(ENHANCED_FALLBACK_ENABLED, bool):
+        errors.append("ENHANCED_FALLBACK_ENABLED must be a boolean")
+    
+    if not isinstance(FALLBACK_PERFORMANCE_LOGGING, bool):
+        errors.append("FALLBACK_PERFORMANCE_LOGGING must be a boolean")
+    
+    if FALLBACK_RETRY_DELAY < 0.1 or FALLBACK_RETRY_DELAY > 5.0:
+        warnings.append("FALLBACK_RETRY_DELAY should be between 0.1-5.0 seconds")
+    
+    if MAX_FALLBACK_RETRIES < 0 or MAX_FALLBACK_RETRIES > 5:
+        warnings.append("MAX_FALLBACK_RETRIES should be between 0-5")
+    
+    if FALLBACK_TIMEOUT_THRESHOLD < 1.0 or FALLBACK_TIMEOUT_THRESHOLD > 10.0:
+        warnings.append("FALLBACK_TIMEOUT_THRESHOLD should be between 1.0-10.0 seconds")
+    
     # Check performance monitoring settings
     if not isinstance(PERFORMANCE_MONITORING_ENABLED, bool):
         errors.append("PERFORMANCE_MONITORING_ENABLED must be a boolean")
@@ -573,7 +596,12 @@ def get_config_summary():
             'fast_path_timeout_ms': FAST_PATH_TIMEOUT,
             'attribute_check_timeout_ms': ATTRIBUTE_CHECK_TIMEOUT,
             'debug_logging': ACCESSIBILITY_DEBUG_LOGGING,
-            'log_match_scores': LOG_FUZZY_MATCH_SCORES
+            'log_match_scores': LOG_FUZZY_MATCH_SCORES,
+            'enhanced_fallback_enabled': ENHANCED_FALLBACK_ENABLED,
+            'fallback_performance_logging': FALLBACK_PERFORMANCE_LOGGING,
+            'fallback_retry_delay': FALLBACK_RETRY_DELAY,
+            'max_fallback_retries': MAX_FALLBACK_RETRIES,
+            'fallback_timeout_threshold': FALLBACK_TIMEOUT_THRESHOLD
         },
         'performance_monitoring': {
             'enabled': PERFORMANCE_MONITORING_ENABLED,
