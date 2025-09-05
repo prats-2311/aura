@@ -153,6 +153,27 @@ class Orchestrator:
         self.enable_parallel_processing = True
         self.parallel_perception_reasoning = True
         
+        # Conversational Enhancement State Management
+        # Intent recognition and routing state
+        self.intent_recognition_enabled = True
+        self.last_recognized_intent = None
+        
+        # Deferred action state management
+        self.is_waiting_for_user_action = False
+        self.pending_action_payload = None
+        self.deferred_action_type = None
+        self.deferred_action_start_time = None
+        self.mouse_listener = None
+        
+        # Conversational context state
+        self.conversation_history = []
+        self.current_conversation_context = {}
+        
+        # State management locks for thread safety
+        self.intent_lock = threading.Lock()
+        self.deferred_action_lock = threading.Lock()
+        self.conversation_lock = threading.Lock()
+        
         # Command validation patterns
         self._init_validation_patterns()
         

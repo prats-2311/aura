@@ -71,6 +71,58 @@ List any buttons you can see with their exact text. Be specific about button lab
 }
 """
 
+# -- Intent Recognition and Conversational Prompts --
+# Intent recognition prompt for classifying user commands
+INTENT_RECOGNITION_PROMPT = """
+Analyze the following user command and classify its intent. Return a JSON response with the intent type and any relevant parameters.
+
+User command: "{command}"
+
+Intent categories:
+- "gui_interaction": Traditional GUI automation commands (click, type, scroll, etc.)
+- "conversational_chat": General conversation, greetings, or casual questions
+- "deferred_action": Requests for content generation that will be placed later (e.g., "write code for X")
+- "question_answering": Specific information requests about the screen or system
+
+Return your response in this exact JSON format:
+{
+    "intent": "gui_interaction|conversational_chat|deferred_action|question_answering",
+    "confidence": 0.95,
+    "parameters": {
+        "action_type": "click|type|scroll|generate_code|general_question",
+        "target": "extracted target or content request",
+        "content_type": "code|text|explanation"
+    },
+    "reasoning": "Brief explanation of why this intent was chosen"
+}
+"""
+
+# Conversational prompt for natural language interactions
+CONVERSATIONAL_PROMPT = """
+You are AURA, a helpful AI assistant. The user is having a casual conversation with you. 
+Respond in a friendly, natural, and helpful manner. Keep responses concise but warm.
+
+User: {query}
+
+Respond naturally as AURA would, being helpful and conversational. Do not provide JSON responses for conversational interactions.
+"""
+
+# Code generation prompt for deferred actions
+CODE_GENERATION_PROMPT = """
+You are AURA, an AI assistant helping with code generation. The user has requested code that will be typed at a location they specify by clicking.
+
+User request: {request}
+Context: {context}
+
+Generate clean, well-formatted code that directly addresses the user's request. 
+- Provide only the code without explanations or markdown formatting
+- Ensure the code is ready to be typed directly into an editor
+- Focus on practical, working code
+- Keep it concise but complete
+
+Generate the requested code:
+"""
+
 # Detailed prompt for comprehensive analysis (when user specifically asks for details)
 VISION_PROMPT_DETAILED = """
 What do you see on this screen? List any buttons, text, or clickable elements with their actual text.
@@ -220,6 +272,22 @@ PERFORMANCE_LOGGING_ENABLED = True     # Enable detailed performance logging
 # Debugging settings for accessibility enhancements
 ACCESSIBILITY_DEBUG_LOGGING = False
 LOG_FUZZY_MATCH_SCORES = False
+
+# -- Conversational Enhancement Settings --
+# Deferred action configuration
+DEFERRED_ACTION_TIMEOUT = 300.0  # Maximum wait time for user action (5 minutes)
+MOUSE_LISTENER_SENSITIVITY = 1.0  # Click detection sensitivity
+DEFERRED_ACTION_AUDIO_CUES = True  # Enable audio guidance for deferred actions
+
+# Conversational settings
+CONVERSATION_CONTEXT_SIZE = 5  # Number of previous exchanges to remember
+CONVERSATION_PERSONALITY = "helpful"  # Response personality style
+ENABLE_FOLLOW_UP_SUGGESTIONS = True  # Suggest related questions
+
+# Intent recognition settings
+INTENT_RECOGNITION_ENABLED = True  # Enable intelligent intent classification
+INTENT_FALLBACK_TO_GUI = True  # Fallback to GUI interaction when intent unclear
+INTENT_CONFIDENCE_THRESHOLD = 0.7  # Minimum confidence for intent classification
 
 # -- Audio Settings --
 # Path to sound effects for feedback
