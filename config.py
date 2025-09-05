@@ -454,20 +454,30 @@ def print_setup_instructions():
 # -- Dynamic Model Detection --
 def get_active_vision_model():
     """
-    Get the currently active model from LM Studio.
-    
-    This function queries LM Studio to find whatever model is currently loaded
-    and returns its name for use in API requests. It doesn't filter for specific
-    model types since the user wants to use whatever model is running.
+    Get the currently active VISION-CAPABLE model from LM Studio.
+    Filters out embedding models and other non-vision models.
     
     Returns:
-        str: The name of the active model, or None if detection fails
+        str: The name of the active vision model, or None if detection fails
     """
     import requests
     import json
     import logging
     
     logger = logging.getLogger(__name__)
+    
+    # Known embedding model patterns to exclude
+    EMBEDDING_MODEL_PATTERNS = [
+        'embedding', 'embed', 'nomic-embed', 'text-embedding',
+        'sentence-transformer', 'bge-', 'e5-', 'gte-'
+    ]
+    
+    # Known vision model patterns to prioritize
+    VISION_MODEL_PATTERNS = [
+        'vision', 'llava', 'gpt-4v', 'claude-3', 'gemini-pro-vision',
+        'minicpm-v', 'qwen-vl', 'internvl', 'cogvlm', 'moondream',
+        'bakllava', 'yi-vl', 'deepseek-vl'
+    ]
     
     try:
         # Query LM Studio for available models
@@ -478,16 +488,46 @@ def get_active_vision_model():
             
             # LM Studio typically returns models in this format
             if "data" in models_data and models_data["data"]:
-                # Get the first available model (usually the loaded one)
-                active_model = models_data["data"][0]["id"]
-                logger.info(f"Detected active model in LM Studio: {active_model}")
-                return active_model
+                available_models = [model["id"] for model in models_data["data"]]
+                logger.info(f"Available models in LM Studio: {available_models}")
+                
+                # Filter out embedding models
+                vision_capable_models = []
+                for model in available_models:
+                    model_lower = model.lower()
+                    
+                    # Skip embedding models
+                    if any(pattern in model_lower for pattern in EMBEDDING_MODEL_PATTERNS):
+                        logger.debug(f"Skipping embedding model: {model}")
+                        continue
+                    
+                    vision_capable_models.append(model)
+                
+                if not vision_capable_models:
+                    logger.error("No vision-capable models found in LM Studio!")
+                    logger.error("Available models are all embedding models. Please load a vision model.")
+                    logger.error("Recommended: LLaVA, GPT-4V, MiniCPM-V, or similar vision models")
+                    return None
+                
+                # Prioritize known vision models
+                for model in vision_capable_models:
+                    model_lower = model.lower()
+                    if any(pattern in model_lower for pattern in VISION_MODEL_PATTERNS):
+                        logger.info(f"Selected vision model: {model}")
+                        return model
+                
+                # If no known vision models, use the first non-embedding model
+                selected_model = vision_capable_models[0]
+                logger.warning(f"Using first available non-embedding model: {selected_model}")
+                logger.warning("This model may not be vision-capable. Consider loading a proper vision model.")
+                return selected_model
+                
             else:
                 logger.warning("No models found in LM Studio response")
                 return None
                 
     except requests.exceptions.ConnectionError:
-        logger.warning("Cannot connect to LM Studio. Make sure it's running on http://localhost:1234")
+        logger.error("Cannot connect to LM Studio. Make sure it's running on http://localhost:1234")
     except requests.exceptions.Timeout:
         logger.warning("LM Studio connection timeout")
     except Exception as e:

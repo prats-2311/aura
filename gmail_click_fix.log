@@ -1,0 +1,187 @@
+2025-09-06 02:27:00,507 - __main__ - INFO - Gmail Click Issue Fix - Starting diagnostics...
+2025-09-06 02:27:00,507 - __main__ - INFO - ============================================================
+2025-09-06 02:27:00,507 - __main__ - INFO - GMAIL CLICK ISSUE DIAGNOSTIC CHECKS
+2025-09-06 02:27:00,507 - __main__ - INFO - ============================================================
+2025-09-06 02:27:00,507 - __main__ - INFO - 
+--- LM Studio Model Detection ---
+2025-09-06 02:27:00,507 - __main__ - INFO - Testing LM Studio model detection...
+2025-09-06 02:27:00,599 - config - INFO - Available models in LM Studio: ['text-embedding-nomic-embed-text-v1.5:2', 'text-embedding-nomic-embed-text-v1.5', 'smolvlm-500m-instruct', 'smolvlm2-2.2b-instruct', 'phi-3-vision-128k-instruct', 'microsoft/phi-4-mini-reasoning', 'qwen2.5-coder-7b-instruct-mlx', 'google/gemma-3-1b', 'phi-2', 'google/gemma-3-4b', 'qwen/qwen3-4b', 'qwen3-8b-mlx', 'qwen2-7b-instruct']
+2025-09-06 02:27:00,599 - config - INFO - Selected vision model: phi-3-vision-128k-instruct
+2025-09-06 02:27:00,599 - __main__ - INFO - ✅ Detected vision model: phi-3-vision-128k-instruct
+2025-09-06 02:27:00,600 - __main__ - INFO - ✅ Model appears to be vision-capable: phi-3-vision-128k-instruct
+2025-09-06 02:27:01,604 - __main__ - INFO - 
+--- Chrome Accessibility ---
+2025-09-06 02:27:01,604 - __main__ - INFO - Testing Chrome accessibility detection...
+2025-09-06 02:27:01,713 - root - WARNING - Accessibility frameworks not available: No module named 'ApplicationServices'
+2025-09-06 02:27:01,997 - modules.performance - INFO - Connection pool initialized with 10 max connections
+2025-09-06 02:27:01,997 - modules.performance - INFO - Image cache initialized: 100MB, 50 entries
+2025-09-06 02:27:02,011 - modules.performance - INFO - Parallel processor initialized with 4 workers
+2025-09-06 02:27:02,012 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 02:27:02,012 - modules.performance - INFO - Hybrid performance monitor initialized with 500 max metrics
+2025-09-06 02:27:02,013 - root - WARNING - Fuzzy matching library not available: No module named 'thefuzz'. Install with: pip install thefuzz[speedup]
+2025-09-06 02:27:02,017 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 02:27:02,017 - modules.permission_validator - INFO - Permission check completed: ❌ Accessibility permissions required (5 issues)
+2025-09-06 02:27:02,017 - modules.accessibility - INFO - Permission validation: ❌ Accessibility permissions required (5 issues)
+2025-09-06 02:27:02,017 - modules.accessibility - WARNING - Insufficient accessibility permissions for optimal performance
+2025-09-06 02:27:02,017 - modules.accessibility - INFO - Recommendation: Install required PyObjC frameworks: pip install pyobjc-framework-AppKit pyobjc-framework-Accessibility
+2025-09-06 02:27:02,017 - modules.accessibility - INFO - Recommendation: Grant accessibility permissions in System Preferences > Security & Privacy > Privacy > Accessibility
+2025-09-06 02:27:02,017 - modules.accessibility - INFO - Recommendation: Add Terminal (or your Python IDE) to the accessibility permissions list
+2025-09-06 02:27:02,017 - modules.accessibility - INFO - Recommendation: Restart the application after granting accessibility permissions
+2025-09-06 02:27:02,017 - modules.accessibility - INFO - Recommendation: Ensure the application has full disk access if running on macOS 10.15+
+2025-09-06 02:27:02,017 - modules.accessibility - INFO - Recommendation: Verify that the application can access other applications' UI elements
+2025-09-06 02:27:02,017 - modules.accessibility - INFO - Recommendation: Complete accessibility setup is required for AURA to function
+2025-09-06 02:27:02,017 - modules.accessibility - INFO - Recommendation: Follow the step-by-step permission guide
+2025-09-06 02:27:02,017 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-06 02:27:02,018 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 02:27:02,018 - modules.accessibility_debugger - WARNING - Fuzzy matching not available - using exact matching only
+2025-09-06 02:27:02,018 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 02:27:02,018 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 02:27:02,018 - modules.accessibility_debugger - WARNING - Fuzzy matching not available - using exact matching only
+2025-09-06 02:27:02,018 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 02:27:02,018 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 02:27:02,019 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 02:27:02,019 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 02:27:02,019 - modules.accessibility - INFO - Debugging tools initialized successfully
+2025-09-06 02:27:02,019 - modules.accessibility - ERROR - Accessibility API unavailable: Accessibility frameworks not installed
+2025-09-06 02:27:02,019 - modules.accessibility - WARNING - AccessibilityModule entering degraded mode: api_unavailable
+2025-09-06 02:27:02,019 - __main__ - ERROR - ❌ Cannot detect active application
+2025-09-06 02:27:02,019 - __main__ - ERROR - This may indicate accessibility permission issues
+2025-09-06 02:27:03,024 - __main__ - INFO - 
+--- Gmail Element Detection ---
+2025-09-06 02:27:03,025 - __main__ - INFO - Testing Gmail element detection...
+2025-09-06 02:27:03,025 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 02:27:03,025 - modules.permission_validator - INFO - Permission check completed: ❌ Accessibility permissions required (5 issues)
+2025-09-06 02:27:03,026 - modules.accessibility - INFO - Permission validation: ❌ Accessibility permissions required (5 issues)
+2025-09-06 02:27:03,026 - modules.accessibility - WARNING - Insufficient accessibility permissions for optimal performance
+2025-09-06 02:27:03,026 - modules.accessibility - INFO - Recommendation: Install required PyObjC frameworks: pip install pyobjc-framework-AppKit pyobjc-framework-Accessibility
+2025-09-06 02:27:03,026 - modules.accessibility - INFO - Recommendation: Grant accessibility permissions in System Preferences > Security & Privacy > Privacy > Accessibility
+2025-09-06 02:27:03,026 - modules.accessibility - INFO - Recommendation: Add Terminal (or your Python IDE) to the accessibility permissions list
+2025-09-06 02:27:03,026 - modules.accessibility - INFO - Recommendation: Restart the application after granting accessibility permissions
+2025-09-06 02:27:03,026 - modules.accessibility - INFO - Recommendation: Ensure the application has full disk access if running on macOS 10.15+
+2025-09-06 02:27:03,026 - modules.accessibility - INFO - Recommendation: Verify that the application can access other applications' UI elements
+2025-09-06 02:27:03,026 - modules.accessibility - INFO - Recommendation: Complete accessibility setup is required for AURA to function
+2025-09-06 02:27:03,026 - modules.accessibility - INFO - Recommendation: Follow the step-by-step permission guide
+2025-09-06 02:27:03,026 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-06 02:27:03,027 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 02:27:03,027 - modules.accessibility_debugger - WARNING - Fuzzy matching not available - using exact matching only
+2025-09-06 02:27:03,027 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 02:27:03,027 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 02:27:03,027 - modules.accessibility_debugger - WARNING - Fuzzy matching not available - using exact matching only
+2025-09-06 02:27:03,027 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 02:27:03,028 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 02:27:03,028 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 02:27:03,028 - modules.accessibility - INFO - Debugging tools initialized successfully
+2025-09-06 02:27:03,028 - modules.accessibility - ERROR - Accessibility API unavailable: Accessibility frameworks not installed
+2025-09-06 02:27:03,028 - modules.accessibility - WARNING - AccessibilityModule entering degraded mode: api_unavailable
+2025-09-06 02:27:03,028 - __main__ - INFO - Testing with role: AXLink
+2025-09-06 02:27:03,028 - modules.accessibility_debugger - INFO - Analyzing element detection failure for target: 'Gmail'
+2025-09-06 02:27:03,028 - modules.accessibility_debugger - ERROR - Failed to dump accessibility tree: No focused application found and no app_name specified
+2025-09-06 02:27:03,029 - modules.accessibility_debugger - ERROR - Failed to analyze element detection failure: No focused application found and no app_name specified
+2025-09-06 02:27:03,029 - __main__ - INFO - Testing with role: AXButton
+2025-09-06 02:27:03,029 - modules.accessibility_debugger - INFO - Analyzing element detection failure for target: 'Gmail'
+2025-09-06 02:27:03,029 - modules.accessibility_debugger - ERROR - Failed to dump accessibility tree: No focused application found and no app_name specified
+2025-09-06 02:27:03,029 - modules.accessibility_debugger - ERROR - Failed to analyze element detection failure: No focused application found and no app_name specified
+2025-09-06 02:27:03,029 - __main__ - INFO - Testing with role: auto-detect
+2025-09-06 02:27:03,029 - modules.accessibility - INFO - Enhanced role detection failed, falling back to button-only detection for 'Gmail'
+2025-09-06 02:27:03,029 - modules.accessibility - INFO - Using original fallback detection for role 'AXButton', label 'Gmail'
+2025-09-06 02:27:03,029 - modules.accessibility_debugger - INFO - Analyzing element detection failure for target: 'Gmail'
+2025-09-06 02:27:03,029 - modules.accessibility_debugger - ERROR - Failed to dump accessibility tree: No focused application found and no app_name specified
+2025-09-06 02:27:03,030 - modules.accessibility_debugger - ERROR - Failed to analyze element detection failure: No focused application found and no app_name specified
+2025-09-06 02:27:03,030 - __main__ - ERROR - ❌ Gmail element not found with any role
+2025-09-06 02:27:03,030 - __main__ - ERROR - Make sure you're on Google's homepage with Gmail link visible
+2025-09-06 02:27:04,035 - __main__ - INFO - 
+============================================================
+2025-09-06 02:27:04,036 - __main__ - INFO - DIAGNOSTIC SUMMARY
+2025-09-06 02:27:04,036 - __main__ - INFO - ============================================================
+2025-09-06 02:27:04,036 - __main__ - INFO - LM Studio Model Detection: ✅ PASS
+2025-09-06 02:27:04,036 - __main__ - INFO - Chrome Accessibility: ❌ FAIL
+2025-09-06 02:27:04,036 - __main__ - INFO - Gmail Element Detection: ❌ FAIL
+2025-09-06 02:27:04,036 - __main__ - INFO - 
+⚠️  Some diagnostic checks failed.
+2025-09-06 02:27:04,036 - __main__ - INFO - Please address the issues above before testing Gmail click.
+2025-09-06 02:27:04,036 - __main__ - INFO - 
+Gmail click issue fix diagnostics completed.
+2025-09-06 02:27:04,037 - __main__ - INFO - Check gmail_click_fix.log for detailed logs.
+2025-09-06 02:30:27,597 - __main__ - INFO - Gmail Click Issue Fix - Starting diagnostics...
+2025-09-06 02:30:27,600 - __main__ - INFO - ============================================================
+2025-09-06 02:30:27,600 - __main__ - INFO - GMAIL CLICK ISSUE DIAGNOSTIC CHECKS
+2025-09-06 02:30:27,601 - __main__ - INFO - ============================================================
+2025-09-06 02:30:27,601 - __main__ - INFO - 
+--- LM Studio Model Detection ---
+2025-09-06 02:30:27,601 - __main__ - INFO - Testing LM Studio model detection...
+2025-09-06 02:30:27,697 - config - INFO - Available models in LM Studio: ['google/gemma-3-4b', 'text-embedding-nomic-embed-text-v1.5', 'smolvlm-500m-instruct', 'smolvlm2-2.2b-instruct', 'phi-3-vision-128k-instruct', 'microsoft/phi-4-mini-reasoning', 'qwen2.5-coder-7b-instruct-mlx', 'google/gemma-3-1b', 'phi-2', 'qwen/qwen3-4b', 'qwen3-8b-mlx', 'qwen2-7b-instruct']
+2025-09-06 02:30:27,697 - config - INFO - Selected vision model: phi-3-vision-128k-instruct
+2025-09-06 02:30:27,697 - __main__ - INFO - ✅ Detected vision model: phi-3-vision-128k-instruct
+2025-09-06 02:30:27,697 - __main__ - INFO - ✅ Model appears to be vision-capable: phi-3-vision-128k-instruct
+2025-09-06 02:30:28,702 - __main__ - INFO - 
+--- Chrome Accessibility ---
+2025-09-06 02:30:28,702 - __main__ - INFO - Testing Chrome accessibility detection...
+2025-09-06 02:30:29,048 - modules.performance - INFO - Connection pool initialized with 10 max connections
+2025-09-06 02:30:29,048 - modules.performance - INFO - Image cache initialized: 100MB, 50 entries
+2025-09-06 02:30:29,072 - modules.performance - INFO - Parallel processor initialized with 4 workers
+2025-09-06 02:30:29,073 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 02:30:29,073 - modules.performance - INFO - Hybrid performance monitor initialized with 500 max metrics
+2025-09-06 02:30:29,077 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 02:30:29,104 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 02:30:29,104 - modules.accessibility - INFO - Permission validation: ✅ Accessibility permissions granted (FULL)
+2025-09-06 02:30:29,104 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-06 02:30:29,104 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 02:30:29,104 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 02:30:29,104 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 02:30:29,104 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 02:30:29,104 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 02:30:29,106 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 02:30:29,106 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 02:30:29,106 - modules.accessibility - INFO - Debugging tools initialized successfully
+2025-09-06 02:30:29,106 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-06 02:30:29,106 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-06 02:30:29,106 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-06 02:30:29,107 - __main__ - INFO - ✅ Active application detected: Kiro
+2025-09-06 02:30:29,107 - __main__ - WARNING - ⚠️  Active app is not a browser: Kiro
+2025-09-06 02:30:29,107 - __main__ - INFO - Please make sure Chrome or another browser is the active application
+2025-09-06 02:30:30,112 - __main__ - INFO - 
+--- Gmail Element Detection ---
+2025-09-06 02:30:30,112 - __main__ - INFO - Testing Gmail element detection...
+2025-09-06 02:30:30,113 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 02:30:30,114 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 02:30:30,114 - modules.accessibility - INFO - Permission validation: ✅ Accessibility permissions granted (FULL)
+2025-09-06 02:30:30,114 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-06 02:30:30,114 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 02:30:30,115 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 02:30:30,115 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 02:30:30,115 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 02:30:30,115 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 02:30:30,115 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 02:30:30,115 - modules.accessibility - INFO - Debugging tools initialized successfully
+2025-09-06 02:30:30,115 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-06 02:30:30,115 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-06 02:30:30,115 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-06 02:30:30,115 - __main__ - INFO - Testing with role: AXLink
+2025-09-06 02:30:30,122 - modules.accessibility_debugger - INFO - Analyzing element detection failure for target: 'Gmail'
+2025-09-06 02:30:30,123 - modules.accessibility_debugger - ERROR - Failed to dump accessibility tree: No focused application found and no app_name specified
+2025-09-06 02:30:30,123 - modules.accessibility_debugger - ERROR - Failed to analyze element detection failure: No focused application found and no app_name specified
+2025-09-06 02:30:30,123 - __main__ - INFO - Testing with role: AXButton
+2025-09-06 02:30:30,124 - modules.accessibility_debugger - INFO - Analyzing element detection failure for target: 'Gmail'
+2025-09-06 02:30:30,124 - modules.accessibility_debugger - ERROR - Failed to dump accessibility tree: No focused application found and no app_name specified
+2025-09-06 02:30:30,124 - modules.accessibility_debugger - ERROR - Failed to analyze element detection failure: No focused application found and no app_name specified
+2025-09-06 02:30:30,124 - __main__ - INFO - Testing with role: auto-detect
+2025-09-06 02:30:30,125 - modules.accessibility - INFO - Enhanced role detection failed, falling back to button-only detection for 'Gmail'
+2025-09-06 02:30:30,125 - modules.accessibility - INFO - Using original fallback detection for role 'AXButton', label 'Gmail'
+2025-09-06 02:30:30,125 - modules.accessibility_debugger - INFO - Analyzing element detection failure for target: 'Gmail'
+2025-09-06 02:30:30,125 - modules.accessibility_debugger - ERROR - Failed to dump accessibility tree: No focused application found and no app_name specified
+2025-09-06 02:30:30,126 - modules.accessibility_debugger - ERROR - Failed to analyze element detection failure: No focused application found and no app_name specified
+2025-09-06 02:30:30,126 - __main__ - ERROR - ❌ Gmail element not found with any role
+2025-09-06 02:30:30,126 - __main__ - ERROR - Make sure you're on Google's homepage with Gmail link visible
+2025-09-06 02:30:31,131 - __main__ - INFO - 
+============================================================
+2025-09-06 02:30:31,131 - __main__ - INFO - DIAGNOSTIC SUMMARY
+2025-09-06 02:30:31,131 - __main__ - INFO - ============================================================
+2025-09-06 02:30:31,131 - __main__ - INFO - LM Studio Model Detection: ✅ PASS
+2025-09-06 02:30:31,131 - __main__ - INFO - Chrome Accessibility: ❌ FAIL
+2025-09-06 02:30:31,131 - __main__ - INFO - Gmail Element Detection: ❌ FAIL
+2025-09-06 02:30:31,131 - __main__ - INFO - 
+⚠️  Some diagnostic checks failed.
+2025-09-06 02:30:31,131 - __main__ - INFO - Please address the issues above before testing Gmail click.
+2025-09-06 02:30:31,132 - __main__ - INFO - 
+Gmail click issue fix diagnostics completed.
+2025-09-06 02:30:31,132 - __main__ - INFO - Check gmail_click_fix.log for detailed logs.

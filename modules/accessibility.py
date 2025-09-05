@@ -340,6 +340,12 @@ class AccessibilityModule:
         'AXToolbarButton', 'AXPopUpButton', 'AXComboBox'
     }
     
+    # Chrome-specific application detection
+    CHROME_APP_NAMES = {
+        'Google Chrome', 'Chrome', 'Chromium', 'Microsoft Edge', 
+        'Safari', 'Firefox', 'Arc', 'Brave Browser'
+    }
+    
     def __init__(self):
         """Initialize accessibility API connections with error handling."""
         self.logger = logging.getLogger(__name__)
@@ -2886,6 +2892,16 @@ class AccessibilityModule:
                 'app_name': 'Safari'
             }
         """
+        # Check if this might be a Chrome/web element and use optimized detection
+        if self._is_web_element_search(label, app_name):
+            try:
+                web_result = self.find_element_enhanced_chrome(role, label, app_name)
+                if web_result and web_result.found:
+                    self.logger.info(f"Chrome-optimized detection successful for: {label}")
+                    return web_result.element
+            except Exception as e:
+                self.logger.debug(f"Chrome-optimized detection failed: {e}")
+        
         # Use enhanced element detection by default
         try:
             enhanced_result = self.find_element_enhanced(role, label, app_name)
@@ -2910,6 +2926,232 @@ class AccessibilityModule:
         
         # Fallback to original implementation logic for maximum backward compatibility
         return self._find_element_original_implementation(role, label, app_name)
+    
+    def _is_web_element_search(self, label: str, app_name: Optional[str] = None) -> bool:
+        """Check if this search is likely for a web element."""
+        if app_name and app_name in self.CHROME_APP_NAMES:
+            return True
+        
+        # Check if current app is a browser
+        current_app = self.get_active_application()
+        if current_app and current_app.get('name') in self.CHROME_APP_NAMES:
+            return True
+        
+        # Check label for web-specific terms
+        web_terms = ['gmail', 'google', 'sign in', 'login', 'search', 'mail', 'inbox']
+        label_lower = label.lower()
+        return any(term in label_lower for term in web_terms)
+    
+    def find_element_enhanced_chrome(self, role: str, label: str, app_name: Optional[str] = None) -> ElementMatchResult:
+        """
+        Enhanced element finding specifically optimized for Chrome and web browsers.
+        Handles tab detection and web-specific element roles.
+        """
+        start_time = time.time()
+        
+        try:
+            # Auto-detect Chrome if no app specified
+            if not app_name:
+                app_name = self._detect_active_browser()
+            
+            if not app_name:
+                return ElementMatchResult(found=False, error_message="No browser application detected")
+            
+            # Enhanced role detection for web elements
+            search_roles = self._get_web_element_roles(role, label)
+            
+            # Search with Chrome-specific optimizations
+            for search_role in search_roles:
+                result = self._search_chrome_elements(search_role, label, app_name)
+                if result.found:
+                    result.search_time_ms = (time.time() - start_time) * 1000
+                    return result
+            
+            # Return failure result
+            return ElementMatchResult(
+                found=False, 
+                error_message="No matching elements found in browser",
+                search_time_ms=(time.time() - start_time) * 1000
+            )
+            
+        except Exception as e:
+            return ElementMatchResult(
+                found=False, 
+                error_message=f"Chrome search error: {e}",
+                search_time_ms=(time.time() - start_time) * 1000
+            )
+    
+    def _detect_active_browser(self) -> Optional[str]:
+        """Detect the currently active browser application."""
+        try:
+            current_app = self.get_active_application()
+            if current_app and current_app.get('name') in self.CHROME_APP_NAMES:
+                return current_app['name']
+            
+            # Check running browsers
+            if self.workspace:
+                running_apps = self.workspace.runningApplications()
+                for app in running_apps:
+                    app_name = app.localizedName()
+                    if app_name in self.CHROME_APP_NAMES:
+                        return app_name
+        except Exception as e:
+            self.logger.debug(f"Error detecting browser: {e}")
+        
+        return None
+    
+    def _get_web_element_roles(self, role: str, label: str) -> List[str]:
+        """Get appropriate roles for web elements based on context."""
+        label_lower = label.lower()
+        
+        # Gmail-specific role mapping
+        if 'gmail' in label_lower:
+            return ['AXLink', 'AXButton', 'AXMenuItem']
+        
+        # General web element role mapping
+        if role:
+            return [role]
+        
+        # Auto-detect role based on label
+        if any(word in label_lower for word in ['sign in', 'login', 'submit', 'continue']):
+            return ['AXButton', 'AXLink']
+        elif any(word in label_lower for word in ['gmail', 'mail', 'inbox']):
+            return ['AXLink', 'AXButton']
+        else:
+            return ['AXButton', 'AXLink', 'AXMenuItem']
+    
+    def _search_chrome_elements(self, role: str, label: str, app_name: str) -> ElementMatchResult:
+        """Search for elements within Chrome with tab awareness."""
+        try:
+            # Get Chrome application element
+            chrome_element = self._get_application_element(app_name)
+            if not chrome_element:
+                return ElementMatchResult(found=False, error_message=f"Cannot access {app_name}")
+            
+            # Search within Chrome's accessibility tree
+            elements = self._traverse_chrome_tree(chrome_element, role, label)
+            
+            if elements:
+                # Return the best match
+                best_match = self._select_best_chrome_match(elements, label)
+                return ElementMatchResult(
+                    found=True,
+                    element=best_match,
+                    confidence_score=95.0,
+                    matched_attribute='chrome_optimized'
+                )
+            
+            return ElementMatchResult(found=False, error_message="No matching elements in Chrome")
+            
+        except Exception as e:
+            return ElementMatchResult(found=False, error_message=f"Chrome search error: {e}")
+    
+    def _traverse_chrome_tree(self, chrome_element, target_role: str, target_label: str) -> List[Dict[str, Any]]:
+        """Traverse Chrome's accessibility tree looking for matching elements."""
+        matches = []
+        
+        def traverse_recursive(element, depth=0, max_depth=10):
+            if depth > max_depth:
+                return
+            
+            try:
+                # Get element info
+                element_info = self._extract_element_info(element)
+                if not element_info:
+                    return
+                
+                # Check if this element matches
+                if self._is_chrome_element_match(element_info, target_role, target_label):
+                    matches.append(element_info)
+                
+                # Traverse children
+                children = self._get_element_children(element)
+                if children:
+                    for child in children:
+                        traverse_recursive(child, depth + 1, max_depth)
+                        
+            except Exception as e:
+                self.logger.debug(f"Error traversing element at depth {depth}: {e}")
+        
+        traverse_recursive(chrome_element)
+        return matches
+    
+    def _is_chrome_element_match(self, element_info: Dict[str, Any], target_role: str, target_label: str) -> bool:
+        """Check if a Chrome element matches the search criteria."""
+        element_role = element_info.get('role', '')
+        element_title = element_info.get('title', '')
+        element_description = element_info.get('description', '')
+        
+        # Role match (if specified)
+        if target_role and element_role != target_role:
+            return False
+        
+        # Label matching with fuzzy logic
+        target_lower = target_label.lower().strip()
+        
+        # Check title
+        if element_title and self._fuzzy_match(target_lower, element_title.lower().strip()):
+            return True
+        
+        # Check description
+        if element_description and self._fuzzy_match(target_lower, element_description.lower().strip()):
+            return True
+        
+        return False
+    
+    def _fuzzy_match(self, target: str, candidate: str, threshold: int = 80) -> bool:
+        """Perform fuzzy string matching."""
+        if not FUZZY_MATCHING_AVAILABLE:
+            return target in candidate or candidate in target
+        
+        try:
+            # Direct match
+            if target == candidate:
+                return True
+            
+            # Substring match
+            if target in candidate or candidate in target:
+                return True
+            
+            # Fuzzy match
+            ratio = fuzz.ratio(target, candidate)
+            partial_ratio = fuzz.partial_ratio(target, candidate)
+            
+            return max(ratio, partial_ratio) >= threshold
+            
+        except Exception:
+            return target in candidate
+    
+    def _select_best_chrome_match(self, elements: List[Dict[str, Any]], target_label: str) -> Dict[str, Any]:
+        """Select the best matching element from Chrome search results."""
+        if len(elements) == 1:
+            return elements[0]
+        
+        # Score elements based on various criteria
+        scored_elements = []
+        
+        for element in elements:
+            score = 0
+            
+            # Prefer exact title matches
+            title = element.get('title', '').lower().strip()
+            if title == target_label.lower().strip():
+                score += 100
+            
+            # Prefer elements that are enabled
+            if element.get('enabled', False):
+                score += 50
+            
+            # Prefer elements with reasonable size
+            coords = element.get('coordinates', [0, 0, 0, 0])
+            if len(coords) >= 4 and coords[2] > 10 and coords[3] > 10:  # width > 10, height > 10
+                score += 25
+            
+            scored_elements.append((score, element))
+        
+        # Return highest scoring element
+        scored_elements.sort(key=lambda x: x[0], reverse=True)
+        return scored_elements[0][1]
     
     def _find_element_original_implementation(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
