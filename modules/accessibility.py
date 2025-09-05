@@ -438,8 +438,39 @@ class AccessibilityModule:
         self.cache_cleanup_interval = 60  # Cleanup every 60 seconds
         self.last_cache_cleanup = time.time()
         
+        # Enhanced logging configuration
+        self.operation_logger = logging.getLogger(f"{__name__}.operations")
+        self.performance_logger = logging.getLogger(f"{__name__}.performance")
+        self.debug_logger = logging.getLogger(f"{__name__}.debug")
+        
+        # Configure logging levels based on configuration
+        if self.debug_logging:
+            self.operation_logger.setLevel(logging.DEBUG)
+            self.debug_logger.setLevel(logging.DEBUG)
+        else:
+            self.operation_logger.setLevel(logging.INFO)
+            self.debug_logger.setLevel(logging.INFO)
+        
+        # Performance metrics tracking
+        self.operation_metrics = {
+            'element_role_checks': {'count': 0, 'total_time_ms': 0.0, 'success_count': 0},
+            'attribute_examinations': {'count': 0, 'total_time_ms': 0.0, 'success_count': 0},
+            'fuzzy_matching_operations': {'count': 0, 'total_time_ms': 0.0, 'success_count': 0},
+            'target_extractions': {'count': 0, 'total_time_ms': 0.0, 'success_count': 0},
+            'cache_operations': {'count': 0, 'total_time_ms': 0.0, 'hit_count': 0}
+        }
+        
+        # Success rate tracking
+        self.success_rates = {
+            'fast_path_execution': {'attempts': 0, 'successes': 0},
+            'fuzzy_matching': {'attempts': 0, 'successes': 0},
+            'element_detection': {'attempts': 0, 'successes': 0},
+            'attribute_access': {'attempts': 0, 'successes': 0}
+        }
+        
         try:
             self._initialize_accessibility_api()
+            self._log_initialization_success()
         except AccessibilityPermissionError as e:
             self.logger.warning(f"Accessibility permissions not granted: {e}")
             self._enter_degraded_mode("permission_denied", str(e))
@@ -647,6 +678,784 @@ class AccessibilityModule:
         except Exception as fallback_error:
             self.logger.error(f"Target extraction fallback failed: {fallback_error}")
             return command
+    
+    def _log_initialization_success(self):
+        """Log successful initialization with configuration details."""
+        self.operation_logger.info("AccessibilityModule initialized successfully")
+        
+        if self.debug_logging:
+            config_summary = {
+                'fuzzy_matching_enabled': self.fuzzy_matching_enabled,
+                'fuzzy_confidence_threshold': self.fuzzy_confidence_threshold,
+                'clickable_roles_count': len(self.clickable_roles),
+                'accessibility_attributes_count': len(self.accessibility_attributes),
+                'fast_path_timeout_ms': self.fast_path_timeout_ms,
+                'performance_monitoring': self.performance_monitoring_enabled
+            }
+            self.debug_logger.debug(f"Configuration loaded: {config_summary}")
+    
+    def _log_element_role_check(self, element_info: Dict[str, Any], role: str, check_result: bool, duration_ms: float):
+        """
+        Log element role checking operation with detailed information.
+        
+        Args:
+            element_info: Information about the element being checked
+            role: Role being checked for
+            check_result: Whether the role check succeeded
+            duration_ms: Time taken for the check
+        """
+        # Update metrics
+        self.operation_metrics['element_role_checks']['count'] += 1
+        self.operation_metrics['element_role_checks']['total_time_ms'] += duration_ms
+        if check_result:
+            self.operation_metrics['element_role_checks']['success_count'] += 1
+        
+        if self.debug_logging:
+            element_summary = {
+                'element_role': element_info.get('role', 'unknown'),
+                'element_title': element_info.get('title', 'no_title')[:50],  # Truncate for logging
+                'target_role': role,
+                'match_result': check_result,
+                'check_duration_ms': round(duration_ms, 2)
+            }
+            self.debug_logger.debug(f"Role check: {element_summary}")
+        
+        # Log performance warnings
+        if duration_ms > 100:  # Warn if role check takes more than 100ms
+            self.performance_logger.warning(f"Slow role check: {duration_ms:.2f}ms for role '{role}'")
+    
+    def _log_attribute_examination(self, element_info: Dict[str, Any], attribute: str, 
+                                 attribute_value: Optional[str], success: bool, duration_ms: float):
+        """
+        Log attribute examination operation with detailed information.
+        
+        Args:
+            element_info: Information about the element
+            attribute: Attribute being examined
+            attribute_value: Value retrieved (if successful)
+            success: Whether attribute access succeeded
+            duration_ms: Time taken for the examination
+        """
+        # Update metrics
+        self.operation_metrics['attribute_examinations']['count'] += 1
+        self.operation_metrics['attribute_examinations']['total_time_ms'] += duration_ms
+        if success:
+            self.operation_metrics['attribute_examinations']['success_count'] += 1
+        
+        if self.debug_logging:
+            examination_summary = {
+                'element_role': element_info.get('role', 'unknown'),
+                'attribute': attribute,
+                'value_length': len(attribute_value) if attribute_value else 0,
+                'value_preview': attribute_value[:30] + '...' if attribute_value and len(attribute_value) > 30 else attribute_value,
+                'success': success,
+                'duration_ms': round(duration_ms, 2)
+            }
+            self.debug_logger.debug(f"Attribute examination: {examination_summary}")
+        
+        # Log performance warnings
+        if duration_ms > 50:  # Warn if attribute access takes more than 50ms
+            self.performance_logger.warning(f"Slow attribute access: {duration_ms:.2f}ms for attribute '{attribute}'")
+    
+    def _log_fuzzy_matching_operation(self, target_text: str, element_text: str, 
+                                    confidence_score: float, success: bool, duration_ms: float):
+        """
+        Log fuzzy matching operation with detailed scoring information.
+        
+        Args:
+            target_text: Text being matched against
+            element_text: Element text being compared
+            confidence_score: Fuzzy matching confidence score
+            success: Whether the match exceeded threshold
+            duration_ms: Time taken for fuzzy matching
+        """
+        # Update metrics
+        self.operation_metrics['fuzzy_matching_operations']['count'] += 1
+        self.operation_metrics['fuzzy_matching_operations']['total_time_ms'] += duration_ms
+        if success:
+            self.operation_metrics['fuzzy_matching_operations']['success_count'] += 1
+        
+        # Always log fuzzy match scores if enabled
+        if self.log_fuzzy_match_scores or self.debug_logging:
+            match_summary = {
+                'target_text': target_text[:30] + '...' if len(target_text) > 30 else target_text,
+                'element_text': element_text[:30] + '...' if len(element_text) > 30 else element_text,
+                'confidence_score': round(confidence_score, 2),
+                'threshold': self.fuzzy_confidence_threshold,
+                'match_success': success,
+                'duration_ms': round(duration_ms, 2)
+            }
+            
+            if self.log_fuzzy_match_scores:
+                self.operation_logger.info(f"Fuzzy match: {match_summary}")
+            else:
+                self.debug_logger.debug(f"Fuzzy match: {match_summary}")
+        
+        # Log performance warnings
+        if duration_ms > self.fuzzy_matching_timeout_ms:
+            self.performance_logger.warning(f"Fuzzy matching timeout: {duration_ms:.2f}ms > {self.fuzzy_matching_timeout_ms}ms")
+        elif duration_ms > self.fuzzy_matching_timeout_ms * 0.8:  # Warn at 80% of timeout
+            self.performance_logger.warning(f"Slow fuzzy matching: {duration_ms:.2f}ms (approaching timeout)")
+    
+    def _log_target_extraction(self, original_command: str, extracted_target: str, 
+                             action_type: str, confidence: float, removed_words: List[str], duration_ms: float):
+        """
+        Log target extraction operation with parsing details.
+        
+        Args:
+            original_command: Original user command
+            extracted_target: Extracted target text
+            action_type: Detected action type
+            confidence: Extraction confidence score
+            removed_words: Words removed during extraction
+            duration_ms: Time taken for extraction
+        """
+        # Update metrics
+        self.operation_metrics['target_extractions']['count'] += 1
+        self.operation_metrics['target_extractions']['total_time_ms'] += duration_ms
+        if confidence > 0.7:  # Consider high confidence as success
+            self.operation_metrics['target_extractions']['success_count'] += 1
+        
+        if self.debug_logging:
+            extraction_summary = {
+                'original_command': original_command[:50] + '...' if len(original_command) > 50 else original_command,
+                'extracted_target': extracted_target,
+                'action_type': action_type,
+                'confidence': round(confidence, 2),
+                'removed_words': removed_words,
+                'duration_ms': round(duration_ms, 2)
+            }
+            self.debug_logger.debug(f"Target extraction: {extraction_summary}")
+        
+        # Log low confidence warnings
+        if confidence < 0.5:
+            self.operation_logger.warning(f"Low confidence target extraction: {confidence:.2f} for command '{original_command}'")
+    
+    def _log_performance_metrics(self, operation_name: str, duration_ms: float, 
+                               success: bool, metadata: Optional[Dict[str, Any]] = None):
+        """
+        Log performance metrics for accessibility operations.
+        
+        Args:
+            operation_name: Name of the operation
+            duration_ms: Duration in milliseconds
+            success: Whether operation succeeded
+            metadata: Additional metadata to log
+        """
+        # Update performance statistics
+        with self.performance_lock:
+            self.performance_stats['total_operations'] += 1
+            if success:
+                self.performance_stats['successful_operations'] += 1
+            
+            # Update timing statistics
+            if duration_ms < self.performance_stats['fastest_operation_ms']:
+                self.performance_stats['fastest_operation_ms'] = duration_ms
+            if duration_ms > self.performance_stats['slowest_operation_ms']:
+                self.performance_stats['slowest_operation_ms'] = duration_ms
+            
+            # Update average duration
+            total_ops = self.performance_stats['total_operations']
+            current_avg = self.performance_stats['average_duration_ms']
+            self.performance_stats['average_duration_ms'] = ((current_avg * (total_ops - 1)) + duration_ms) / total_ops
+            
+            # Check for performance warnings
+            if duration_ms > self.performance_warning_threshold_ms:
+                self.performance_stats['performance_warnings'] += 1
+                self.performance_logger.warning(
+                    f"Performance warning: {operation_name} took {duration_ms:.2f}ms "
+                    f"(threshold: {self.performance_warning_threshold_ms}ms)"
+                )
+        
+        # Log detailed performance information if enabled
+        if self.performance_monitoring_enabled:
+            perf_info = {
+                'operation': operation_name,
+                'duration_ms': round(duration_ms, 2),
+                'success': success,
+                'metadata': metadata or {}
+            }
+            self.performance_logger.info(f"Performance: {perf_info}")
+    
+    def _log_cache_operation(self, operation_type: str, cache_key: str, hit: bool, duration_ms: float):
+        """
+        Log cache operation with hit/miss information.
+        
+        Args:
+            operation_type: Type of cache operation (lookup, store, cleanup)
+            cache_key: Cache key being operated on
+            hit: Whether operation was a cache hit
+            duration_ms: Time taken for cache operation
+        """
+        # Update metrics
+        self.operation_metrics['cache_operations']['count'] += 1
+        self.operation_metrics['cache_operations']['total_time_ms'] += duration_ms
+        if hit:
+            self.operation_metrics['cache_operations']['hit_count'] += 1
+        
+        if self.debug_logging:
+            cache_summary = {
+                'operation': operation_type,
+                'key_preview': cache_key[:30] + '...' if len(cache_key) > 30 else cache_key,
+                'hit': hit,
+                'duration_ms': round(duration_ms, 2)
+            }
+            self.debug_logger.debug(f"Cache operation: {cache_summary}")
+    
+    def _log_success_rates(self):
+        """Log current success rates for various operations."""
+        if not self.debug_logging:
+            return
+        
+        rates_summary = {}
+        for operation, stats in self.success_rates.items():
+            if stats['attempts'] > 0:
+                success_rate = (stats['successes'] / stats['attempts']) * 100
+                rates_summary[operation] = {
+                    'success_rate_percent': round(success_rate, 1),
+                    'attempts': stats['attempts'],
+                    'successes': stats['successes']
+                }
+        
+        if rates_summary:
+            self.operation_logger.info(f"Success rates: {rates_summary}")
+    
+    def _log_operation_summary(self, operation_name: str, total_duration_ms: float, 
+                             steps_completed: List[str], success: bool, error_message: Optional[str] = None):
+        """
+        Log a comprehensive summary of a multi-step operation.
+        
+        Args:
+            operation_name: Name of the overall operation
+            total_duration_ms: Total time for the operation
+            steps_completed: List of steps that were completed
+            success: Whether the overall operation succeeded
+            error_message: Error message if operation failed
+        """
+        summary = {
+            'operation': operation_name,
+            'total_duration_ms': round(total_duration_ms, 2),
+            'steps_completed': steps_completed,
+            'success': success,
+            'error': error_message
+        }
+        
+        if success:
+            self.operation_logger.info(f"Operation completed: {summary}")
+        else:
+            self.operation_logger.warning(f"Operation failed: {summary}")
+        
+        # Log performance warning if operation was slow
+        if total_duration_ms > self.fast_path_timeout_ms:
+            self.performance_logger.warning(
+                f"Operation exceeded fast path timeout: {total_duration_ms:.2f}ms > {self.fast_path_timeout_ms}ms"
+            )
+    
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """
+        Get a comprehensive summary of performance metrics and success rates.
+        
+        Returns:
+            Dictionary containing performance statistics
+        """
+        with self.performance_lock:
+            # Calculate success rates
+            success_rates = {}
+            for operation, stats in self.success_rates.items():
+                if stats['attempts'] > 0:
+                    success_rates[operation] = {
+                        'success_rate_percent': round((stats['successes'] / stats['attempts']) * 100, 1),
+                        'attempts': stats['attempts'],
+                        'successes': stats['successes']
+                    }
+            
+            # Calculate operation efficiency
+            operation_efficiency = {}
+            for operation, metrics in self.operation_metrics.items():
+                if metrics['count'] > 0:
+                    avg_time = metrics['total_time_ms'] / metrics['count']
+                    success_rate = (metrics.get('success_count', 0) / metrics['count']) * 100
+                    operation_efficiency[operation] = {
+                        'average_time_ms': round(avg_time, 2),
+                        'success_rate_percent': round(success_rate, 1),
+                        'total_operations': metrics['count']
+                    }
+            
+            return {
+                'overall_performance': dict(self.performance_stats),
+                'success_rates': success_rates,
+                'operation_efficiency': operation_efficiency,
+                'cache_statistics': dict(self.cache_stats),
+                'configuration': {
+                    'fuzzy_matching_enabled': self.fuzzy_matching_enabled,
+                    'debug_logging_enabled': self.debug_logging,
+                    'performance_monitoring_enabled': self.performance_monitoring_enabled,
+                    'fast_path_timeout_ms': self.fast_path_timeout_ms
+                }
+            }
+    
+    def enable_verbose_logging(self):
+        """
+        Enable verbose logging mode for detailed troubleshooting.
+        
+        This method activates comprehensive debug logging for all accessibility operations,
+        including detailed element inspection, fuzzy match scoring, and performance metrics.
+        """
+        self.debug_logging = True
+        self.log_fuzzy_match_scores = True
+        
+        # Set all loggers to DEBUG level
+        self.operation_logger.setLevel(logging.DEBUG)
+        self.performance_logger.setLevel(logging.DEBUG)
+        self.debug_logger.setLevel(logging.DEBUG)
+        
+        # Also set the main logger to DEBUG
+        self.logger.setLevel(logging.DEBUG)
+        
+        self.operation_logger.info("Verbose logging mode enabled - detailed debugging information will be logged")
+        
+        # Log current configuration for debugging
+        config_details = {
+            'fuzzy_matching_enabled': self.fuzzy_matching_enabled,
+            'fuzzy_confidence_threshold': self.fuzzy_confidence_threshold,
+            'fuzzy_matching_timeout_ms': self.fuzzy_matching_timeout_ms,
+            'clickable_roles': list(self.clickable_roles),
+            'accessibility_attributes': self.accessibility_attributes,
+            'fast_path_timeout_ms': self.fast_path_timeout_ms,
+            'attribute_check_timeout_ms': self.attribute_check_timeout_ms,
+            'performance_monitoring_enabled': self.performance_monitoring_enabled
+        }
+        self.debug_logger.debug(f"Verbose mode configuration: {config_details}")
+    
+    def disable_verbose_logging(self):
+        """
+        Disable verbose logging mode and return to normal logging levels.
+        """
+        self.debug_logging = False
+        self.log_fuzzy_match_scores = False
+        
+        # Reset loggers to INFO level
+        self.operation_logger.setLevel(logging.INFO)
+        self.performance_logger.setLevel(logging.INFO)
+        self.debug_logger.setLevel(logging.INFO)
+        self.logger.setLevel(logging.INFO)
+        
+        self.operation_logger.info("Verbose logging mode disabled - returning to normal logging level")
+    
+    def inspect_fuzzy_match_scores(self, target_text: str, element_texts: List[str]) -> List[Dict[str, Any]]:
+        """
+        Diagnostic method to inspect fuzzy match scores for multiple element texts.
+        
+        Args:
+            target_text: Text to match against
+            element_texts: List of element texts to compare
+            
+        Returns:
+            List of dictionaries containing match scores and details
+        """
+        if not FUZZY_MATCHING_AVAILABLE:
+            self.debug_logger.warning("Fuzzy matching library not available for score inspection")
+            return []
+        
+        results = []
+        
+        for element_text in element_texts:
+            try:
+                start_time = time.time()
+                
+                # Calculate fuzzy match score
+                confidence_score = fuzz.partial_ratio(target_text.lower(), element_text.lower())
+                
+                duration_ms = (time.time() - start_time) * 1000
+                
+                match_result = {
+                    'target_text': target_text,
+                    'element_text': element_text,
+                    'confidence_score': confidence_score,
+                    'threshold': self.fuzzy_confidence_threshold,
+                    'would_match': confidence_score >= self.fuzzy_confidence_threshold,
+                    'duration_ms': round(duration_ms, 2),
+                    'score_difference': confidence_score - self.fuzzy_confidence_threshold
+                }
+                
+                results.append(match_result)
+                
+                # Log detailed match information
+                self.debug_logger.debug(f"Fuzzy match inspection: {match_result}")
+                
+            except Exception as e:
+                error_result = {
+                    'target_text': target_text,
+                    'element_text': element_text,
+                    'error': str(e),
+                    'confidence_score': 0,
+                    'would_match': False
+                }
+                results.append(error_result)
+                self.debug_logger.error(f"Error inspecting fuzzy match: {error_result}")
+        
+        # Sort results by confidence score (highest first)
+        results.sort(key=lambda x: x.get('confidence_score', 0), reverse=True)
+        
+        self.debug_logger.info(f"Fuzzy match inspection completed for '{target_text}' against {len(element_texts)} elements")
+        
+        return results
+    
+    def inspect_element_attributes(self, element_info: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Diagnostic method to inspect all accessible attributes of an element.
+        
+        Args:
+            element_info: Element information dictionary
+            
+        Returns:
+            Dictionary containing all accessible attributes and their values
+        """
+        inspection_result = {
+            'element_info': element_info,
+            'attributes': {},
+            'attribute_access_times': {},
+            'attribute_errors': {},
+            'total_attributes_checked': 0,
+            'successful_attributes': 0,
+            'failed_attributes': 0
+        }
+        
+        # Check all configured accessibility attributes
+        for attribute in self.accessibility_attributes:
+            try:
+                start_time = time.time()
+                
+                # Try to access the attribute
+                attribute_value = None
+                if hasattr(element_info, 'get'):
+                    attribute_value = element_info.get(attribute)
+                elif hasattr(element_info, attribute):
+                    attribute_value = getattr(element_info, attribute)
+                
+                duration_ms = (time.time() - start_time) * 1000
+                
+                inspection_result['attributes'][attribute] = attribute_value
+                inspection_result['attribute_access_times'][attribute] = round(duration_ms, 2)
+                inspection_result['total_attributes_checked'] += 1
+                
+                if attribute_value is not None:
+                    inspection_result['successful_attributes'] += 1
+                    self.debug_logger.debug(f"Attribute '{attribute}' accessed successfully: {attribute_value}")
+                else:
+                    inspection_result['failed_attributes'] += 1
+                    self.debug_logger.debug(f"Attribute '{attribute}' is None or not accessible")
+                
+            except Exception as e:
+                inspection_result['attribute_errors'][attribute] = str(e)
+                inspection_result['failed_attributes'] += 1
+                self.debug_logger.error(f"Error accessing attribute '{attribute}': {e}")
+        
+        # Also check for common alternative attributes
+        alternative_attributes = ['title', 'name', 'label', 'description', 'value', 'text', 'role']
+        for alt_attr in alternative_attributes:
+            if alt_attr not in inspection_result['attributes']:
+                try:
+                    start_time = time.time()
+                    
+                    alt_value = None
+                    if hasattr(element_info, 'get'):
+                        alt_value = element_info.get(alt_attr)
+                    elif hasattr(element_info, alt_attr):
+                        alt_value = getattr(element_info, alt_attr)
+                    
+                    duration_ms = (time.time() - start_time) * 1000
+                    
+                    if alt_value is not None:
+                        inspection_result['attributes'][f'alt_{alt_attr}'] = alt_value
+                        inspection_result['attribute_access_times'][f'alt_{alt_attr}'] = round(duration_ms, 2)
+                        self.debug_logger.debug(f"Alternative attribute '{alt_attr}' found: {alt_value}")
+                
+                except Exception as e:
+                    self.debug_logger.debug(f"Alternative attribute '{alt_attr}' not accessible: {e}")
+        
+        # Calculate success rate
+        if inspection_result['total_attributes_checked'] > 0:
+            success_rate = (inspection_result['successful_attributes'] / inspection_result['total_attributes_checked']) * 100
+            inspection_result['attribute_success_rate'] = round(success_rate, 1)
+        else:
+            inspection_result['attribute_success_rate'] = 0.0
+        
+        self.debug_logger.info(f"Element attribute inspection completed: {inspection_result['successful_attributes']}/{inspection_result['total_attributes_checked']} attributes accessible")
+        
+        return inspection_result
+    
+    def log_element_search_process(self, target_text: str, role_filter: Optional[str] = None, 
+                                 app_name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Helper method to log the complete element search process with detailed steps.
+        
+        Args:
+            target_text: Text to search for
+            role_filter: Optional role filter
+            app_name: Optional application name
+            
+        Returns:
+            Dictionary containing detailed search process information
+        """
+        search_log = {
+            'search_parameters': {
+                'target_text': target_text,
+                'role_filter': role_filter,
+                'app_name': app_name,
+                'timestamp': time.time()
+            },
+            'search_steps': [],
+            'performance_metrics': {},
+            'cache_operations': [],
+            'errors_encountered': [],
+            'final_result': None
+        }
+        
+        self.debug_logger.info(f"Starting element search process: target='{target_text}', role='{role_filter}', app='{app_name}'")
+        
+        # Log configuration being used
+        config_info = {
+            'fuzzy_matching_enabled': self.fuzzy_matching_enabled,
+            'fuzzy_confidence_threshold': self.fuzzy_confidence_threshold,
+            'clickable_roles': list(self.clickable_roles),
+            'accessibility_attributes': self.accessibility_attributes
+        }
+        search_log['configuration_used'] = config_info
+        self.debug_logger.debug(f"Search configuration: {config_info}")
+        
+        # Log cache state
+        cache_info = {
+            'cache_entries': len(self.element_cache),
+            'cache_stats': dict(self.cache_stats),
+            'fuzzy_cache_entries': len(self.fuzzy_match_cache),
+            'target_extraction_cache_entries': len(self.target_extraction_cache)
+        }
+        search_log['cache_state'] = cache_info
+        self.debug_logger.debug(f"Cache state at search start: {cache_info}")
+        
+        return search_log
+    
+    def log_search_step(self, search_log: Dict[str, Any], step_name: str, 
+                       step_data: Dict[str, Any], duration_ms: float):
+        """
+        Log a specific step in the element search process.
+        
+        Args:
+            search_log: Search log dictionary to update
+            step_name: Name of the search step
+            step_data: Data about the step
+            duration_ms: Time taken for the step
+        """
+        step_entry = {
+            'step_name': step_name,
+            'step_data': step_data,
+            'duration_ms': round(duration_ms, 2),
+            'timestamp': time.time()
+        }
+        
+        search_log['search_steps'].append(step_entry)
+        self.debug_logger.debug(f"Search step '{step_name}': {step_entry}")
+    
+    def finalize_search_log(self, search_log: Dict[str, Any], final_result: Any, 
+                          total_duration_ms: float, success: bool):
+        """
+        Finalize the element search log with results and summary.
+        
+        Args:
+            search_log: Search log dictionary to finalize
+            final_result: Final search result
+            total_duration_ms: Total search duration
+            success: Whether search was successful
+        """
+        search_log['final_result'] = final_result
+        search_log['total_duration_ms'] = round(total_duration_ms, 2)
+        search_log['success'] = success
+        search_log['steps_count'] = len(search_log['search_steps'])
+        
+        # Calculate step timing breakdown
+        step_timings = {}
+        for step in search_log['search_steps']:
+            step_name = step['step_name']
+            if step_name in step_timings:
+                step_timings[step_name] += step['duration_ms']
+            else:
+                step_timings[step_name] = step['duration_ms']
+        
+        search_log['step_timing_breakdown'] = step_timings
+        
+        # Log final summary
+        summary = {
+            'target_text': search_log['search_parameters']['target_text'],
+            'success': success,
+            'total_duration_ms': total_duration_ms,
+            'steps_executed': search_log['steps_count'],
+            'step_breakdown': step_timings
+        }
+        
+        if success:
+            self.debug_logger.info(f"Element search completed successfully: {summary}")
+        else:
+            self.debug_logger.warning(f"Element search failed: {summary}")
+        
+        return search_log
+    
+    def create_diagnostic_report(self) -> Dict[str, Any]:
+        """
+        Create a comprehensive diagnostic report for troubleshooting accessibility issues.
+        
+        Returns:
+            Dictionary containing comprehensive diagnostic information
+        """
+        report = {
+            'timestamp': time.time(),
+            'system_status': {},
+            'configuration': {},
+            'performance_metrics': {},
+            'cache_status': {},
+            'recent_operations': {},
+            'recommendations': []
+        }
+        
+        # System status
+        report['system_status'] = {
+            'accessibility_enabled': self.accessibility_enabled,
+            'degraded_mode': self.degraded_mode,
+            'fuzzy_matching_available': FUZZY_MATCHING_AVAILABLE,
+            'appkit_available': APPKIT_AVAILABLE,
+            'accessibility_functions_available': ACCESSIBILITY_FUNCTIONS_AVAILABLE,
+            'error_count': self.error_count,
+            'recovery_attempts': self.recovery_attempts
+        }
+        
+        # Configuration details
+        report['configuration'] = {
+            'fuzzy_matching_enabled': self.fuzzy_matching_enabled,
+            'fuzzy_confidence_threshold': self.fuzzy_confidence_threshold,
+            'fuzzy_matching_timeout_ms': self.fuzzy_matching_timeout_ms,
+            'clickable_roles': list(self.clickable_roles),
+            'accessibility_attributes': self.accessibility_attributes,
+            'fast_path_timeout_ms': self.fast_path_timeout_ms,
+            'attribute_check_timeout_ms': self.attribute_check_timeout_ms,
+            'debug_logging': self.debug_logging,
+            'log_fuzzy_match_scores': self.log_fuzzy_match_scores,
+            'performance_monitoring_enabled': self.performance_monitoring_enabled
+        }
+        
+        # Performance metrics
+        report['performance_metrics'] = self.get_performance_summary()
+        
+        # Cache status
+        report['cache_status'] = {
+            'element_cache_entries': len(self.element_cache),
+            'fuzzy_match_cache_entries': len(self.fuzzy_match_cache),
+            'target_extraction_cache_entries': len(self.target_extraction_cache),
+            'cache_statistics': dict(self.cache_stats),
+            'cache_ttl_seconds': self.cache_ttl_seconds,
+            'max_cache_entries': self.max_cache_entries
+        }
+        
+        # Recent operations summary
+        report['recent_operations'] = {
+            'operation_metrics': dict(self.operation_metrics),
+            'success_rates': dict(self.success_rates),
+            'performance_stats': dict(self.performance_stats)
+        }
+        
+        # Generate recommendations based on current state
+        recommendations = []
+        
+        if self.degraded_mode:
+            recommendations.append("System is in degraded mode - check accessibility permissions")
+        
+        if not FUZZY_MATCHING_AVAILABLE and self.fuzzy_matching_enabled:
+            recommendations.append("Fuzzy matching is enabled but library is not available - install thefuzz[speedup]")
+        
+        if self.performance_stats.get('performance_warnings', 0) > 0:
+            recommendations.append("Performance warnings detected - consider optimizing timeout settings")
+        
+        # Check success rates
+        for operation, stats in self.success_rates.items():
+            if stats['attempts'] > 5:  # Only check if we have enough data
+                success_rate = (stats['successes'] / stats['attempts']) * 100
+                if success_rate < 70:  # Less than 70% success rate
+                    recommendations.append(f"Low success rate for {operation}: {success_rate:.1f}% - investigate configuration")
+        
+        # Check cache hit rates
+        cache_total = self.cache_stats.get('hits', 0) + self.cache_stats.get('misses', 0)
+        if cache_total > 10:  # Only check if we have enough data
+            hit_rate = (self.cache_stats.get('hits', 0) / cache_total) * 100
+            if hit_rate < 30:  # Less than 30% hit rate
+                recommendations.append(f"Low cache hit rate: {hit_rate:.1f}% - consider adjusting cache TTL")
+        
+        if not self.debug_logging and len(recommendations) > 0:
+            recommendations.append("Enable verbose logging for more detailed troubleshooting information")
+        
+        report['recommendations'] = recommendations
+        
+        self.debug_logger.info(f"Diagnostic report generated with {len(recommendations)} recommendations")
+        
+        return report
+    
+    def print_diagnostic_report(self):
+        """
+        Print a human-readable diagnostic report to the console.
+        """
+        report = self.create_diagnostic_report()
+        
+        print("\n" + "="*80)
+        print("ACCESSIBILITY MODULE DIAGNOSTIC REPORT")
+        print("="*80)
+        
+        print(f"\nTimestamp: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(report['timestamp']))}")
+        
+        print("\n--- SYSTEM STATUS ---")
+        status = report['system_status']
+        print(f"Accessibility Enabled: {'✅' if status['accessibility_enabled'] else '❌'}")
+        print(f"Degraded Mode: {'⚠️ YES' if status['degraded_mode'] else '✅ NO'}")
+        print(f"Fuzzy Matching Available: {'✅' if status['fuzzy_matching_available'] else '❌'}")
+        print(f"Error Count: {status['error_count']}")
+        print(f"Recovery Attempts: {status['recovery_attempts']}")
+        
+        print("\n--- CONFIGURATION ---")
+        config = report['configuration']
+        print(f"Fuzzy Matching: {'✅ Enabled' if config['fuzzy_matching_enabled'] else '❌ Disabled'}")
+        print(f"Confidence Threshold: {config['fuzzy_confidence_threshold']}%")
+        print(f"Fast Path Timeout: {config['fast_path_timeout_ms']}ms")
+        print(f"Debug Logging: {'✅ Enabled' if config['debug_logging'] else '❌ Disabled'}")
+        print(f"Clickable Roles: {len(config['clickable_roles'])} configured")
+        
+        print("\n--- PERFORMANCE METRICS ---")
+        perf = report['performance_metrics']['overall_performance']
+        if perf['total_operations'] > 0:
+            success_rate = (perf['successful_operations'] / perf['total_operations']) * 100
+            print(f"Total Operations: {perf['total_operations']}")
+            print(f"Success Rate: {success_rate:.1f}%")
+            print(f"Average Duration: {perf['average_duration_ms']:.1f}ms")
+            print(f"Performance Warnings: {perf['performance_warnings']}")
+        else:
+            print("No operations recorded yet")
+        
+        print("\n--- CACHE STATUS ---")
+        cache = report['cache_status']
+        print(f"Element Cache Entries: {cache['element_cache_entries']}")
+        print(f"Fuzzy Match Cache Entries: {cache['fuzzy_match_cache_entries']}")
+        cache_stats = cache['cache_statistics']
+        if cache_stats.get('total_lookups', 0) > 0:
+            hit_rate = (cache_stats.get('hits', 0) / cache_stats['total_lookups']) * 100
+            print(f"Cache Hit Rate: {hit_rate:.1f}%")
+        
+        print("\n--- RECOMMENDATIONS ---")
+        recommendations = report['recommendations']
+        if recommendations:
+            for i, rec in enumerate(recommendations, 1):
+                print(f"{i}. {rec}")
+        else:
+            print("✅ No issues detected - system appears to be functioning optimally")
+        
+        print("\n" + "="*80)
+        print("END OF DIAGNOSTIC REPORT")
+        print("="*80 + "\n")
     
     def _validate_configuration_with_fallback(self) -> Dict[str, Any]:
         """
