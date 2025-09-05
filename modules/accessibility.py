@@ -749,12 +749,51 @@ class AccessibilityModule:
         
         return diagnostics
     
-    def find_element(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def find_element_enhanced(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
-        Find UI element by role and label with caching and error recovery.
+        Enhanced element finding with multi-role detection and backward compatibility.
         
         Args:
-            role: Accessibility role (e.g., 'AXButton', 'AXMenuItem')
+            role: Accessibility role (e.g., 'AXButton', 'AXMenuItem') or empty for broader search
+            label: Element label or title
+            app_name: Optional application name to limit search scope
+        
+        Returns:
+            Dictionary with element details or None if not found
+        """
+        # Check if enhanced features are available
+        if not self.is_enhanced_role_detection_available():
+            self.logger.info("Enhanced role detection not available, falling back to original implementation")
+            return self._find_element_original_fallback(role, label, app_name)
+        
+        try:
+            # First attempt: Enhanced role detection
+            result = self._find_element_with_enhanced_roles(role, label, app_name)
+            if result:
+                self.logger.debug(f"Enhanced role detection succeeded for {role} '{label}'")
+                return result
+            
+            # Fallback: Original button-only detection for backward compatibility
+            if not role or role.lower() in ['button', 'clickable']:
+                self.logger.debug(f"Falling back to button-only detection for '{label}'")
+                result = self._find_element_button_only_fallback(label, app_name)
+                if result:
+                    self.logger.debug(f"Button-only fallback succeeded for '{label}'")
+                    return result
+            
+            return None
+            
+        except Exception as e:
+            self.logger.warning(f"Enhanced element detection failed: {e}")
+            # Final fallback to original method
+            return self._find_element_original_fallback(role, label, app_name)
+    
+    def find_element(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Find UI element by role and label with enhanced role detection and backward compatibility.
+        
+        Args:
+            role: Accessibility role (e.g., 'AXButton', 'AXMenuItem') or empty for broader search
             label: Element label or title
             app_name: Optional application name to limit search scope
         
@@ -769,6 +808,116 @@ class AccessibilityModule:
                 'app_name': 'Safari'
             }
         """
+        # Use enhanced element detection by default
+        try:
+            result = self.find_element_enhanced(role, label, app_name)
+            if result:
+                return result
+        except Exception as e:
+            self.logger.debug(f"Enhanced element detection failed, using original logic: {e}")
+        
+        # Fallback to original implementation logic for maximum backward compatibility
+        return self._find_element_original_implementation(role, label, app_name)
+    
+    def _find_element_original_implementation(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Original find_element implementation for backward compatibility.
+        
+        This preserves the exact original behavior when enhanced detection fails.
+        """
+        self.logger.debug("Using original implementation for backward compatibility")
+        
+        # For backward compatibility, default to AXButton if no role specified
+        if not role:
+            role = 'AXButton'
+        
+        # Use the existing logic but with original element matching criteria
+        try:
+            # Check for application focus changes
+            self._check_application_focus_change()
+            
+            # Attempt recovery if in degraded mode
+            if self.degraded_mode and self._should_attempt_recovery():
+                if self._attempt_recovery():
+                    self.logger.info("Recovery successful, retrying find_element")
+            
+            # If still in degraded mode, return None
+            if self.degraded_mode:
+                self.logger.debug("Skipping find_element - in degraded mode")
+                return None
+            
+            if not self.accessibility_enabled:
+                return None
+            
+            # Get the target application info
+            if app_name:
+                # Find specific application
+                running_apps = self.workspace.runningApplications()
+                target_app = None
+                for app in running_apps:
+                    if app.localizedName() == app_name:
+                        target_app = app
+                        break
+                
+                if not target_app:
+                    self.logger.debug(f"Application '{app_name}' not found")
+                    return None
+
+                app_pid = target_app.processIdentifier()
+                actual_app_name = app_name
+            else:
+                # Use focused application
+                current_app = self.get_active_application()
+                if not current_app:
+                    self.logger.debug("No active application found")
+                    return None
+                
+                app_pid = current_app['pid']
+                actual_app_name = current_app['name']
+            
+            # Get the target application element
+            app_element = self._get_target_application_element(app_name)
+            if not app_element:
+                self.logger.debug(f"Cannot access application: {app_name or 'focused app'}")
+                return None
+            
+            # Traverse the accessibility tree to find elements
+            found_elements = self.traverse_accessibility_tree(app_element, max_depth=5)
+            
+            # Find matching elements using original strict criteria
+            matching_elements = []
+            for element_info in found_elements:
+                element_role = element_info.get('role', '')
+                element_title = element_info.get('title', '')
+                
+                # Original logic: exact role match and fuzzy label match
+                if role == element_role and self.fuzzy_match_label(element_title, label):
+                    if self.is_element_actionable(element_info) and self._is_element_visible(element_info):
+                        matching_elements.append(element_info)
+            
+            # Find the best match if multiple elements found
+            if matching_elements:
+                best_match = self.find_best_matching_element(matching_elements, label)
+                if best_match:
+                    coordinates = self._calculate_element_coordinates(best_match['element'])
+                    if coordinates:
+                        return {
+                            'coordinates': coordinates,
+                            'center_point': [
+                                coordinates[0] + coordinates[2] // 2,
+                                coordinates[1] + coordinates[3] // 2
+                            ],
+                            'role': best_match.get('role', ''),
+                            'title': best_match.get('title', ''),
+                            'enabled': best_match.get('enabled', True),
+                            'app_name': actual_app_name
+                        }
+            
+            return None
+            
+        except Exception as e:
+            self.logger.debug(f"Original implementation failed: {e}")
+            return None
         # Check for application focus changes
         self._check_application_focus_change()
         
@@ -925,6 +1074,394 @@ class AccessibilityModule:
             self._handle_accessibility_error(e, "find_element")
             return None
     
+    def _find_element_with_enhanced_roles(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Find element using enhanced role detection with all clickable roles.
+        
+        Args:
+            role: Target element role (can be empty for broader search)
+            label: Target element label/text
+            app_name: Optional application name for scoped search
+        
+        Returns:
+            Element information dict or None if not found
+        """
+        # Check for application focus changes
+        self._check_application_focus_change()
+        
+        # Attempt recovery if in degraded mode
+        if self.degraded_mode and self._should_attempt_recovery():
+            if self._attempt_recovery():
+                self.logger.info("Recovery successful, retrying enhanced element search")
+        
+        # If still in degraded mode, return None
+        if self.degraded_mode:
+            self.logger.debug("Skipping enhanced element search - in degraded mode")
+            return None
+        
+        if not self.accessibility_enabled:
+            return None
+        
+        try:
+            # Get the target application info
+            if app_name:
+                # Find specific application
+                running_apps = self.workspace.runningApplications()
+                target_app = None
+                for app in running_apps:
+                    if app.localizedName() == app_name:
+                        target_app = app
+                        break
+                
+                if not target_app:
+                    raise ElementNotFoundError(f"Application '{app_name}' not found")
+                
+                app_pid = target_app.processIdentifier()
+                actual_app_name = app_name
+            else:
+                # Use focused application
+                current_app = self.get_active_application()
+                if not current_app:
+                    raise ElementNotFoundError("No active application found")
+                
+                app_pid = current_app['pid']
+                actual_app_name = current_app['name']
+            
+            # Try to get elements from cache first
+            cached_elements = self._get_cached_elements(actual_app_name, app_pid)
+            
+            if cached_elements is not None:
+                # Search in cached elements using enhanced role detection
+                matching_elements = self._search_cached_elements_enhanced(actual_app_name, app_pid, role, label)
+                
+                # Filter by actionability and visibility
+                actionable_elements = self.filter_elements_by_criteria(
+                    matching_elements, 
+                    actionable_only=True, 
+                    visible_only=True
+                )
+                
+                # Find best match from cached results
+                if actionable_elements:
+                    for element_info in actionable_elements:
+                        if self._element_matches_criteria(element_info, role, label):
+                            try:
+                                coordinates = self._calculate_element_coordinates(element_info['element'])
+                                if coordinates:
+                                    self.logger.debug(f"Found element in cache with enhanced roles: {role} '{label}'")
+                                    return {
+                                        'coordinates': coordinates,
+                                        'center_point': [
+                                            coordinates[0] + coordinates[2] // 2,
+                                            coordinates[1] + coordinates[3] // 2
+                                        ],
+                                        'role': element_info.get('role', ''),
+                                        'title': element_info.get('title', ''),
+                                        'enabled': element_info.get('enabled', True),
+                                        'app_name': actual_app_name
+                                    }
+                            except Exception as e:
+                                self.logger.debug(f"Cached element coordinate calculation failed: {e}")
+                                continue
+            
+            # Cache miss or no valid cached results - perform fresh traversal
+            self.logger.debug(f"Performing fresh accessibility tree traversal with enhanced roles for {actual_app_name}")
+            
+            # Get the target application element
+            app_element = self._get_target_application_element(app_name)
+            if not app_element:
+                raise ElementNotFoundError(
+                    f"Cannot access application: {app_name or 'focused app'}", 
+                    element_role=role, 
+                    element_label=label
+                )
+            
+            # Traverse the accessibility tree to find elements
+            try:
+                found_elements = self.traverse_accessibility_tree(app_element, max_depth=5)
+            except Exception as e:
+                raise AccessibilityTreeTraversalError(f"Failed to traverse accessibility tree: {e}")
+            
+            # Cache the fresh results
+            if found_elements:
+                self._cache_elements(actual_app_name, app_pid, found_elements)
+            
+            # Filter elements by actionability and visibility
+            actionable_elements = self.filter_elements_by_criteria(
+                found_elements, 
+                actionable_only=True, 
+                visible_only=True
+            )
+            
+            # Find matching elements using enhanced criteria
+            matching_elements = []
+            for element_info in actionable_elements:
+                if self._element_matches_criteria(element_info, role, label):
+                    matching_elements.append(element_info)
+            
+            # Find the best match if multiple elements found
+            if matching_elements:
+                best_match = self.find_best_matching_element(matching_elements, label)
+                if best_match:
+                    try:
+                        coordinates = self._calculate_element_coordinates(best_match['element'])
+                        if not coordinates:
+                            raise AccessibilityCoordinateError(
+                                f"Failed to calculate coordinates for element", 
+                                element_info=best_match
+                            )
+                        
+                        return {
+                            'coordinates': coordinates,
+                            'center_point': [
+                                coordinates[0] + coordinates[2] // 2,
+                                coordinates[1] + coordinates[3] // 2
+                            ],
+                            'role': best_match.get('role', ''),
+                            'title': best_match.get('title', ''),
+                            'enabled': best_match.get('enabled', True),
+                            'app_name': actual_app_name
+                        }
+                    except AccessibilityCoordinateError as e:
+                        self.logger.warning(f"Coordinate calculation failed: {e}")
+                        return None
+            
+            # Element not found
+            return None
+            
+        except (ElementNotFoundError, AccessibilityTreeTraversalError, AccessibilityCoordinateError) as e:
+            # These are expected errors that don't indicate API problems
+            self.logger.debug(f"Enhanced element search failed: {e}")
+            return None
+        except Exception as e:
+            self._handle_accessibility_error(e, "find_element_enhanced")
+            return None
+    
+    def _find_element_button_only_fallback(self, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Fallback to original button-only detection for backward compatibility.
+        
+        Args:
+            label: Element label to search for
+            app_name: Optional application name
+            
+        Returns:
+            Element information dict or None if not found
+        """
+        self.logger.info(f"Enhanced role detection failed, falling back to button-only detection for '{label}'")
+        
+        try:
+            # Use original logic that only searches for AXButton elements
+            result = self._find_element_original_fallback('AXButton', label, app_name)
+            if result:
+                self.logger.info(f"Button-only fallback succeeded for '{label}'")
+            else:
+                self.logger.debug(f"Button-only fallback found no results for '{label}'")
+            return result
+        except Exception as e:
+            self.logger.warning(f"Button-only fallback failed for '{label}': {e}")
+            return None
+    
+    def _find_element_original_fallback(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Final fallback to original element detection logic.
+        
+        Args:
+            role: Element role
+            label: Element label
+            app_name: Optional application name
+            
+        Returns:
+            Element information dict or None if not found
+        """
+        self.logger.info(f"Using original fallback detection for role '{role}', label '{label}'")
+        
+        # This implements the original find_element logic as a fallback
+        try:
+            if not role:
+                role = 'AXButton'  # Default to button for backward compatibility
+                self.logger.debug("No role specified, defaulting to AXButton for backward compatibility")
+            
+            # Use the original find_element implementation logic
+            result = self._find_element_with_strict_role_matching(role, label, app_name)
+            if result:
+                self.logger.info(f"Original fallback succeeded for '{role}' '{label}'")
+            else:
+                self.logger.debug(f"Original fallback found no results for '{role}' '{label}'")
+            return result
+        except Exception as e:
+            self.logger.warning(f"Original fallback failed for '{role}' '{label}': {e}")
+            return None
+    
+    def _find_element_with_strict_role_matching(self, role: str, label: str, app_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Find element with strict role matching for backward compatibility.
+        
+        Args:
+            role: Exact role to match
+            label: Element label
+            app_name: Optional application name
+            
+        Returns:
+            Element information dict or None if not found
+        """
+        self.logger.debug(f"Using strict role matching for '{role}' '{label}'")
+        
+        try:
+            # Get the target application info
+            if app_name:
+                # Find specific application
+                running_apps = self.workspace.runningApplications()
+                target_app = None
+                for app in running_apps:
+                    if app.localizedName() == app_name:
+                        target_app = app
+                        break
+                
+                if not target_app:
+                    self.logger.debug(f"Application '{app_name}' not found")
+                    return None
+
+                app_pid = target_app.processIdentifier()
+                actual_app_name = app_name
+            else:
+                # Use focused application
+                current_app = self.get_active_application()
+                if not current_app:
+                    self.logger.debug("No active application found")
+                    return None
+                
+                app_pid = current_app['pid']
+                actual_app_name = current_app['name']
+            
+            # Get the target application element
+            app_element = self._get_target_application_element(app_name)
+            if not app_element:
+                self.logger.debug(f"Cannot access application: {app_name or 'focused app'}")
+                return None
+            
+            # Traverse the accessibility tree to find elements
+            found_elements = self.traverse_accessibility_tree(app_element, max_depth=5)
+            
+            # Find matching elements using strict criteria (exact role match only)
+            matching_elements = []
+            for element_info in found_elements:
+                element_role = element_info.get('role', '')
+                element_title = element_info.get('title', '')
+                
+                # Strict logic: exact role match and fuzzy label match
+                if role == element_role and self.fuzzy_match_label(element_title, label):
+                    if self.is_element_actionable(element_info) and self._is_element_visible(element_info):
+                        matching_elements.append(element_info)
+                        self.logger.debug(f"Found strict match: {element_role} '{element_title}'")
+            
+            # Find the best match if multiple elements found
+            if matching_elements:
+                best_match = self.find_best_matching_element(matching_elements, label)
+                if best_match:
+                    coordinates = self._calculate_element_coordinates(best_match['element'])
+                    if coordinates:
+                        self.logger.debug(f"Strict role matching succeeded for '{role}' '{label}'")
+                        return {
+                            'coordinates': coordinates,
+                            'center_point': [
+                                coordinates[0] + coordinates[2] // 2,
+                                coordinates[1] + coordinates[3] // 2
+                            ],
+                            'role': best_match.get('role', ''),
+                            'title': best_match.get('title', ''),
+                            'enabled': best_match.get('enabled', True),
+                            'app_name': actual_app_name
+                        }
+            
+            self.logger.debug(f"No strict matches found for '{role}' '{label}'")
+            return None
+            
+        except Exception as e:
+            self.logger.debug(f"Strict role matching failed for '{role}' '{label}': {e}")
+            return None
+    
+    def _search_cached_elements_enhanced(self, app_name: str, app_pid: int, role: str, label: str) -> List[Dict[str, Any]]:
+        """
+        Search cached elements using enhanced role detection.
+        
+        Args:
+            app_name: Application name
+            app_pid: Application process ID
+            role: Target role (can be empty for broader search)
+            label: Target label
+            
+        Returns:
+            List of matching elements
+        """
+        cache_key = self._get_cache_key(app_name, app_pid)
+        
+        with self.cache_lock:
+            if cache_key not in self.element_indexes:
+                return []
+            
+            index = self.element_indexes[cache_key]
+            candidates = set()
+            
+            # Enhanced role searching
+            if role:
+                # Direct role matches
+                role_matches = index.role_index.get(role, [])
+                candidates.update(id(elem) for elem in role_matches)
+                
+                # Category matches
+                category_matches = index.role_index.get(role.lower(), [])
+                candidates.update(id(elem) for elem in category_matches)
+            else:
+                # If no role specified, search all clickable elements
+                for clickable_role in self.CLICKABLE_ROLES:
+                    clickable_matches = index.role_index.get(clickable_role, [])
+                    candidates.update(id(elem) for elem in clickable_matches)
+            
+            # Search by exact title match
+            if label:
+                title_matches = index.title_index.get(label, [])
+                if role or candidates:
+                    # Intersect with role matches if we have role candidates
+                    title_ids = {id(elem) for elem in title_matches}
+                    if candidates:
+                        candidates = candidates.intersection(title_ids)
+                    else:
+                        candidates = title_ids
+                else:
+                    candidates.update(id(elem) for elem in title_matches)
+                
+                # Search by normalized title for fuzzy matching
+                normalized_label = self._normalize_text(label)
+                if normalized_label:
+                    normalized_matches = index.normalized_title_index.get(normalized_label, [])
+                    normalized_ids = {id(elem) for elem in normalized_matches}
+                    candidates = candidates.union(normalized_ids)
+            
+            # Convert back to element objects
+            all_elements = []
+            for elements_list in [index.role_index.get(role, []), 
+                                index.title_index.get(label, []),
+                                index.normalized_title_index.get(self._normalize_text(label), [])]:
+                all_elements.extend(elements_list)
+            
+            # Add clickable elements if no specific role
+            if not role:
+                for clickable_role in self.CLICKABLE_ROLES:
+                    clickable_elements = index.role_index.get(clickable_role, [])
+                    all_elements.extend(clickable_elements)
+            
+            # Filter to only candidates and remove duplicates
+            result = []
+            seen_ids = set()
+            for elem in all_elements:
+                elem_id = id(elem)
+                if elem_id in candidates and elem_id not in seen_ids:
+                    result.append(elem)
+                    seen_ids.add(elem_id)
+            
+            return result
+
     def traverse_accessibility_tree(self, element, max_depth: int = 5) -> List[Dict[str, Any]]:
         """
         Recursively traverse accessibility tree to find all elements with error handling.
@@ -1037,13 +1574,25 @@ class AccessibilityModule:
             return []
     
     def _element_matches_criteria(self, element_info: Dict[str, Any], role: str, label: str) -> bool:
-        """Check if element matches the search criteria."""
-        # Check role match
+        """Check if element matches the search criteria with enhanced role detection."""
         element_role = element_info.get('role', '')
-        if role and role not in element_role:
-            # Also check if role matches category
-            element_category = self.classify_element_role(element_role)
-            if role.lower() != element_category:
+        
+        # Enhanced role matching logic
+        if role:
+            # Direct role match
+            if role == element_role:
+                pass  # Continue to label check
+            # Check if role matches category
+            elif role.lower() == self.classify_element_role(element_role):
+                pass  # Continue to label check
+            # Check if searching for clickable elements and element is clickable
+            elif role.lower() in ['button', 'clickable'] and self.is_clickable_element_role(element_role):
+                pass  # Continue to label check
+            else:
+                return False
+        else:
+            # If no specific role requested, check if element is clickable for broad search
+            if not self.is_clickable_element_role(element_role):
                 return False
         
         # Check label match using fuzzy matching
@@ -1125,6 +1674,13 @@ class AccessibilityModule:
         'static': ['AXStaticText', 'AXHeading']
     }
     
+    # Enhanced clickable element roles for comprehensive detection
+    CLICKABLE_ROLES = {
+        'AXButton', 'AXMenuButton', 'AXMenuItem', 'AXMenuBarItem',
+        'AXLink', 'AXCheckBox', 'AXRadioButton', 'AXTab',
+        'AXToolbarButton', 'AXPopUpButton', 'AXComboBox'
+    }
+    
     ACTIONABLE_ROLES = {
         'AXButton', 'AXMenuButton', 'AXMenuItem', 'AXMenuBarItem',
         'AXTextField', 'AXSecureTextField', 'AXTextArea',
@@ -1147,6 +1703,79 @@ class AccessibilityModule:
             if role in roles:
                 return category
         return 'unknown'
+    
+    def is_clickable_element_role(self, role: str) -> bool:
+        """
+        Check if an element role is clickable based on CLICKABLE_ROLES.
+        
+        Args:
+            role: Raw accessibility role (e.g., 'AXButton', 'AXLink')
+        
+        Returns:
+            True if the role is in CLICKABLE_ROLES, False otherwise
+        """
+        try:
+            return role in self.CLICKABLE_ROLES
+        except AttributeError:
+            # Graceful degradation when CLICKABLE_ROLES is not configured
+            self.logger.debug("CLICKABLE_ROLES not configured, falling back to button-only detection")
+            return role == 'AXButton'
+    
+    def categorize_element_type(self, role: str) -> str:
+        """
+        Categorize element type for enhanced role detection.
+        
+        Args:
+            role: Raw accessibility role
+            
+        Returns:
+            Element type category ('clickable', 'input', 'display', 'container', 'unknown')
+        """
+        try:
+            if role in self.CLICKABLE_ROLES:
+                return 'clickable'
+            elif role in ['AXTextField', 'AXSecureTextField', 'AXTextArea']:
+                return 'input'
+            elif role in ['AXStaticText', 'AXHeading', 'AXImage']:
+                return 'display'
+            elif role in ['AXGroup', 'AXWindow', 'AXDialog', 'AXScrollArea']:
+                return 'container'
+            else:
+                return 'unknown'
+        except AttributeError:
+            # Graceful degradation when CLICKABLE_ROLES is not configured
+            self.logger.debug("CLICKABLE_ROLES not configured, using basic categorization")
+            if role == 'AXButton':
+                return 'clickable'
+            elif role in ['AXTextField', 'AXSecureTextField', 'AXTextArea']:
+                return 'input'
+            elif role in ['AXStaticText', 'AXHeading', 'AXImage']:
+                return 'display'
+            elif role in ['AXGroup', 'AXWindow', 'AXDialog', 'AXScrollArea']:
+                return 'container'
+            else:
+                return 'unknown'
+    
+    def is_enhanced_role_detection_available(self) -> bool:
+        """
+        Check if enhanced role detection features are properly configured.
+        
+        Returns:
+            True if enhanced features are available, False if fallback is needed
+        """
+        try:
+            # Check if CLICKABLE_ROLES is available and properly configured
+            if not hasattr(self, 'CLICKABLE_ROLES') or not self.CLICKABLE_ROLES:
+                return False
+            
+            # Check if enhanced methods are available
+            if not hasattr(self, 'is_clickable_element_role'):
+                return False
+            
+            return True
+        except Exception as e:
+            self.logger.debug(f"Enhanced role detection not available: {e}")
+            return False
     
     def is_element_actionable(self, element_info: Dict[str, Any]) -> bool:
         """

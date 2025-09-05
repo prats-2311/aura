@@ -8,9 +8,9 @@
   - Write unit tests for configuration loading and validation
   - _Requirements: 3.1, 3.4, 6.1, 6.3_
 
-- [ ] 2. Implement enhanced element role detection
+- [x] 2. Implement enhanced element role detection
 
-  - [ ] 2.1 Expand clickable element role constants
+  - [x] 2.1 Expand clickable element role constants
 
     - Define CLICKABLE_ROLES constant in AccessibilityModule with all clickable element types
     - Update element search logic to check all roles in CLICKABLE_ROLES set instead of just AXButton
@@ -18,7 +18,7 @@
     - Write unit tests for role detection with mocked accessibility elements
     - _Requirements: 1.1, 1.2, 1.4_
 
-  - [ ] 2.2 Implement backward compatibility for role detection
+  - [x] 2.2 Implement backward compatibility for role detection
     - Add fallback logic to existing button-only detection when enhanced detection fails
     - Implement graceful degradation when CLICKABLE_ROLES is not configured
     - Add logging for role detection fallback scenarios
