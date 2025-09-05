@@ -326,6 +326,13 @@ class AccessibilityModule:
     using the Accessibility API.
     """
     
+    # Enhanced clickable element roles for comprehensive detection
+    CLICKABLE_ROLES = {
+        'AXButton', 'AXMenuButton', 'AXMenuItem', 'AXMenuBarItem',
+        'AXLink', 'AXCheckBox', 'AXRadioButton', 'AXTab',
+        'AXToolbarButton', 'AXPopUpButton', 'AXComboBox'
+    }
+    
     def __init__(self):
         """Initialize accessibility API connections with error handling."""
         self.logger = logging.getLogger(__name__)
@@ -3577,13 +3584,6 @@ class AccessibilityModule:
         'static': ['AXStaticText', 'AXHeading']
     }
     
-    # Enhanced clickable element roles for comprehensive detection
-    CLICKABLE_ROLES = {
-        'AXButton', 'AXMenuButton', 'AXMenuItem', 'AXMenuBarItem',
-        'AXLink', 'AXCheckBox', 'AXRadioButton', 'AXTab',
-        'AXToolbarButton', 'AXPopUpButton', 'AXComboBox'
-    }
-    
     # Accessibility attributes to check in priority order for multi-attribute text searching
     ACCESSIBILITY_ATTRIBUTES = ['AXTitle', 'AXDescription', 'AXValue']
     
@@ -3627,8 +3627,10 @@ class AccessibilityModule:
             True if the role is in CLICKABLE_ROLES, False otherwise
         """
         try:
-            return role in self.CLICKABLE_ROLES
-        except AttributeError:
+            # Use instance attribute first, fall back to class constant
+            clickable_roles = getattr(self, 'clickable_roles', self.CLICKABLE_ROLES)
+            return role in clickable_roles
+        except (AttributeError, NameError):
             # Graceful degradation when CLICKABLE_ROLES is not configured
             self.logger.debug("CLICKABLE_ROLES not configured, falling back to button-only detection")
             return role == 'AXButton'
@@ -3676,8 +3678,15 @@ class AccessibilityModule:
             True if enhanced features are available, False if fallback is needed
         """
         try:
-            # Check if CLICKABLE_ROLES is available and properly configured
-            if not hasattr(self, 'CLICKABLE_ROLES') or not self.CLICKABLE_ROLES:
+            # Check if clickable_roles instance attribute or class constant is available
+            clickable_roles = getattr(self, 'clickable_roles', None)
+            if not clickable_roles:
+                try:
+                    clickable_roles = self.CLICKABLE_ROLES
+                except AttributeError:
+                    return False
+            
+            if not clickable_roles:
                 return False
             
             # Check if enhanced methods are available
