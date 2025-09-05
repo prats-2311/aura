@@ -3201,9 +3201,161 @@ Focus on being helpful while being honest about what information is actually vis
         
         return ""
     
+    def _extract_target_from_command(self, command: str) -> str:
+        """
+        Extract target element name from natural language command.
+        
+        Removes action words ("click", "type", "press") and articles ("the", "on", "a", "an")
+        to isolate the target element name.
+        
+        Args:
+            command: Natural language command
+            
+        Returns:
+            Extracted target element name
+            
+        Examples:
+            "Click on the Gmail link" -> "gmail link"
+            "Press the Submit button" -> "submit button"
+            "Type in the search box" -> "search box"
+        """
+        try:
+            # Convert to lowercase for processing
+            processed_command = command.lower().strip()
+            
+            # Define action words to remove
+            action_words = [
+                'click', 'press', 'tap', 'select', 'choose', 'hit',
+                'type', 'enter', 'input', 'write', 'fill',
+                'scroll', 'swipe', 'drag', 'move',
+                'open', 'close', 'minimize', 'maximize',
+                'double', 'right'  # For double-click, right-click
+            ]
+            
+            # Define articles and prepositions to remove
+            articles = [
+                'the', 'a', 'an', 'on', 'in', 'at', 'to', 'for', 'with',
+                'into', 'onto', 'upon', 'inside', 'within'
+            ]
+            
+            # Split command into words
+            words = processed_command.split()
+            
+            # Track removed words for confidence scoring
+            removed_words = []
+            
+            # Remove action words
+            filtered_words = []
+            for word in words:
+                if word in action_words:
+                    removed_words.append(word)
+                else:
+                    filtered_words.append(word)
+            
+            # Remove articles and prepositions
+            final_words = []
+            for word in filtered_words:
+                if word in articles:
+                    removed_words.append(word)
+                else:
+                    final_words.append(word)
+            
+            # Join remaining words to form target (preserve original case)
+            if final_words:
+                # Reconstruct target preserving original case
+                original_words = command.split()
+                target_parts = []
+                for word in final_words:
+                    # Find the original case version of this word
+                    for orig_word in original_words:
+                        if orig_word.lower() == word:
+                            target_parts.append(orig_word)
+                            break
+                    else:
+                        # If not found, use the lowercase version
+                        target_parts.append(word)
+                target = ' '.join(target_parts).strip()
+            else:
+                target = ''
+            
+            # If target is empty or too short, fall back to original command
+            if not target or len(target) < 2:
+                logger.debug(f"Target extraction resulted in empty/short target, using original command")
+                return command.strip()
+            
+            # Calculate confidence based on words removed and remaining text
+            confidence = self._calculate_target_extraction_confidence(
+                original_command=command,
+                extracted_target=target,
+                removed_words=removed_words
+            )
+            
+            logger.debug(f"Target extraction: '{command}' -> '{target}' (confidence: {confidence:.2f})")
+            
+            return target
+            
+        except Exception as e:
+            logger.error(f"Error extracting target from command '{command}': {e}")
+            return command.strip()  # Fallback to original command
+    
+    def _calculate_target_extraction_confidence(self, original_command: str, extracted_target: str, removed_words: List[str]) -> float:
+        """
+        Calculate confidence score for target extraction.
+        
+        Args:
+            original_command: Original user command
+            extracted_target: Extracted target text
+            removed_words: List of words that were removed
+            
+        Returns:
+            Confidence score between 0.0 and 1.0
+        """
+        try:
+            original_words = original_command.lower().split()
+            target_words = extracted_target.lower().split()
+            
+            # Base confidence starts at 0.5
+            confidence = 0.5
+            
+            # Increase confidence if we removed action words (good extraction)
+            action_words_removed = sum(1 for word in removed_words if word in [
+                'click', 'press', 'tap', 'select', 'type', 'enter', 'input', 'write'
+            ])
+            if action_words_removed > 0:
+                confidence += 0.2 * min(action_words_removed, 2)  # Max +0.4
+            
+            # Increase confidence if we removed articles (good extraction)
+            articles_removed = sum(1 for word in removed_words if word in [
+                'the', 'a', 'an', 'on', 'in', 'at'
+            ])
+            if articles_removed > 0:
+                confidence += 0.1 * min(articles_removed, 2)  # Max +0.2
+            
+            # Decrease confidence if target is too short relative to original
+            if len(original_words) > 0 and len(target_words) < len(original_words) * 0.3:
+                confidence -= 0.2
+            
+            # Increase confidence if target contains meaningful words
+            if target_words:
+                meaningful_words = [word for word in target_words if len(word) > 2]
+                if len(meaningful_words) >= len(target_words) * 0.7:
+                    confidence += 0.1
+            
+            # Ensure confidence is within bounds
+            confidence = max(0.0, min(1.0, confidence))
+            
+            return confidence
+            
+        except Exception as e:
+            logger.debug(f"Error calculating target extraction confidence: {e}")
+            return 0.5  # Default confidence
+    
     def _extract_gui_elements_from_command(self, command: str) -> Dict[str, str]:
         """
-        Extract target element information from user command.
+        Enhanced GUI element extraction with intelligent target parsing.
+        
+        Uses enhanced target extraction to isolate the target element name
+        and returns empty role for broader element searching.
         
         Args:
             command: User command to parse
@@ -3212,7 +3364,7 @@ Focus on being helpful while being honest about what information is actually vis
             Dictionary with 'role', 'label', 'action', and optionally 'app_name' keys
         """
         gui_elements = {
-            'role': '',
+            'role': '',  # Empty for broader search
             'label': '',
             'action': 'click',
             'app_name': None
@@ -3237,59 +3389,24 @@ Focus on being helpful while being honest about what information is actually vis
                 if gui_elements['action'] != 'click':
                     break
             
-            # Extract element role/type
-            role_patterns = {
-                'button': [r'\bbutton\b', r'\bbtn\b'],
-                'menu': [r'\bmenu\b', r'\bmenuitem\b', r'\bmenubar\b'],
-                'text_field': [r'\btext\s*field\b', r'\binput\s*field\b', r'\btext\s*box\b'],
-                'checkbox': [r'\bcheckbox\b', r'\bcheck\s*box\b'],
-                'link': [r'\blink\b', r'\bhyperlink\b'],
-                'tab': [r'\btab\b'],
-                'window': [r'\bwindow\b', r'\bdialog\b']
-            }
+            # Use enhanced target extraction to get the cleaned target
+            extracted_target = self._extract_target_from_command(command)
             
-            for role, patterns in role_patterns.items():
-                for pattern in patterns:
-                    if re.search(pattern, command_lower):
-                        gui_elements['role'] = role
-                        break
-                if gui_elements['role']:
-                    break
+            # If target extraction succeeded, use it as the label
+            if extracted_target and extracted_target != command.strip():
+                gui_elements['label'] = extracted_target
+                logger.debug(f"Using enhanced target extraction: '{command}' -> '{extracted_target}'")
+            else:
+                # Fallback to full command text when target extraction fails
+                logger.debug(f"Target extraction failed, using full command text as fallback")
+                gui_elements['label'] = command.strip()
             
-            # Extract element label/text
-            label_patterns = [
-                r'(?:click|press|tap|select)\s+(?:on\s+)?(?:the\s+)?["\']([^"\']+)["\']',  # Quoted text
-                r'(?:click|press|tap|select)\s+(?:on\s+)?(?:the\s+)?(\w+(?:\s+\w+)*?)(?:\s+(?:button|menu|link|tab))?$',  # Text before element type
-                r'(?:button|menu|link|tab)\s+["\']([^"\']+)["\']',  # Element type followed by quoted text
-                r'(?:button|menu|link|tab)\s+(\w+(?:\s+\w+)*)',  # Element type followed by text
-            ]
-            
-            for pattern in label_patterns:
-                match = re.search(pattern, command_lower)
-                if match:
-                    gui_elements['label'] = match.group(1).strip()
-                    break
-            
-            # If no specific label found, try to extract any quoted text
-            if not gui_elements['label']:
-                quoted_match = re.search(r'["\']([^"\']+)["\']', command_lower)
-                if quoted_match:
-                    gui_elements['label'] = quoted_match.group(1).strip()
-            
-            # If still no label, try to extract text after common action words
-            if not gui_elements['label']:
-                action_match = re.search(r'(?:click|press|tap|select)\s+(?:on\s+)?(?:the\s+)?(.+)', command_lower)
-                if action_match:
-                    potential_label = action_match.group(1).strip()
-                    # Clean up common suffixes
-                    potential_label = re.sub(r'\s+(?:button|menu|link|tab|item)$', '', potential_label)
-                    if potential_label and len(potential_label) > 0:
-                        gui_elements['label'] = potential_label
-            
-            # Extract application name if specified
+            # Extract application name if specified (improved logic)
+            # Only look for explicit app name patterns that don't interfere with target extraction
             app_patterns = [
-                r'in\s+(\w+(?:\s+\w+)*?)(?:\s+app|\s+application|$)',
-                r'(?:on|in)\s+(\w+)(?:\s+window|\s+app|\s+application)',
+                r'in\s+(\w+)\s+app\b',  # "in Safari app"
+                r'in\s+(\w+)\s+application\b',  # "in Chrome application"
+                r'(?:on|in)\s+(\w+)\s+window\b',  # "in Safari window" - but only single word apps
             ]
             
             for pattern in app_patterns:
@@ -3297,20 +3414,20 @@ Focus on being helpful while being honest about what information is actually vis
                 if match:
                     app_name = match.group(1).strip()
                     # Filter out common words that aren't app names
-                    if app_name not in ['the', 'this', 'that', 'my', 'current', 'active']:
+                    common_words = ['the', 'this', 'that', 'my', 'current', 'active', 'main', 'search', 'file']
+                    if app_name not in common_words and len(app_name) > 2:
                         gui_elements['app_name'] = app_name.title()
                         break
             
             # Validate that we have enough information for GUI command
-            if not gui_elements['label'] and not gui_elements['role']:
-                logger.debug("Insufficient GUI element information extracted")
+            if not gui_elements['label']:
+                logger.debug("No label extracted from command")
                 return {}
             
-            # Set default role if not specified but we have a label
-            if gui_elements['label'] and not gui_elements['role']:
-                gui_elements['role'] = 'button'  # Default assumption
+            # Note: We intentionally leave role empty for broader element searching
+            # This allows the accessibility module to search all clickable element types
             
-            logger.debug(f"Extracted GUI elements: {gui_elements}")
+            logger.debug(f"Enhanced GUI elements extracted: {gui_elements}")
             return gui_elements
             
         except Exception as e:

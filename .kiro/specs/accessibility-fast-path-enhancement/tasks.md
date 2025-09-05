@@ -59,9 +59,9 @@
     - Write integration tests for complete fuzzy matching element detection
     - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 5. Implement intelligent target extraction in orchestrator
+- [x] 5. Implement intelligent target extraction in orchestrator
 
-  - [ ] 5.1 Create command parsing and target extraction
+  - [x] 5.1 Create command parsing and target extraction
 
     - Implement \_extract_target_from_command method that removes action words and articles
     - Define lists of common action words (click, type, press) and articles (the, on, a, an)
@@ -69,7 +69,7 @@
     - Write unit tests for target extraction with various command phrasings
     - _Requirements: 4.1, 4.2, 4.3_
 
-  - [ ] 5.2 Integrate target extraction into GUI element extraction
+  - [x] 5.2 Integrate target extraction into GUI element extraction
     - Modify \_extract_gui_elements_from_command to use enhanced target extraction
     - Update method to return empty role for broader element searching
     - Add fallback to full command text when target extraction fails
