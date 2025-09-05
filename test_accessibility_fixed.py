@@ -1,104 +1,110 @@
 #!/usr/bin/env python3
 """
-Fixed Accessibility Module Test
-
-This version uses the correct import paths for macOS accessibility functions.
+Test accessibility with proper function calls
 """
 
-def test_accessibility_fixed():
-    print("🧪 Testing Fixed Accessibility Implementation...")
+import sys
+import os
+
+def test_accessibility_properly():
+    """Test accessibility with correct function calls."""
+    print(f"Python executable: {sys.executable}")
     
     try:
-        # Method 1: Import from ApplicationServices (correct way)
-        try:
-            from ApplicationServices import AXUIElementCreateSystemWide
-            print("✅ Method 1: AXUIElementCreateSystemWide imported from ApplicationServices")
-            
-            # Test system-wide element creation
-            system_wide = AXUIElementCreateSystemWide()
-            if system_wide:
-                print("✅ System-wide element created successfully!")
-                print("🎉 Accessibility permissions are working!")
-                return True
-            else:
-                print("❌ System-wide element creation returned None")
-                print("📋 This means accessibility permissions are not granted")
-                return False
+        from ApplicationServices import (
+            AXIsProcessTrusted, 
+            AXUIElementCreateSystemWide,
+            AXUIElementCopyAttributeValue,
+            kAXFocusedApplicationAttribute
+        )
+        from CoreFoundation import CFRelease
+        import objc
+        
+        print("✅ ApplicationServices imported successfully")
+        
+        # Test basic trust check
+        is_trusted = AXIsProcessTrusted()
+        print(f"AXIsProcessTrusted(): {is_trusted}")
+        
+        if is_trusted:
+            # Test system element access
+            try:
+                system_element = AXUIElementCreateSystemWide()
+                print("✅ AXUIElementCreateSystemWide() successful")
                 
-        except ImportError:
-            print("⚠️  Method 1 failed, trying Method 2...")
-            
-            # Method 2: Load bundle manually
-            import objc
-            bundle = objc.loadBundle('ApplicationServices', globals())
-            
-            if 'AXUIElementCreateSystemWide' in globals():
-                print("✅ Method 2: AXUIElementCreateSystemWide loaded via bundle")
+                # Test focused app access with proper error handling
+                error = objc.NULL
+                focused_app = AXUIElementCopyAttributeValue(system_element, kAXFocusedApplicationAttribute, error)
                 
-                system_wide = AXUIElementCreateSystemWide()
-                if system_wide:
-                    print("✅ System-wide element created successfully!")
-                    print("🎉 Accessibility permissions are working!")
+                if focused_app is not None:
+                    print("✅ AXUIElementCopyAttributeValue() successful")
+                    print("🎉 ALL ACCESSIBILITY FUNCTIONS WORKING!")
                     return True
                 else:
-                    print("❌ System-wide element creation returned None")
+                    print(f"❌ AXUIElementCopyAttributeValue() returned None")
                     return False
-            else:
-                print("❌ Method 2: Could not load AXUIElementCreateSystemWide")
+                    
+            except Exception as e:
+                print(f"❌ Accessibility function failed: {e}")
                 return False
-    
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        return False
-
-def test_nsworkspace():
-    print("\n🧪 Testing NSWorkspace...")
-    
-    try:
-        from AppKit import NSWorkspace
-        workspace = NSWorkspace.sharedWorkspace()
-        
-        if workspace:
-            print("✅ NSWorkspace created successfully")
-            
-            # Get frontmost application
-            app = workspace.frontmostApplication()
-            if app:
-                print(f"✅ Frontmost app: {app.localizedName()}")
-            else:
-                print("⚠️  No frontmost app detected")
-            
-            return True
         else:
-            print("❌ NSWorkspace creation failed")
+            print("❌ Process not trusted - permissions not granted")
             return False
             
-    except Exception as e:
-        print(f"❌ NSWorkspace error: {e}")
+    except ImportError as e:
+        print(f"❌ Import failed: {e}")
         return False
 
-def main():
-    print("🔧 AURA Accessibility Fix Test")
-    print("=" * 40)
-    
-    # Test accessibility
-    accessibility_works = test_accessibility_fixed()
-    
-    # Test NSWorkspace
-    nsworkspace_works = test_nsworkspace()
-    
-    print("\n" + "=" * 40)
-    print("📊 RESULTS:")
-    print(f"Accessibility API: {'✅ Working' if accessibility_works else '❌ Not Working'}")
-    print(f"NSWorkspace API: {'✅ Working' if nsworkspace_works else '❌ Not Working'}")
-    
-    if accessibility_works and nsworkspace_works:
-        print("\n🎉 All tests passed! AURA accessibility should work now.")
-    elif nsworkspace_works:
-        print("\n⚠️  NSWorkspace works but accessibility permissions needed.")
-        print("Please grant accessibility permissions in System Preferences.")
-    else:
-        print("\n❌ Tests failed. PyObjC installation may need fixing.")
+def check_what_aura_needs():
+    """Check what AURA's permission validator is actually testing."""
+    try:
+        from modules.permission_validator import PermissionValidator
+        
+        # Let's look at the source to see what it's checking
+        validator = PermissionValidator()
+        
+        # Check the actual permission validation logic
+        print("\nChecking AURA's permission validation logic...")
+        
+        # Try to call the internal methods to see what's failing
+        if hasattr(validator, '_check_system_wide_element_access'):
+            try:
+                system_access = validator._check_system_wide_element_access()
+                print(f"System-wide element access: {system_access}")
+            except Exception as e:
+                print(f"System-wide element access failed: {e}")
+        
+        if hasattr(validator, '_check_focused_application_access'):
+            try:
+                focused_access = validator._check_focused_application_access()
+                print(f"Focused application access: {focused_access}")
+            except Exception as e:
+                print(f"Focused application access failed: {e}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error checking AURA's permission logic: {e}")
+        return False
 
 if __name__ == "__main__":
-    main()
+    print("="*60)
+    print("TESTING ACCESSIBILITY WITH PROPER FUNCTION CALLS")
+    print("="*60)
+    
+    # Test PyObjC with proper calls
+    print("\n1. Testing PyObjC with correct function calls:")
+    pyobjc_works = test_accessibility_properly()
+    
+    # Check what AURA is actually testing
+    print("\n2. Checking AURA's permission validation logic:")
+    check_what_aura_needs()
+    
+    print(f"\nThe correct Python executable to add to System Preferences:")
+    print(f"📁 {sys.executable}")
+    
+    if pyobjc_works:
+        print("\n✅ Basic accessibility is working!")
+        print("The issue is likely in AURA's permission validation logic.")
+    else:
+        print("\n❌ Need to fix accessibility permissions first.")

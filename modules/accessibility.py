@@ -595,13 +595,13 @@ class AccessibilityModule:
             
             # Initialize error recovery manager (import here to avoid circular dependency)
             try:
-                from .error_recovery import ErrorRecoveryManager
-                recovery_config = {
-                    'max_retries': self.max_retries,
-                    'retry_delay': self.retry_delay,
-                    'backoff_multiplier': self.backoff_multiplier,
-                    'timeout_threshold': getattr(self, 'fast_path_timeout_ms', 5000) / 1000.0
-                }
+                from .error_recovery import ErrorRecoveryManager, RecoveryConfiguration
+                recovery_config = RecoveryConfiguration(
+                    max_retries=self.max_retries,
+                    base_delay=self.retry_delay,
+                    exponential_base=self.backoff_multiplier,
+                    max_delay=getattr(self, 'fast_path_timeout_ms', 5000) / 1000.0
+                )
                 self.error_recovery_manager = ErrorRecoveryManager(recovery_config)
             except ImportError as e:
                 self.logger.debug(f"Error recovery manager not available: {e}")

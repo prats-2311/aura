@@ -878,12 +878,13 @@ class Orchestrator:
             self.diagnostic_tools = AccessibilityHealthChecker(diagnostic_config)
             
             # Initialize error recovery manager
-            recovery_config = {
-                'max_retries': self.max_retries,
-                'retry_delay': self.retry_delay,
-                'timeout_threshold': 5.0,  # 5 seconds
-                'enable_automatic_recovery': True
-            }
+            from modules.error_recovery import RecoveryConfiguration
+            recovery_config = RecoveryConfiguration(
+                max_retries=self.max_retries,
+                base_delay=self.retry_delay,
+                max_delay=5.0,  # 5 seconds
+                enable_alternative_strategies=True
+            )
             
             self.error_recovery_manager = ErrorRecoveryManager(recovery_config)
             

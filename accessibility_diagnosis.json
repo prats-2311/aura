@@ -1,0 +1,17 @@
+{
+  "python_info": {
+    "sys_executable": "/opt/anaconda3/bin/python",
+    "which_python": "/opt/anaconda3/bin/python",
+    "which_python3": "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
+    "real_path": "/opt/anaconda3/bin/python3.13",
+    "is_symlink": true,
+    "conda_env": "base",
+    "virtual_env": null
+  },
+  "api_check": {
+    "pyobjc_available": false,
+    "error": "No module named 'ApplicationServices'"
+  },
+  "functions_work": false,
+  "tcc_clients": null
+}

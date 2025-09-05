@@ -399,7 +399,9 @@ class PermissionValidator:
             
             # Try to access system-wide attributes
             try:
-                focused_app = AXUIElementCopyAttributeValue(system_wide, kAXFocusedApplicationAttribute)
+                import objc
+                error = objc.NULL
+                focused_app = AXUIElementCopyAttributeValue(system_wide, kAXFocusedApplicationAttribute, error)
                 has_focused_app = focused_app is not None
             except Exception as e:
                 has_focused_app = False
@@ -468,7 +470,9 @@ class PermissionValidator:
             system_wide = AXUIElementCreateSystemWide()
             if system_wide:
                 try:
-                    focused_app = AXUIElementCopyAttributeValue(system_wide, kAXFocusedApplicationAttribute)
+                    import objc
+                    error = objc.NULL
+                    focused_app = AXUIElementCopyAttributeValue(system_wide, kAXFocusedApplicationAttribute, error)
                     accessibility_access = focused_app is not None
                 except Exception as e:
                     accessibility_access = False
