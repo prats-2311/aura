@@ -187,6 +187,27 @@ Return the response in this JSON structure:
 }
 """
 
+# -- Fuzzy Matching Configuration --
+# Fuzzy string matching settings for accessibility enhancements
+FUZZY_MATCHING_ENABLED = True
+FUZZY_CONFIDENCE_THRESHOLD = 85  # Minimum confidence score (0-100) for fuzzy matches
+FUZZY_MATCHING_TIMEOUT = 200     # Maximum time in milliseconds for fuzzy matching operations
+
+# Accessibility element detection settings
+CLICKABLE_ROLES = [
+    "AXButton", "AXLink", "AXMenuItem", 
+    "AXCheckBox", "AXRadioButton"
+]
+ACCESSIBILITY_ATTRIBUTES = ["AXTitle", "AXDescription", "AXValue"]
+
+# Performance settings for enhanced accessibility
+FAST_PATH_TIMEOUT = 2000         # Maximum time in milliseconds for fast path execution
+ATTRIBUTE_CHECK_TIMEOUT = 500    # Maximum time in milliseconds for attribute checking
+
+# Debugging settings for accessibility enhancements
+ACCESSIBILITY_DEBUG_LOGGING = False
+LOG_FUZZY_MATCH_SCORES = False
+
 # -- Audio Settings --
 # Path to sound effects for feedback
 BASE_DIR = Path(__file__).parent
@@ -423,6 +444,34 @@ def validate_config():
     if not 0.0 <= HYBRID_FEEDBACK_VOLUME <= 1.0:
         errors.append("HYBRID_FEEDBACK_VOLUME must be between 0.0 and 1.0")
     
+    # Check fuzzy matching configuration
+    if not isinstance(FUZZY_MATCHING_ENABLED, bool):
+        errors.append("FUZZY_MATCHING_ENABLED must be a boolean")
+    
+    if not 0 <= FUZZY_CONFIDENCE_THRESHOLD <= 100:
+        errors.append("FUZZY_CONFIDENCE_THRESHOLD must be between 0 and 100")
+    
+    if FUZZY_MATCHING_TIMEOUT < 50 or FUZZY_MATCHING_TIMEOUT > 5000:
+        warnings.append("FUZZY_MATCHING_TIMEOUT should be between 50-5000 milliseconds")
+    
+    if not isinstance(CLICKABLE_ROLES, list) or not CLICKABLE_ROLES:
+        errors.append("CLICKABLE_ROLES must be a non-empty list")
+    
+    if not isinstance(ACCESSIBILITY_ATTRIBUTES, list) or not ACCESSIBILITY_ATTRIBUTES:
+        errors.append("ACCESSIBILITY_ATTRIBUTES must be a non-empty list")
+    
+    if FAST_PATH_TIMEOUT < 500 or FAST_PATH_TIMEOUT > 10000:
+        warnings.append("FAST_PATH_TIMEOUT should be between 500-10000 milliseconds")
+    
+    if ATTRIBUTE_CHECK_TIMEOUT < 100 or ATTRIBUTE_CHECK_TIMEOUT > 2000:
+        warnings.append("ATTRIBUTE_CHECK_TIMEOUT should be between 100-2000 milliseconds")
+    
+    if not isinstance(ACCESSIBILITY_DEBUG_LOGGING, bool):
+        errors.append("ACCESSIBILITY_DEBUG_LOGGING must be a boolean")
+    
+    if not isinstance(LOG_FUZZY_MATCH_SCORES, bool):
+        errors.append("LOG_FUZZY_MATCH_SCORES must be a boolean")
+    
     # Check automation settings
     if MOUSE_MOVE_DURATION < 0:
         errors.append("MOUSE_MOVE_DURATION cannot be negative")
@@ -495,6 +544,17 @@ def get_config_summary():
             'debug_mode': DEBUG_MODE,
             'mock_apis': MOCK_APIS,
             'log_level': LOG_LEVEL
+        },
+        'fuzzy_matching': {
+            'enabled': FUZZY_MATCHING_ENABLED,
+            'confidence_threshold': FUZZY_CONFIDENCE_THRESHOLD,
+            'timeout_ms': FUZZY_MATCHING_TIMEOUT,
+            'clickable_roles': CLICKABLE_ROLES,
+            'accessibility_attributes': ACCESSIBILITY_ATTRIBUTES,
+            'fast_path_timeout_ms': FAST_PATH_TIMEOUT,
+            'attribute_check_timeout_ms': ATTRIBUTE_CHECK_TIMEOUT,
+            'debug_logging': ACCESSIBILITY_DEBUG_LOGGING,
+            'log_match_scores': LOG_FUZZY_MATCH_SCORES
         }
     }
 

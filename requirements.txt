@@ -40,6 +40,7 @@ ollama>=0.3.0            # Ollama Cloud API client
 # Data Processing
 pandas>=2.1.0            # Data manipulation and analysis
 jsonschema>=4.19.0       # JSON schema validation
+thefuzz[speedup]>=0.22.1 # Fuzzy string matching with C speedup
 
 # Logging and Monitoring
 structlog>=23.2.0        # Structured logging
