@@ -1506,20 +1506,111 @@ class Orchestrator:
     
     def _handle_deferred_action_request(self, execution_id: str, intent_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Handle deferred action requests (placeholder for future implementation).
+        Handle deferred action requests that initiate multi-step workflows.
+        
+        This method implements the deferred action workflow:
+        1. Generate requested content using reasoning module
+        2. Enter waiting state for user click
+        3. Start global mouse listener
+        4. Provide audio instructions to user
         
         Args:
             execution_id (str): Unique execution identifier
             intent_data (Dict[str, Any]): Intent recognition result with parameters
             
         Returns:
-            Dict[str, Any]: Execution result
+            Dict[str, Any]: Execution result indicating waiting state
         """
-        logger.info(f"[{execution_id}] Deferred action handler not yet implemented, falling back to GUI interaction")
-        # For now, fall back to GUI interaction processing
-        # This will be implemented in a future task
-        command = intent_data.get('original_command', '')
-        return self._handle_gui_interaction(execution_id, command)
+        try:
+            logger.info(f"[{execution_id}] Starting deferred action workflow")
+            
+            # Extract parameters from intent data
+            parameters = intent_data.get('parameters', {})
+            content_request = parameters.get('target', '')
+            content_type = parameters.get('content_type', 'code')
+            original_command = intent_data.get('original_command', '')
+            
+            if not content_request:
+                content_request = original_command
+            
+            logger.info(f"[{execution_id}] Content request: {content_request}, Type: {content_type}")
+            
+            # Step 1: Generate content using reasoning module
+            self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.REASONING, 30)
+            
+            try:
+                generated_content = self._generate_deferred_content(execution_id, content_request, content_type)
+                if not generated_content:
+                    return self._create_error_result(
+                        execution_id, 
+                        "Failed to generate content for deferred action",
+                        "Content generation failed. Please try rephrasing your request."
+                    )
+                
+                logger.info(f"[{execution_id}] Content generated successfully ({len(generated_content)} characters)")
+                
+            except Exception as e:
+                logger.error(f"[{execution_id}] Content generation failed: {e}")
+                return self._create_error_result(
+                    execution_id,
+                    f"Content generation error: {e}",
+                    "Failed to generate the requested content. Please try again."
+                )
+            
+            # Step 2: Set up deferred action state
+            self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.ACTION, 60)
+            
+            with self.deferred_action_lock:
+                try:
+                    # Store action state
+                    self.pending_action_payload = generated_content
+                    self.deferred_action_type = 'type'  # Default action is typing
+                    self.deferred_action_start_time = time.time()
+                    self.is_waiting_for_user_action = True
+                    
+                    logger.debug(f"[{execution_id}] Deferred action state configured")
+                    
+                    # Step 3: Start global mouse listener
+                    self._start_mouse_listener_for_deferred_action(execution_id)
+                    
+                    # Step 4: Provide user instructions via audio feedback
+                    self._provide_deferred_action_instructions(execution_id, content_type)
+                    
+                    # Update progress to indicate waiting state
+                    self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.ACTION, 80)
+                    
+                    logger.info(f"[{execution_id}] Deferred action workflow initiated successfully")
+                    
+                    return {
+                        'status': 'waiting_for_user_action',
+                        'execution_id': execution_id,
+                        'message': 'Content generated. Click where you want it placed.',
+                        'content_preview': generated_content[:100] + '...' if len(generated_content) > 100 else generated_content,
+                        'content_type': content_type,
+                        'waiting_since': self.deferred_action_start_time,
+                        'instructions': 'Click anywhere on the screen where you want the content to be typed.',
+                        'success': True
+                    }
+                    
+                except Exception as e:
+                    logger.error(f"[{execution_id}] Failed to set up deferred action state: {e}")
+                    # Clean up on failure
+                    self._reset_deferred_action_state()
+                    return self._create_error_result(
+                        execution_id,
+                        f"Deferred action setup failed: {e}",
+                        "Failed to set up the deferred action. Please try again."
+                    )
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Deferred action request failed: {e}")
+            # Ensure state is clean on any failure
+            self._reset_deferred_action_state()
+            return self._create_error_result(
+                execution_id,
+                f"Deferred action failed: {e}",
+                "The deferred action could not be completed. Please try again."
+            )
     
     def _process_conversational_query_with_reasoning(self, execution_id: str, query: str) -> str:
         """
@@ -1630,6 +1721,314 @@ class Orchestrator:
             
         except Exception as e:
             logger.warning(f"Failed to update conversation history: {e}")
+    
+    def _generate_deferred_content(self, execution_id: str, content_request: str, content_type: str) -> Optional[str]:
+        """
+        Generate content for deferred actions using the reasoning module.
+        
+        Args:
+            execution_id (str): Unique execution identifier
+            content_request (str): User's content request
+            content_type (str): Type of content to generate (code, text, etc.)
+            
+        Returns:
+            Generated content string, or None if generation fails
+        """
+        try:
+            logger.debug(f"[{execution_id}] Generating {content_type} content for: {content_request}")
+            
+            # Import config here to avoid circular imports
+            from config import CODE_GENERATION_PROMPT
+            
+            # Prepare context for content generation
+            context = {
+                'request_type': content_type,
+                'execution_id': execution_id,
+                'timestamp': time.time()
+            }
+            
+            # Format the prompt with the user's request
+            formatted_prompt = CODE_GENERATION_PROMPT.format(
+                request=content_request,
+                context=str(context)
+            )
+            
+            # Use reasoning module to generate content
+            if not self.module_availability.get('reasoning', False):
+                logger.error(f"[{execution_id}] Reasoning module not available for content generation")
+                return None
+            
+            # Generate content using reasoning module
+            response = self.reasoning_module.reason(formatted_prompt)
+            
+            if not response or not response.get('response'):
+                logger.warning(f"[{execution_id}] Empty response from reasoning module")
+                return None
+            
+            generated_content = response['response'].strip()
+            
+            # Basic validation of generated content
+            if len(generated_content) < 5:
+                logger.warning(f"[{execution_id}] Generated content too short: {generated_content}")
+                return None
+            
+            logger.info(f"[{execution_id}] Content generation successful ({len(generated_content)} chars)")
+            return generated_content
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Content generation failed: {e}")
+            return None
+    
+    def _start_mouse_listener_for_deferred_action(self, execution_id: str) -> None:
+        """
+        Start the global mouse listener for deferred action completion.
+        
+        Args:
+            execution_id (str): Unique execution identifier
+        """
+        try:
+            # Import mouse listener here to avoid circular imports
+            from utils.mouse_listener import GlobalMouseListener, is_mouse_listener_available
+            
+            if not is_mouse_listener_available():
+                raise RuntimeError("Mouse listener not available - pynput library required")
+            
+            # Create callback for mouse clicks
+            def on_deferred_action_trigger():
+                self._on_deferred_action_trigger(execution_id)
+            
+            # Create and start mouse listener
+            self.mouse_listener = GlobalMouseListener(callback=on_deferred_action_trigger)
+            self.mouse_listener.start()
+            
+            logger.info(f"[{execution_id}] Global mouse listener started for deferred action")
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Failed to start mouse listener: {e}")
+            raise
+    
+    def _provide_deferred_action_instructions(self, execution_id: str, content_type: str) -> None:
+        """
+        Provide audio instructions to the user for deferred action completion.
+        
+        Args:
+            execution_id (str): Unique execution identifier
+            content_type (str): Type of content that was generated
+        """
+        try:
+            # Prepare instruction message based on content type
+            if content_type == 'code':
+                instruction_message = "Code generated successfully. Click where you want me to type it."
+            elif content_type == 'text':
+                instruction_message = "Text generated successfully. Click where you want me to type it."
+            else:
+                instruction_message = "Content generated successfully. Click where you want me to place it."
+            
+            # Use feedback module for audio instructions if available
+            if self.module_availability.get('feedback', False):
+                try:
+                    self.feedback_module.provide_feedback(
+                        message=instruction_message,
+                        priority=FeedbackPriority.HIGH,
+                        include_audio=True
+                    )
+                    logger.debug(f"[{execution_id}] Audio instructions provided via feedback module")
+                except Exception as e:
+                    logger.warning(f"[{execution_id}] Failed to provide audio feedback: {e}")
+            
+            # Also use audio module directly as fallback
+            elif self.module_availability.get('audio', False):
+                try:
+                    self.audio_module.speak(instruction_message)
+                    logger.debug(f"[{execution_id}] Audio instructions provided via audio module")
+                except Exception as e:
+                    logger.warning(f"[{execution_id}] Failed to provide audio instructions: {e}")
+            
+            else:
+                logger.warning(f"[{execution_id}] No audio modules available for instructions")
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Failed to provide deferred action instructions: {e}")
+    
+    def _on_deferred_action_trigger(self, execution_id: str) -> None:
+        """
+        Callback method triggered when user clicks during deferred action.
+        
+        This method executes the pending action at the click location and
+        completes the deferred action workflow.
+        
+        Args:
+            execution_id (str): Unique execution identifier
+        """
+        try:
+            logger.info(f"[{execution_id}] Deferred action triggered by user click")
+            
+            with self.deferred_action_lock:
+                # Verify we're in the correct state
+                if not self.is_waiting_for_user_action:
+                    logger.warning(f"[{execution_id}] Deferred action trigger called but not waiting for user action")
+                    return
+                
+                if not self.pending_action_payload:
+                    logger.error(f"[{execution_id}] No pending action payload found")
+                    self._reset_deferred_action_state()
+                    return
+                
+                # Get click coordinates if available
+                click_coordinates = None
+                if self.mouse_listener:
+                    click_coordinates = self.mouse_listener.get_last_click_coordinates()
+                
+                logger.info(f"[{execution_id}] Executing deferred action at coordinates: {click_coordinates}")
+                
+                # Execute the pending action
+                try:
+                    success = self._execute_pending_deferred_action(execution_id, click_coordinates)
+                    
+                    if success:
+                        # Provide success feedback
+                        self._provide_deferred_action_completion_feedback(execution_id, True)
+                        logger.info(f"[{execution_id}] Deferred action completed successfully")
+                    else:
+                        # Provide failure feedback
+                        self._provide_deferred_action_completion_feedback(execution_id, False)
+                        logger.error(f"[{execution_id}] Deferred action execution failed")
+                
+                except Exception as e:
+                    logger.error(f"[{execution_id}] Error executing pending deferred action: {e}")
+                    self._provide_deferred_action_completion_feedback(execution_id, False)
+                
+                finally:
+                    # Always reset state after execution attempt
+                    self._reset_deferred_action_state()
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Error in deferred action trigger: {e}")
+            # Ensure state is reset even on error
+            self._reset_deferred_action_state()
+    
+    def _execute_pending_deferred_action(self, execution_id: str, click_coordinates: Optional[Tuple[int, int]]) -> bool:
+        """
+        Execute the pending deferred action with the generated content.
+        
+        Args:
+            execution_id (str): Unique execution identifier
+            click_coordinates (Optional[Tuple[int, int]]): Where the user clicked
+            
+        Returns:
+            True if execution was successful, False otherwise
+        """
+        try:
+            if not self.pending_action_payload:
+                logger.error(f"[{execution_id}] No pending action payload to execute")
+                return False
+            
+            action_type = self.deferred_action_type or 'type'
+            content = self.pending_action_payload
+            
+            logger.info(f"[{execution_id}] Executing {action_type} action with {len(content)} characters")
+            
+            # If we have click coordinates, click there first to position cursor
+            if click_coordinates and self.module_availability.get('automation', False):
+                try:
+                    x, y = click_coordinates
+                    logger.debug(f"[{execution_id}] Clicking at coordinates ({x}, {y}) before typing")
+                    
+                    # Use automation module to click at the coordinates
+                    click_result = self.automation_module.click(x, y)
+                    if not click_result.get('success', False):
+                        logger.warning(f"[{execution_id}] Click at coordinates failed, proceeding with typing anyway")
+                    
+                    # Small delay to ensure click is processed
+                    time.sleep(0.2)
+                    
+                except Exception as e:
+                    logger.warning(f"[{execution_id}] Failed to click at coordinates: {e}")
+            
+            # Execute the main action (typically typing)
+            if action_type == 'type' and self.module_availability.get('automation', False):
+                try:
+                    type_result = self.automation_module.type_text(content)
+                    
+                    if type_result.get('success', False):
+                        logger.info(f"[{execution_id}] Successfully typed {len(content)} characters")
+                        return True
+                    else:
+                        logger.error(f"[{execution_id}] Type action failed: {type_result.get('error', 'Unknown error')}")
+                        return False
+                        
+                except Exception as e:
+                    logger.error(f"[{execution_id}] Error during type action: {e}")
+                    return False
+            
+            else:
+                logger.error(f"[{execution_id}] Unsupported action type '{action_type}' or automation module unavailable")
+                return False
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Error executing pending deferred action: {e}")
+            return False
+    
+    def _provide_deferred_action_completion_feedback(self, execution_id: str, success: bool) -> None:
+        """
+        Provide audio feedback when deferred action completes.
+        
+        Args:
+            execution_id (str): Unique execution identifier
+            success (bool): Whether the action completed successfully
+        """
+        try:
+            if success:
+                message = "Content placed successfully."
+                sound_type = "success"
+            else:
+                message = "Failed to place content. Please try again."
+                sound_type = "failure"
+            
+            # Provide audio feedback
+            if self.module_availability.get('feedback', False):
+                try:
+                    self.feedback_module.provide_feedback(
+                        message=message,
+                        priority=FeedbackPriority.HIGH,
+                        include_audio=True,
+                        sound_type=sound_type
+                    )
+                    logger.debug(f"[{execution_id}] Completion feedback provided via feedback module")
+                except Exception as e:
+                    logger.warning(f"[{execution_id}] Failed to provide completion feedback: {e}")
+            
+            # Fallback to audio module
+            elif self.module_availability.get('audio', False):
+                try:
+                    self.audio_module.speak(message)
+                    logger.debug(f"[{execution_id}] Completion feedback provided via audio module")
+                except Exception as e:
+                    logger.warning(f"[{execution_id}] Failed to provide audio completion feedback: {e}")
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Error providing deferred action completion feedback: {e}")
+    
+    def _create_error_result(self, execution_id: str, error_message: str, user_message: str) -> Dict[str, Any]:
+        """
+        Create a standardized error result for deferred actions.
+        
+        Args:
+            execution_id (str): Unique execution identifier
+            error_message (str): Technical error message for logging
+            user_message (str): User-friendly error message
+            
+        Returns:
+            Dict containing error result information
+        """
+        return {
+            'status': 'failed',
+            'execution_id': execution_id,
+            'error': error_message,
+            'message': user_message,
+            'success': False,
+            'timestamp': time.time()
+        }
     
     def _reset_deferred_action_state(self) -> None:
         """
