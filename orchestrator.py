@@ -1424,25 +1424,84 @@ class Orchestrator:
         command = intent_data.get('original_command', '')
         return self._handle_gui_interaction(execution_id, command)
     
+    def _reset_deferred_action_state(self) -> None:
+        """
+        Reset all deferred action state variables and cleanup resources.
+        
+        This method should be called when:
+        - A deferred action completes successfully
+        - A deferred action is cancelled by a new command
+        - An error occurs during deferred action processing
+        - A timeout occurs while waiting for user action
+        """
+        try:
+            logger.debug("Resetting deferred action state")
+            
+            # Stop mouse listener if active
+            if self.mouse_listener is not None:
+                try:
+                    self.mouse_listener.stop()
+                    logger.debug("Mouse listener stopped")
+                except Exception as e:
+                    logger.warning(f"Error stopping mouse listener: {e}")
+                finally:
+                    self.mouse_listener = None
+            
+            # Reset state variables
+            self.is_waiting_for_user_action = False
+            self.pending_action_payload = None
+            self.deferred_action_type = None
+            self.deferred_action_start_time = None
+            
+            logger.debug("Deferred action state reset completed")
+            
+        except Exception as e:
+            logger.error(f"Error resetting deferred action state: {e}")
+            # Force reset critical variables even if cleanup fails
+            self.is_waiting_for_user_action = False
+            self.mouse_listener = None
+    
     def _handle_gui_interaction(self, execution_id: str, command: str) -> Dict[str, Any]:
         """
-        Handle GUI interaction commands (placeholder that calls existing logic).
+        Handle GUI interaction commands using the preserved legacy execution logic.
         
         Args:
             execution_id (str): Unique execution identifier
             command (str): GUI command to execute
             
         Returns:
-            Dict[str, Any]: Execution result
+            Dict[str, Any]: Execution result from GUI command processing
         """
-        logger.info(f"[{execution_id}] Processing as GUI interaction command")
-        # For now, this is a placeholder that will continue with the existing logic
-        # In a future task, this will be refactored to contain the GUI-specific logic
-        # For now, we'll continue with the existing validation and processing
-        return {"status": "continue_with_existing_logic", "execution_id": execution_id, "command": command}
+        logger.info(f"[{execution_id}] Processing GUI interaction command: '{command}'")
+        
+        # Create execution context for legacy processing
+        execution_context = {
+            "execution_id": execution_id,
+            "command": command,
+            "start_time": time.time(),
+            "status": CommandStatus.PROCESSING,
+            "steps_completed": [],
+            "errors": [],
+            "warnings": [],
+            "validation_result": None,
+            "screen_context": None,
+            "action_plan": None,
+            "execution_results": None
+        }
+        
+        # Use the legacy execution logic for GUI commands
+        return self._legacy_execute_command_internal(command, execution_context)
     
     def _execute_command_internal(self, command: str) -> Dict[str, Any]:
-        """Internal command execution with validation, parallel processing, and comprehensive error handling."""
+        """
+        Internal command execution with intent-based routing and comprehensive error handling.
+        
+        Acts as an intelligent router that:
+        1. Recognizes user intent using LLM-based classification
+        2. Checks for deferred action interruptions
+        3. Routes commands to appropriate handlers based on intent
+        4. Preserves existing GUI interaction functionality
+        """
         execution_id = f"cmd_{int(time.time() * 1000)}"
         start_time = time.time()
         
@@ -1476,42 +1535,113 @@ class Orchestrator:
         try:
             logger.info(f"Starting command execution [{execution_id}]: '{command}'")
             
-            # Step 0: Intent Recognition (New)
-            logger.info(f"[{execution_id}] Step 0: Intent recognition")
-            self._update_progress(execution_id, CommandStatus.VALIDATING, ExecutionStep.VALIDATION, 5)
+            # Step 0: Check for deferred action interruption
+            with self.deferred_action_lock:
+                if self.is_waiting_for_user_action:
+                    logger.info(f"[{execution_id}] Interrupting deferred action due to new command")
+                    self._reset_deferred_action_state()
+                    # Continue processing the new command
+            
+            # Step 1: Intent Recognition and Routing
+            logger.info(f"[{execution_id}] Step 1: Intent recognition and routing")
+            self._update_progress(execution_id, CommandStatus.VALIDATING, ExecutionStep.VALIDATION, 10)
             
             intent_result = self._recognize_intent(command)
             execution_context["intent_result"] = intent_result
             
-            logger.info(f"[{execution_id}] Intent recognized: {intent_result.get('intent', 'unknown')} "
-                       f"(confidence: {intent_result.get('confidence', 0):.2f})")
-            
-            # Route to appropriate handler based on intent
             intent_type = intent_result.get('intent', 'gui_interaction')
+            confidence = intent_result.get('confidence', 0.0)
             
+            logger.info(f"[{execution_id}] Intent recognized: {intent_type} (confidence: {confidence:.2f})")
+            
+            # Route to appropriate handler based on intent type
+            return self._route_command_by_intent(execution_id, command, intent_result, execution_context)
+            
+        except Exception as e:
+            # Handle execution failure
+            execution_context["status"] = CommandStatus.FAILED
+            execution_context["end_time"] = time.time()
+            execution_context["total_duration"] = execution_context["end_time"] - start_time
+            execution_context["errors"].append(str(e))
+            
+            # Update progress with failure
+            self._update_progress(execution_id, CommandStatus.FAILED, error=str(e))
+            
+            # Provide failure feedback
+            if self.feedback_module:
+                self.feedback_module.play("failure", FeedbackPriority.HIGH)
+                self.feedback_module.speak(
+                    f"I encountered an error while executing your command: {str(e)}", 
+                    FeedbackPriority.HIGH
+                )
+            
+            # Add to history
+            self.command_history.append(execution_context.copy())
+            
+            logger.error(f"[{execution_id}] Command execution failed: {e}")
+            
+            return self._format_execution_result(execution_context)
+        
+        finally:
+            self.current_command = None
+            self.command_status = CommandStatus.PENDING
+            # Clear progress tracking
+            with self.progress_lock:
+                self.current_progress = None
+    
+    def _route_command_by_intent(self, execution_id: str, command: str, intent_result: Dict[str, Any], execution_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Route command to appropriate handler based on recognized intent.
+        
+        Args:
+            execution_id: Unique execution identifier
+            command: Original user command
+            intent_result: Result from intent recognition
+            execution_context: Current execution context
+            
+        Returns:
+            Execution result from the appropriate handler
+        """
+        intent_type = intent_result.get('intent', 'gui_interaction')
+        
+        try:
             if intent_type == 'conversational_chat':
                 logger.info(f"[{execution_id}] Routing to conversational handler")
-                handler_result = self._handle_conversational_query(execution_id, command)
-                if handler_result.get("status") != "continue_with_existing_logic":
-                    return handler_result
+                return self._handle_conversational_query(execution_id, command)
+                
             elif intent_type == 'deferred_action':
                 logger.info(f"[{execution_id}] Routing to deferred action handler")
-                handler_result = self._handle_deferred_action_request(execution_id, intent_result)
-                if handler_result.get("status") != "continue_with_existing_logic":
-                    return handler_result
+                return self._handle_deferred_action_request(execution_id, intent_result)
+                
             elif intent_type == 'question_answering':
                 logger.info(f"[{execution_id}] Routing to question answering handler")
                 return self._route_to_question_answering(command, execution_context)
+                
             else:
-                # For 'gui_interaction' or any other intent, continue with existing GUI processing
-                logger.info(f"[{execution_id}] Processing as GUI interaction (intent: {intent_type})")
-                handler_result = self._handle_gui_interaction(execution_id, command)
-                if handler_result.get("status") != "continue_with_existing_logic":
-                    return handler_result
-            
-            # Step 1: Command Validation and Preprocessing
-            logger.info(f"[{execution_id}] Step 1: Command validation")
-            self._update_progress(execution_id, CommandStatus.VALIDATING, ExecutionStep.VALIDATION, 10)
+                # For 'gui_interaction' or any other intent, use GUI handler
+                logger.info(f"[{execution_id}] Routing to GUI interaction handler (intent: {intent_type})")
+                return self._handle_gui_interaction(execution_id, command)
+                
+        except Exception as e:
+            logger.error(f"[{execution_id}] Handler routing failed for intent '{intent_type}': {e}")
+            # Fallback to GUI interaction handler for safety
+            logger.info(f"[{execution_id}] Falling back to GUI interaction handler")
+            return self._handle_gui_interaction(execution_id, command)
+    
+    def _legacy_execute_command_internal(self, command: str, execution_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Legacy command execution logic preserved for GUI interactions.
+        
+        This method contains the original command processing logic that handles
+        validation, perception, reasoning, and action execution for GUI commands.
+        """
+        execution_id = execution_context["execution_id"]
+        start_time = execution_context["start_time"]
+        
+        try:
+            # Step 2: Command Validation and Preprocessing
+            logger.info(f"[{execution_id}] Step 2: Command validation")
+            self._update_progress(execution_id, CommandStatus.VALIDATING, ExecutionStep.VALIDATION, 20)
             
             validation_result = self.validate_command(command)
             execution_context["validation_result"] = validation_result
@@ -1531,11 +1661,11 @@ class Orchestrator:
                 logger.info(f"[{execution_id}] Detected {validation_result.command_type}, routing to information extraction mode")
                 return self._route_to_question_answering(command, execution_context)
             
-            # Step 1.5: Attempt Fast Path for GUI Commands
+            # Step 2.5: Attempt Fast Path for GUI Commands
             fast_path_result = None
             if self._is_gui_command(normalized_command, validation_result.__dict__):
                 logger.info(f"[{execution_id}] Attempting fast path execution for GUI command")
-                self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.PERCEPTION, 15)
+                self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.PERCEPTION, 30)
                 
                 # Handle application focus changes and start background preloading
                 self._handle_application_focus_change()
@@ -1573,9 +1703,9 @@ class Orchestrator:
             if not fast_path_result and self.feedback_module:
                 self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
             
-            # Step 2: Parallel Perception and Reasoning Preparation
+            # Step 3: Parallel Perception and Reasoning Preparation
             execution_context["status"] = CommandStatus.PROCESSING
-            self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.PERCEPTION, 25)
+            self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.PERCEPTION, 40)
             
             if self.enable_parallel_processing and validation_result.command_type in ['click', 'type', 'scroll']:
                 # For GUI commands, we can start perception and prepare reasoning in parallel
@@ -1592,8 +1722,8 @@ class Orchestrator:
             execution_context["action_plan"] = action_plan
             execution_context["steps_completed"].extend([ExecutionStep.PERCEPTION, ExecutionStep.REASONING])
             
-            # Step 3: Action Execution
-            logger.info(f"[{execution_id}] Step 3: Action execution")
+            # Step 4: Action Execution
+            logger.info(f"[{execution_id}] Step 4: Action execution")
             self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.ACTION, 80)
             
             execution_results = self._perform_action_execution(execution_context)
@@ -1617,7 +1747,8 @@ class Orchestrator:
             self._update_progress(execution_id, CommandStatus.COMPLETED, ExecutionStep.CLEANUP, 100)
             
             # Provide success feedback
-            self.feedback_module.play("success", FeedbackPriority.NORMAL)
+            if self.feedback_module:
+                self.feedback_module.play("success", FeedbackPriority.NORMAL)
             
             # Add to history
             self.command_history.append(execution_context.copy())
@@ -1637,11 +1768,12 @@ class Orchestrator:
             self._update_progress(execution_id, CommandStatus.FAILED, error=str(e))
             
             # Provide failure feedback
-            self.feedback_module.play("failure", FeedbackPriority.HIGH)
-            self.feedback_module.speak(
-                f"I encountered an error while executing your command: {str(e)}", 
-                FeedbackPriority.HIGH
-            )
+            if self.feedback_module:
+                self.feedback_module.play("failure", FeedbackPriority.HIGH)
+                self.feedback_module.speak(
+                    f"I encountered an error while executing your command: {str(e)}", 
+                    FeedbackPriority.HIGH
+                )
             
             # Add to history
             self.command_history.append(execution_context.copy())
@@ -1649,13 +1781,6 @@ class Orchestrator:
             logger.error(f"[{execution_id}] Command execution failed: {e}")
             
             return self._format_execution_result(execution_context)
-        
-        finally:
-            self.current_command = None
-            self.command_status = CommandStatus.PENDING
-            # Clear progress tracking
-            with self.progress_lock:
-                self.current_progress = None
     
     def _perform_screen_perception(self, execution_context: Dict[str, Any]) -> Dict[str, Any]:
         """
