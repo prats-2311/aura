@@ -1236,25 +1236,31 @@ class Orchestrator:
             else:
                 raise OrchestratorError(f"System unavailable: {error_info.user_message}")
         
-        # Ensure only one command executes at a time, but handle deferred actions specially
-        self.execution_lock.acquire()
+        # Ensure only one command executes at a time with timeout-based lock acquisition
+        lock_acquired = False
         try:
+            # CONCURRENCY FIX: Use timeout-based lock acquisition to prevent indefinite blocking
+            lock_acquired = self.execution_lock.acquire(timeout=30.0)
+            if not lock_acquired:
+                logger.warning("Failed to acquire execution lock within 30 seconds - system may be busy")
+                raise OrchestratorError("System is currently busy processing another command. Please try again in a moment.")
+            
+            logger.debug("Execution lock acquired successfully")
+            
             result = self._execute_command_internal(command.strip())
             
-            # For deferred actions, release the lock early to allow subsequent commands
+            # CONCURRENCY FIX: For deferred actions, release the lock early to allow subsequent commands
             if isinstance(result, dict) and result.get('status') == 'waiting_for_user_action':
-                logger.debug(f"Releasing execution lock early for deferred action: {result.get('execution_id')}")
+                logger.info(f"Releasing execution lock early for deferred action: {result.get('execution_id')}")
                 self.execution_lock.release()
+                lock_acquired = False  # Mark as released to avoid double release
                 return result
             else:
                 # For non-deferred actions, keep the lock until we return
-                self.execution_lock.release()
+                logger.debug("Command execution completed, releasing lock")
                 return result
                 
         except Exception as e:
-            # Always release the lock on exception
-            self.execution_lock.release()
-            
             # Handle execution errors with potential recovery
             error_info = global_error_handler.handle_error(
                 error=e,
@@ -1277,9 +1283,19 @@ class Orchestrator:
                     except Exception as retry_error:
                         logger.error(f"Command execution failed even after recovery: {retry_error}")
                         raise OrchestratorError(f"Command execution failed: {error_info.user_message}")
-                
-                # Re-raise with user-friendly message
-                raise OrchestratorError(f"Command execution failed: {error_info.user_message}")
+            
+            # Re-raise with user-friendly message
+            raise OrchestratorError(f"Command execution failed: {error_info.user_message}")
+            
+        finally:
+            # CONCURRENCY FIX: Ensure lock is always released in finally block
+            if lock_acquired and self.execution_lock.locked():
+                try:
+                    logger.debug("Releasing execution lock in finally block")
+                    self.execution_lock.release()
+                except Exception as lock_error:
+                    logger.error(f"Failed to release execution lock in finally block: {lock_error}")
+
     
     def _recognize_intent(self, command: str) -> Dict[str, Any]:
         """
@@ -1292,11 +1308,15 @@ class Orchestrator:
             Dict[str, Any]: Intent classification result with type, confidence, and parameters
         """
         # CONCURRENCY FIX: Use timeout to prevent hanging on intent lock
+        intent_lock_acquired = False
         try:
-            lock_acquired = self.intent_lock.acquire(timeout=10.0)
-            if not lock_acquired:
-                logger.warning("Could not acquire intent lock within timeout - using fallback")
+            logger.debug("Attempting to acquire intent recognition lock")
+            intent_lock_acquired = self.intent_lock.acquire(timeout=10.0)
+            if not intent_lock_acquired:
+                logger.warning("Could not acquire intent lock within 10 seconds - using fallback intent")
                 return self._get_fallback_intent("gui_interaction", "Intent lock timeout")
+            
+            logger.debug("Intent recognition lock acquired successfully")
         except Exception as lock_error:
             logger.error(f"Error acquiring intent lock: {lock_error}")
             return self._get_fallback_intent("gui_interaction", "Intent lock error")
@@ -1368,11 +1388,13 @@ class Orchestrator:
                 logger.error(f"Intent recognition failed: {error_info.message}")
                 return self._get_fallback_intent("gui_interaction", f"Recognition error: {str(e)}")
         finally:
-            # Always release the intent lock
-            try:
-                self.intent_lock.release()
-            except Exception as release_error:
-                logger.error(f"Error releasing intent lock: {release_error}")
+            # CONCURRENCY FIX: Always release the intent lock with proper logging
+            if intent_lock_acquired and self.intent_lock.locked():
+                try:
+                    logger.debug("Releasing intent recognition lock")
+                    self.intent_lock.release()
+                except Exception as release_error:
+                    logger.error(f"Error releasing intent lock: {release_error}")
     
     def _parse_intent_response(self, response: Dict[str, Any], original_command: str) -> Dict[str, Any]:
         """
@@ -2654,8 +2676,21 @@ class Orchestrator:
         Args:
             execution_id (str): Unique execution identifier
         """
+        execution_lock_acquired = False
         try:
             logger.info(f"[{execution_id}] Deferred action triggered by user click")
+            
+            # CONCURRENCY FIX: Re-acquire execution lock before executing final action
+            logger.debug(f"[{execution_id}] Attempting to re-acquire execution lock for deferred action completion")
+            execution_lock_acquired = self.execution_lock.acquire(timeout=15.0)
+            
+            if not execution_lock_acquired:
+                logger.error(f"[{execution_id}] Failed to acquire execution lock for deferred action completion")
+                self._provide_deferred_action_completion_feedback(execution_id, False, "System busy - could not complete action")
+                self._reset_deferred_action_state()
+                return
+            
+            logger.debug(f"[{execution_id}] Execution lock re-acquired successfully for deferred action")
             
             with self.deferred_action_lock:
                 # Verify we're in the correct state
@@ -2695,19 +2730,20 @@ class Orchestrator:
                 finally:
                     # Always reset state after execution attempt
                     self._reset_deferred_action_state()
-                    
-                    # CONCURRENCY FIX: Ensure execution lock is released
-                    if hasattr(self, 'execution_lock') and self.execution_lock.locked():
-                        logger.warning(f"[{execution_id}] Force releasing execution lock after deferred action completion")
-                        try:
-                            self.execution_lock.release()
-                        except Exception as lock_error:
-                            logger.error(f"[{execution_id}] Failed to release execution lock: {lock_error}")
             
         except Exception as e:
             logger.error(f"[{execution_id}] Error in deferred action trigger: {e}")
             # Ensure state is reset even on error
             self._reset_deferred_action_state()
+            
+        finally:
+            # CONCURRENCY FIX: Always release execution lock when deferred action completes
+            if execution_lock_acquired and self.execution_lock.locked():
+                try:
+                    logger.debug(f"[{execution_id}] Releasing execution lock after deferred action completion")
+                    self.execution_lock.release()
+                except Exception as lock_error:
+                    logger.error(f"[{execution_id}] Failed to release execution lock: {lock_error}")
     
     def _execute_pending_deferred_action(self, execution_id: str, click_coordinates: Optional[Tuple[int, int]]) -> bool:
         """
@@ -2776,20 +2812,21 @@ class Orchestrator:
             logger.error(f"[{execution_id}] Error executing pending deferred action: {e}")
             return False
     
-    def _provide_deferred_action_completion_feedback(self, execution_id: str, success: bool) -> None:
+    def _provide_deferred_action_completion_feedback(self, execution_id: str, success: bool, error_message: str = None) -> None:
         """
         Provide audio feedback when deferred action completes.
         
         Args:
             execution_id (str): Unique execution identifier
             success (bool): Whether the action completed successfully
+            error_message (str, optional): Custom error message for failures
         """
         try:
             if success:
                 message = "Content placed successfully."
                 sound_type = "success"
             else:
-                message = "Failed to place content. Please try again."
+                message = error_message or "Failed to place content. Please try again."
                 sound_type = "failure"
             
             # Provide enhanced audio feedback
