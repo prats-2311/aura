@@ -12,7 +12,7 @@
   - Add proper logging and error handling patterns for all handlers
   - _Requirements: 1.1, 1.2_
 
-- [ ] 0.1 Create GUI handler class and migrate existing logic
+- [x] 0.1 Create GUI handler class and migrate existing logic
 
   - Create `handlers/gui_handler.py` inheriting from `BaseHandler`
   - Migrate entire GUI interaction logic from `Orchestrator._execute_command_internal` to `GUIHandler.handle()`
