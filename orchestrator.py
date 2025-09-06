@@ -1414,6 +1414,7 @@ class Orchestrator:
         
         Processes natural language conversations using the reasoning module with
         conversational prompts, extracts responses, and provides audio feedback.
+        Enhanced with comprehensive error handling and recovery strategies.
         
         Args:
             execution_id (str): Unique execution identifier
@@ -1435,11 +1436,17 @@ class Orchestrator:
             "errors": [],
             "warnings": [],
             "response": None,
-            "audio_feedback_provided": False
+            "audio_feedback_provided": False,
+            "error_recovery_attempted": False,
+            "fallback_strategy_used": None
         }
         
         try:
             logger.info(f"[{execution_id}] Processing conversational query: '{query}'")
+            
+            # Input validation
+            if not query or not query.strip():
+                raise ValueError("Empty conversational query provided")
             
             # Update progress
             self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.REASONING, 30)
@@ -1448,37 +1455,100 @@ class Orchestrator:
             if not self.reasoning_module or not self.module_availability.get('reasoning', False):
                 error_msg = "Reasoning module unavailable for conversational processing"
                 execution_context["errors"].append(error_msg)
+                execution_context["fallback_strategy_used"] = "reasoning_module_unavailable"
                 logger.warning(f"[{execution_id}] {error_msg}")
                 
-                # Provide fallback response
-                fallback_response = "I'm sorry, I'm having trouble processing conversations right now. Please try again later."
-                execution_context["response"] = fallback_response
+                # Attempt module recovery if enabled
+                if self.error_recovery_enabled:
+                    logger.info(f"[{execution_id}] Attempting reasoning module recovery")
+                    execution_context["error_recovery_attempted"] = True
+                    
+                    recovery_result = self.attempt_system_recovery("reasoning")
+                    if recovery_result.get('recovery_successful', False):
+                        logger.info(f"[{execution_id}] Reasoning module recovery successful, retrying")
+                        # Retry the conversational processing
+                        try:
+                            response = self._process_conversational_query_with_reasoning(execution_id, query)
+                            execution_context["response"] = response
+                            execution_context["warnings"].append("Recovered from reasoning module failure")
+                        except Exception as retry_error:
+                            logger.error(f"[{execution_id}] Retry after recovery failed: {retry_error}")
+                            execution_context["errors"].append(f"Recovery retry failed: {str(retry_error)}")
+                            response = None
+                    else:
+                        logger.warning(f"[{execution_id}] Reasoning module recovery failed")
+                        response = None
+                else:
+                    response = None
+                
+                # Use fallback response if no recovery or recovery failed
+                if not execution_context.get("response"):
+                    fallback_response = "I'm sorry, I'm having trouble processing conversations right now. Please try again later."
+                    execution_context["response"] = fallback_response
+                    execution_context["fallback_strategy_used"] = "static_fallback_response"
                 
                 # Provide audio feedback if available
-                if self.feedback_module:
-                    self.feedback_module.speak(fallback_response, FeedbackPriority.NORMAL)
-                    execution_context["audio_feedback_provided"] = True
+                if self.feedback_module and execution_context["response"]:
+                    try:
+                        self.feedback_module.speak(execution_context["response"], FeedbackPriority.NORMAL)
+                        execution_context["audio_feedback_provided"] = True
+                    except Exception as audio_error:
+                        logger.warning(f"[{execution_id}] Audio feedback failed: {audio_error}")
+                        execution_context["warnings"].append(f"Audio feedback failed: {str(audio_error)}")
                 
                 execution_context["status"] = CommandStatus.COMPLETED
                 execution_context["warnings"].append("Used fallback response due to reasoning module unavailability")
                 
             else:
-                # Process conversational query using reasoning module
-                response = self._process_conversational_query_with_reasoning(execution_id, query)
-                execution_context["response"] = response
-                
-                # Provide audio feedback
-                if self.feedback_module and response:
-                    logger.info(f"[{execution_id}] Providing audio feedback for conversational response")
-                    self.feedback_module.speak(response, FeedbackPriority.NORMAL)
-                    execution_context["audio_feedback_provided"] = True
-                
-                execution_context["status"] = CommandStatus.COMPLETED
-                logger.info(f"[{execution_id}] Conversational query processed successfully")
+                # Process conversational query using reasoning module with error handling
+                try:
+                    response = self._process_conversational_query_with_reasoning(execution_id, query)
+                    execution_context["response"] = response
+                    
+                    # Validate response quality
+                    if not response or len(response.strip()) < 3:
+                        raise ValueError("Received empty or invalid response from reasoning module")
+                    
+                    # Provide audio feedback
+                    if self.feedback_module and response:
+                        try:
+                            logger.info(f"[{execution_id}] Providing audio feedback for conversational response")
+                            self.feedback_module.speak(response, FeedbackPriority.NORMAL)
+                            execution_context["audio_feedback_provided"] = True
+                        except Exception as audio_error:
+                            logger.warning(f"[{execution_id}] Audio feedback failed: {audio_error}")
+                            execution_context["warnings"].append(f"Audio feedback failed: {str(audio_error)}")
+                    
+                    execution_context["status"] = CommandStatus.COMPLETED
+                    logger.info(f"[{execution_id}] Conversational query processed successfully")
+                    
+                except Exception as processing_error:
+                    logger.error(f"[{execution_id}] Conversational processing failed: {processing_error}")
+                    execution_context["errors"].append(f"Processing error: {str(processing_error)}")
+                    
+                    # Attempt graceful degradation
+                    execution_context["fallback_strategy_used"] = "processing_error_fallback"
+                    fallback_response = "I encountered an issue while processing your question. Could you please try rephrasing it?"
+                    execution_context["response"] = fallback_response
+                    
+                    # Provide error feedback
+                    if self.feedback_module:
+                        try:
+                            self.feedback_module.speak(fallback_response, FeedbackPriority.NORMAL)
+                            execution_context["audio_feedback_provided"] = True
+                        except Exception as audio_error:
+                            logger.warning(f"[{execution_id}] Error feedback audio failed: {audio_error}")
+                    
+                    execution_context["status"] = CommandStatus.COMPLETED
+                    execution_context["warnings"].append("Used fallback response due to processing error")
             
-            # Update conversation history for context
-            with self.conversation_lock:
-                self._update_conversation_history(query, execution_context.get("response", ""))
+            # Update conversation history for context (with error handling)
+            try:
+                with self.conversation_lock:
+                    self._update_conversation_history(query, execution_context.get("response", ""))
+            except Exception as history_error:
+                logger.warning(f"[{execution_id}] Failed to update conversation history: {history_error}")
+                execution_context["warnings"].append(f"Conversation history update failed: {str(history_error)}")
             
             # Final progress update
             self._update_progress(execution_id, CommandStatus.COMPLETED, None, 100)
@@ -1489,35 +1559,80 @@ class Orchestrator:
             execution_context["steps_completed"].append(ExecutionStep.REASONING)
             
             # Add to command history
-            self.command_history.append(execution_context.copy())
+            try:
+                self.command_history.append(execution_context.copy())
+            except Exception as history_error:
+                logger.warning(f"[{execution_id}] Failed to add to command history: {history_error}")
             
             logger.info(f"[{execution_id}] Conversational query completed in {execution_context['total_duration']:.2f}s")
             
             return self._format_execution_result(execution_context)
             
         except Exception as e:
-            # Handle conversational query failure
+            # Handle conversational query failure with comprehensive error handling
             execution_context["status"] = CommandStatus.FAILED
             execution_context["end_time"] = time.time()
             execution_context["total_duration"] = execution_context["end_time"] - start_time
             execution_context["errors"].append(str(e))
             
-            logger.error(f"[{execution_id}] Conversational query failed: {e}")
+            # Log error with context
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_handle_conversational_query",
+                category=ErrorCategory.PROCESSING_ERROR,
+                severity=ErrorSeverity.MEDIUM,
+                context={
+                    "execution_id": execution_id,
+                    "query_length": len(query) if query else 0,
+                    "reasoning_available": self.module_availability.get('reasoning', False),
+                    "feedback_available": self.module_availability.get('feedback', False)
+                }
+            )
             
-            # Provide error feedback
-            error_message = "I'm sorry, I encountered an error while processing your message. Please try again."
-            execution_context["response"] = error_message
+            logger.error(f"[{execution_id}] Conversational query failed: {error_info.message}")
             
+            # Provide comprehensive error feedback
+            if isinstance(e, ValueError) and "empty" in str(e).lower():
+                error_response = "I didn't receive a valid question. Could you please ask me something?"
+            elif "timeout" in str(e).lower():
+                error_response = "I'm taking too long to respond. Please try asking a simpler question."
+            elif "connection" in str(e).lower() or "api" in str(e).lower():
+                error_response = "I'm having trouble connecting to my language processing service. Please try again in a moment."
+            else:
+                error_response = "I encountered an error while processing your question. Please try rephrasing or try again."
+            
+            execution_context["response"] = error_response
+            execution_context["fallback_strategy_used"] = "comprehensive_error_fallback"
+            
+            # Provide audio error feedback
             if self.feedback_module:
-                self.feedback_module.play("failure", FeedbackPriority.HIGH)
-                self.feedback_module.speak(error_message, FeedbackPriority.HIGH)
-                execution_context["audio_feedback_provided"] = True
+                try:
+                    self.feedback_module.speak(error_response, FeedbackPriority.HIGH)
+                    execution_context["audio_feedback_provided"] = True
+                    
+                    # Play failure sound if available
+                    from config import SOUNDS
+                    if "failure" in SOUNDS:
+                        try:
+                            self.feedback_module.play_sound(SOUNDS["failure"])
+                        except Exception as sound_error:
+                            logger.debug(f"[{execution_id}] Failed to play failure sound: {sound_error}")
+                            
+                except Exception as audio_error:
+                    logger.warning(f"[{execution_id}] Error feedback audio failed: {audio_error}")
+                    execution_context["warnings"].append(f"Error feedback audio failed: {str(audio_error)}")
             
-            # Update progress with failure
-            self._update_progress(execution_id, CommandStatus.FAILED, error=str(e))
+            # Update progress to failed
+            self._update_progress(execution_id, CommandStatus.FAILED, None, 100, error=str(e))
             
-            # Add to command history
-            self.command_history.append(execution_context.copy())
+            # Add to command history for debugging
+            try:
+                self.command_history.append(execution_context.copy())
+            except Exception as history_error:
+                logger.warning(f"[{execution_id}] Failed to add failed execution to command history: {history_error}")
+            
+            return self._format_execution_result(execution_context)
             
             return self._format_execution_result(execution_context)
     
@@ -1525,21 +1640,40 @@ class Orchestrator:
         """
         Handle deferred action requests that initiate multi-step workflows.
         
-        This method implements the deferred action workflow:
+        This method implements the deferred action workflow with comprehensive error handling:
         1. Generate requested content using reasoning module
         2. Enter waiting state for user click
-        3. Start global mouse listener
+        3. Start global mouse listener with timeout management
         4. Provide audio instructions to user
+        5. Handle timeouts and recovery scenarios
         
         Args:
             execution_id (str): Unique execution identifier
             intent_data (Dict[str, Any]): Intent recognition result with parameters
             
         Returns:
-            Dict[str, Any]: Execution result indicating waiting state
+            Dict[str, Any]: Execution result indicating waiting state or error
         """
+        start_time = time.time()
+        
         try:
             logger.info(f"[{execution_id}] Starting deferred action workflow")
+            
+            # Input validation
+            if not intent_data or not isinstance(intent_data, dict):
+                raise ValueError("Invalid intent data provided for deferred action")
+            
+            # Check if system is already in deferred action mode
+            if self.is_waiting_for_user_action:
+                logger.warning(f"[{execution_id}] System already in deferred action mode, cancelling previous action")
+                self._reset_deferred_action_state()
+                
+                # Provide audio feedback about cancellation
+                if self.feedback_module:
+                    try:
+                        self.feedback_module.speak("Previous action cancelled. Starting new deferred action.", FeedbackPriority.NORMAL)
+                    except Exception as audio_error:
+                        logger.warning(f"[{execution_id}] Audio feedback failed: {audio_error}")
             
             # Extract parameters from intent data
             parameters = intent_data.get('parameters', {})
@@ -1550,31 +1684,73 @@ class Orchestrator:
             if not content_request:
                 content_request = original_command
             
+            # Validate content request
+            if not content_request or not content_request.strip():
+                raise ValueError("Empty content request for deferred action")
+            
             logger.info(f"[{execution_id}] Content request: {content_request}, Type: {content_type}")
             
-            # Step 1: Generate content using reasoning module
+            # Step 1: Generate content using reasoning module with error handling
             self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.REASONING, 30)
             
             try:
+                # Check if reasoning module is available
+                if not self.reasoning_module or not self.module_availability.get('reasoning', False):
+                    # Attempt recovery if enabled
+                    if self.error_recovery_enabled:
+                        logger.info(f"[{execution_id}] Reasoning module unavailable, attempting recovery")
+                        recovery_result = self.attempt_system_recovery("reasoning")
+                        if not recovery_result.get('recovery_successful', False):
+                            raise RuntimeError("Reasoning module unavailable and recovery failed")
+                    else:
+                        raise RuntimeError("Reasoning module unavailable for content generation")
+                
                 generated_content = self._generate_deferred_content(execution_id, content_request, content_type)
-                if not generated_content:
-                    return self._create_error_result(
-                        execution_id, 
-                        "Failed to generate content for deferred action",
-                        "Content generation failed. Please try rephrasing your request."
-                    )
+                
+                # Validate generated content
+                if not generated_content or not generated_content.strip():
+                    raise ValueError("Content generation returned empty result")
+                
+                # Check content length for reasonableness
+                if len(generated_content) > 10000:  # 10KB limit
+                    logger.warning(f"[{execution_id}] Generated content is very large ({len(generated_content)} chars)")
+                    # Truncate if too large
+                    generated_content = generated_content[:10000] + "\n# ... (content truncated due to size)"
                 
                 logger.info(f"[{execution_id}] Content generated successfully ({len(generated_content)} characters)")
                 
             except Exception as e:
                 logger.error(f"[{execution_id}] Content generation failed: {e}")
+                
+                # Log error with context
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="orchestrator",
+                    function="_handle_deferred_action_request",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    severity=ErrorSeverity.MEDIUM,
+                    context={
+                        "execution_id": execution_id,
+                        "content_request": content_request[:100],
+                        "content_type": content_type
+                    }
+                )
+                
+                # Provide specific error feedback
+                if "unavailable" in str(e).lower():
+                    user_message = "Content generation service is unavailable. Please try again later."
+                elif "timeout" in str(e).lower():
+                    user_message = "Content generation timed out. Please try a simpler request."
+                else:
+                    user_message = "Failed to generate the requested content. Please try rephrasing your request."
+                
                 return self._create_error_result(
                     execution_id,
-                    f"Content generation error: {e}",
-                    "Failed to generate the requested content. Please try again."
+                    f"Content generation error: {error_info.message}",
+                    user_message
                 )
             
-            # Step 2: Set up deferred action state
+            # Step 2: Set up deferred action state with comprehensive error handling
             self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.ACTION, 60)
             
             with self.deferred_action_lock:
@@ -1590,13 +1766,41 @@ class Orchestrator:
                     self.system_mode = 'waiting_for_user'
                     self.current_execution_id = execution_id
                     
-                    logger.debug(f"[{execution_id}] Deferred action state configured")
+                    logger.debug(f"[{execution_id}] Deferred action state configured (timeout: {self.deferred_action_timeout_seconds}s)")
                     
-                    # Step 3: Start global mouse listener
-                    self._start_mouse_listener_for_deferred_action(execution_id)
+                    # Step 3: Start global mouse listener with error handling
+                    try:
+                        self._start_mouse_listener_for_deferred_action(execution_id)
+                    except Exception as listener_error:
+                        logger.error(f"[{execution_id}] Failed to start mouse listener: {listener_error}")
+                        
+                        # Clean up state and provide fallback
+                        self._reset_deferred_action_state()
+                        
+                        # Check if pynput is available
+                        from utils.mouse_listener import is_mouse_listener_available
+                        if not is_mouse_listener_available():
+                            return self._create_error_result(
+                                execution_id,
+                                "Mouse listener dependency not available",
+                                "Mouse listener functionality is not available. Please install pynput: pip install pynput"
+                            )
+                        else:
+                            return self._create_error_result(
+                                execution_id,
+                                f"Mouse listener failed to start: {listener_error}",
+                                "Failed to start mouse listener. Please try again or check system permissions."
+                            )
                     
-                    # Step 4: Provide user instructions via audio feedback
-                    self._provide_deferred_action_instructions(execution_id, content_type)
+                    # Step 4: Provide user instructions via audio feedback with error handling
+                    try:
+                        self._provide_deferred_action_instructions(execution_id, content_type)
+                    except Exception as instruction_error:
+                        logger.warning(f"[{execution_id}] Failed to provide audio instructions: {instruction_error}")
+                        # Continue without audio instructions - not critical for functionality
+                    
+                    # Step 5: Start timeout monitoring
+                    self._start_deferred_action_timeout_monitoring(execution_id)
                     
                     # Update progress to indicate waiting state
                     self._update_progress(execution_id, CommandStatus.PROCESSING, ExecutionStep.ACTION, 80)
@@ -1610,28 +1814,87 @@ class Orchestrator:
                         'content_preview': generated_content[:100] + '...' if len(generated_content) > 100 else generated_content,
                         'content_type': content_type,
                         'waiting_since': self.deferred_action_start_time,
+                        'timeout_at': self.deferred_action_timeout_time,
+                        'timeout_seconds': self.deferred_action_timeout_seconds,
                         'instructions': 'Click anywhere on the screen where you want the content to be typed.',
-                        'success': True
+                        'success': True,
+                        'duration': time.time() - start_time
                     }
                     
                 except Exception as e:
                     logger.error(f"[{execution_id}] Failed to set up deferred action state: {e}")
+                    
+                    # Log error with context
+                    error_info = global_error_handler.handle_error(
+                        error=e,
+                        module="orchestrator",
+                        function="_handle_deferred_action_request",
+                        category=ErrorCategory.PROCESSING_ERROR,
+                        severity=ErrorSeverity.HIGH,
+                        context={"execution_id": execution_id, "setup_phase": "state_configuration"}
+                    )
+                    
                     # Clean up on failure
                     self._reset_deferred_action_state()
+                    
                     return self._create_error_result(
                         execution_id,
-                        f"Deferred action setup failed: {e}",
+                        f"Deferred action setup failed: {error_info.message}",
                         "Failed to set up the deferred action. Please try again."
                     )
             
         except Exception as e:
             logger.error(f"[{execution_id}] Deferred action request failed: {e}")
+            
+            # Log comprehensive error information
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_handle_deferred_action_request",
+                category=ErrorCategory.PROCESSING_ERROR,
+                severity=ErrorSeverity.HIGH,
+                context={
+                    "execution_id": execution_id,
+                    "duration": time.time() - start_time,
+                    "system_mode": getattr(self, 'system_mode', 'unknown'),
+                    "waiting_for_user": getattr(self, 'is_waiting_for_user_action', False)
+                }
+            )
+            
             # Ensure state is clean on any failure
             self._reset_deferred_action_state()
+            
+            # Provide audio error feedback
+            if self.feedback_module:
+                try:
+                    error_message = "The deferred action could not be started. Please try again."
+                    self.feedback_module.speak(error_message, FeedbackPriority.HIGH)
+                    
+                    # Play failure sound
+                    from config import SOUNDS
+                    if "failure" in SOUNDS:
+                        try:
+                            self.feedback_module.play_sound(SOUNDS["failure"])
+                        except Exception as sound_error:
+                            logger.debug(f"[{execution_id}] Failed to play failure sound: {sound_error}")
+                            
+                except Exception as audio_error:
+                    logger.warning(f"[{execution_id}] Error feedback audio failed: {audio_error}")
+            
+            # Provide specific error messages based on error type
+            if isinstance(e, ValueError):
+                user_message = "Invalid request for deferred action. Please check your command and try again."
+            elif "timeout" in str(e).lower():
+                user_message = "The deferred action setup timed out. Please try again."
+            elif "permission" in str(e).lower():
+                user_message = "Permission denied for deferred action. Please check system permissions."
+            else:
+                user_message = "The deferred action could not be completed. Please try again."
+            
             return self._create_error_result(
                 execution_id,
-                f"Deferred action failed: {e}",
-                "The deferred action could not be completed. Please try again."
+                f"Deferred action failed: {error_info.message}",
+                user_message
             )
     
     def _process_conversational_query_with_reasoning(self, execution_id: str, query: str) -> str:
@@ -1803,32 +2066,122 @@ class Orchestrator:
     
     def _start_mouse_listener_for_deferred_action(self, execution_id: str) -> None:
         """
-        Start the global mouse listener for deferred action completion.
+        Start the global mouse listener for deferred action completion with comprehensive error handling.
         
         Args:
             execution_id (str): Unique execution identifier
+            
+        Raises:
+            RuntimeError: If mouse listener cannot be started
+            ImportError: If required dependencies are not available
         """
         try:
+            logger.debug(f"[{execution_id}] Starting mouse listener for deferred action")
+            
             # Import mouse listener here to avoid circular imports
-            from utils.mouse_listener import GlobalMouseListener, is_mouse_listener_available
+            try:
+                from utils.mouse_listener import GlobalMouseListener, is_mouse_listener_available
+            except ImportError as import_error:
+                logger.error(f"[{execution_id}] Failed to import mouse listener: {import_error}")
+                raise ImportError("Mouse listener module not available. Please check utils/mouse_listener.py")
             
+            # Check if mouse listener functionality is available
             if not is_mouse_listener_available():
-                raise RuntimeError("Mouse listener not available - pynput library required")
+                logger.error(f"[{execution_id}] Mouse listener dependencies not available")
+                raise RuntimeError(
+                    "Mouse listener not available - pynput library required. "
+                    "Install with: pip install pynput"
+                )
             
-            # Create callback for mouse clicks
+            # Clean up any existing mouse listener
+            if self.mouse_listener is not None:
+                logger.warning(f"[{execution_id}] Cleaning up existing mouse listener")
+                try:
+                    self.mouse_listener.stop()
+                except Exception as cleanup_error:
+                    logger.warning(f"[{execution_id}] Error cleaning up existing listener: {cleanup_error}")
+                finally:
+                    self.mouse_listener = None
+                    self.mouse_listener_active = False
+            
+            # Create callback for mouse clicks with error handling
             def on_deferred_action_trigger():
-                self._on_deferred_action_trigger(execution_id)
+                try:
+                    self._on_deferred_action_trigger(execution_id)
+                except Exception as callback_error:
+                    logger.error(f"[{execution_id}] Error in mouse click callback: {callback_error}")
+                    # Ensure state is reset even if callback fails
+                    try:
+                        self._reset_deferred_action_state()
+                    except Exception as reset_error:
+                        logger.error(f"[{execution_id}] Failed to reset state after callback error: {reset_error}")
             
-            # Create and start mouse listener
-            self.mouse_listener = GlobalMouseListener(callback=on_deferred_action_trigger)
-            self.mouse_listener.start()
-            self.mouse_listener_active = True
+            # Create mouse listener with error handling
+            try:
+                self.mouse_listener = GlobalMouseListener(callback=on_deferred_action_trigger)
+            except Exception as creation_error:
+                logger.error(f"[{execution_id}] Failed to create mouse listener: {creation_error}")
+                raise RuntimeError(f"Mouse listener creation failed: {str(creation_error)}")
             
-            logger.info(f"[{execution_id}] Global mouse listener started for deferred action")
+            # Start mouse listener with timeout and error handling
+            try:
+                self.mouse_listener.start()
+                
+                # Give the listener a moment to start and verify it's active
+                time.sleep(0.2)
+                
+                if not self.mouse_listener.is_active():
+                    raise RuntimeError("Mouse listener failed to start properly")
+                
+                self.mouse_listener_active = True
+                logger.info(f"[{execution_id}] Global mouse listener started successfully for deferred action")
+                
+            except Exception as start_error:
+                logger.error(f"[{execution_id}] Failed to start mouse listener: {start_error}")
+                
+                # Clean up failed listener
+                if self.mouse_listener:
+                    try:
+                        self.mouse_listener.stop()
+                    except Exception as stop_error:
+                        logger.warning(f"[{execution_id}] Error stopping failed listener: {stop_error}")
+                    finally:
+                        self.mouse_listener = None
+                        self.mouse_listener_active = False
+                
+                # Provide specific error messages based on error type
+                if "permission" in str(start_error).lower():
+                    raise RuntimeError(
+                        "Permission denied for mouse listener. Please grant accessibility permissions to the application."
+                    )
+                elif "already" in str(start_error).lower():
+                    raise RuntimeError("Mouse listener is already running. Please try again.")
+                else:
+                    raise RuntimeError(f"Mouse listener startup failed: {str(start_error)}")
             
         except Exception as e:
-            logger.error(f"[{execution_id}] Failed to start mouse listener: {e}")
-            raise
+            # Log comprehensive error information
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_start_mouse_listener_for_deferred_action",
+                category=ErrorCategory.RESOURCE_ERROR,
+                severity=ErrorSeverity.HIGH,
+                context={
+                    "execution_id": execution_id,
+                    "mouse_listener_active": getattr(self, 'mouse_listener_active', False),
+                    "existing_listener": self.mouse_listener is not None
+                }
+            )
+            
+            logger.error(f"[{execution_id}] Mouse listener startup failed: {error_info.message}")
+            
+            # Ensure cleanup state
+            self.mouse_listener = None
+            self.mouse_listener_active = False
+            
+            # Re-raise with enhanced error message
+            raise RuntimeError(f"Failed to start mouse listener: {error_info.user_message}")
     
     def _provide_deferred_action_instructions(self, execution_id: str, content_type: str) -> None:
         """
@@ -2475,6 +2828,154 @@ class Orchestrator:
         
         return issues
     
+    def _start_deferred_action_timeout_monitoring(self, execution_id: str) -> None:
+        """
+        Start timeout monitoring for deferred actions.
+        
+        Creates a background thread that monitors for timeout conditions
+        and automatically handles timeout scenarios with proper cleanup.
+        
+        Args:
+            execution_id (str): Current execution identifier
+        """
+        def timeout_monitor():
+            """Background thread function for timeout monitoring."""
+            try:
+                logger.debug(f"[{execution_id}] Starting deferred action timeout monitoring")
+                
+                while self.is_waiting_for_user_action and self.deferred_action_timeout_time:
+                    current_time = time.time()
+                    
+                    # Check if timeout has been reached
+                    if current_time >= self.deferred_action_timeout_time:
+                        logger.warning(f"[{execution_id}] Deferred action timeout reached")
+                        self._handle_deferred_action_timeout(execution_id)
+                        break
+                    
+                    # Check every 5 seconds
+                    time.sleep(5.0)
+                    
+                logger.debug(f"[{execution_id}] Deferred action timeout monitoring ended")
+                
+            except Exception as e:
+                logger.error(f"[{execution_id}] Error in timeout monitoring: {e}")
+                # Ensure cleanup happens even if monitoring fails
+                if self.is_waiting_for_user_action:
+                    self._handle_deferred_action_timeout(execution_id)
+        
+        # Start timeout monitoring in a daemon thread
+        timeout_thread = threading.Thread(
+            target=timeout_monitor,
+            daemon=True,
+            name=f"DeferredActionTimeout-{execution_id}"
+        )
+        timeout_thread.start()
+    
+    def _handle_deferred_action_timeout(self, execution_id: str) -> None:
+        """
+        Handle timeout of deferred actions with proper cleanup and user feedback.
+        
+        Args:
+            execution_id (str): Execution identifier of the timed-out action
+        """
+        try:
+            logger.warning(f"[{execution_id}] Handling deferred action timeout")
+            
+            # Calculate how long the action was waiting
+            elapsed_time = 0.0
+            if self.deferred_action_start_time:
+                elapsed_time = time.time() - self.deferred_action_start_time
+            
+            # Provide audio feedback about timeout
+            if self.feedback_module:
+                try:
+                    timeout_message = f"The deferred action has timed out after {elapsed_time:.0f} seconds. The action has been cancelled."
+                    self.feedback_module.speak(timeout_message, FeedbackPriority.HIGH)
+                    
+                    # Play failure sound
+                    from config import SOUNDS
+                    if "failure" in SOUNDS:
+                        try:
+                            self.feedback_module.play_sound(SOUNDS["failure"])
+                        except Exception as sound_error:
+                            logger.debug(f"[{execution_id}] Failed to play timeout sound: {sound_error}")
+                            
+                except Exception as audio_error:
+                    logger.warning(f"[{execution_id}] Timeout audio feedback failed: {audio_error}")
+            
+            # Log timeout event with context
+            error_info = global_error_handler.handle_error(
+                error=TimeoutError(f"Deferred action timed out after {elapsed_time:.1f} seconds"),
+                module="orchestrator",
+                function="_handle_deferred_action_timeout",
+                category=ErrorCategory.TIMEOUT_ERROR,
+                severity=ErrorSeverity.MEDIUM,
+                context={
+                    "execution_id": execution_id,
+                    "elapsed_time": elapsed_time,
+                    "timeout_threshold": self.deferred_action_timeout_seconds,
+                    "pending_payload_size": len(self.pending_action_payload) if self.pending_action_payload else 0
+                }
+            )
+            
+            # Reset deferred action state with timeout-specific cleanup
+            self._reset_deferred_action_state_with_timeout(execution_id, elapsed_time)
+            
+            logger.info(f"[{execution_id}] Deferred action timeout handled successfully")
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Error handling deferred action timeout: {e}")
+            
+            # Force state reset even if timeout handling fails
+            try:
+                self._reset_deferred_action_state()
+            except Exception as reset_error:
+                logger.error(f"[{execution_id}] Force state reset failed: {reset_error}")
+    
+    def _reset_deferred_action_state_with_timeout(self, execution_id: str, elapsed_time: float) -> None:
+        """
+        Reset deferred action state with timeout-specific handling.
+        
+        Args:
+            execution_id (str): Execution identifier
+            elapsed_time (float): How long the action was waiting before timeout
+        """
+        try:
+            logger.info(f"[{execution_id}] Resetting deferred action state due to timeout (elapsed: {elapsed_time:.1f}s)")
+            
+            # Store timeout information before reset
+            timeout_info = {
+                "execution_id": execution_id,
+                "elapsed_time": elapsed_time,
+                "timeout_threshold": self.deferred_action_timeout_seconds,
+                "payload_size": len(self.pending_action_payload) if self.pending_action_payload else 0,
+                "timestamp": time.time()
+            }
+            
+            # Perform standard state reset
+            self._reset_deferred_action_state()
+            
+            # Add timeout event to command history
+            try:
+                timeout_event = {
+                    "execution_id": execution_id,
+                    "event_type": "deferred_action_timeout",
+                    "status": CommandStatus.FAILED,
+                    "mode": "deferred_action",
+                    "timeout_info": timeout_info,
+                    "timestamp": time.time()
+                }
+                self.command_history.append(timeout_event)
+            except Exception as history_error:
+                logger.warning(f"[{execution_id}] Failed to add timeout event to history: {history_error}")
+            
+            logger.info(f"[{execution_id}] Deferred action state reset completed for timeout")
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Error in timeout-specific state reset: {e}")
+            # Fallback to force reset
+            self._force_state_reset()
+    
     def _validate_mouse_listener_state(self) -> List[str]:
         """
         Validate mouse listener state for consistency.
@@ -2771,6 +3272,7 @@ class Orchestrator:
     def _handle_gui_interaction(self, execution_id: str, command: str) -> Dict[str, Any]:
         """
         Handle GUI interaction commands using the preserved legacy execution logic.
+        Enhanced with comprehensive error handling and recovery strategies.
         
         Args:
             execution_id (str): Unique execution identifier
@@ -2779,25 +3281,199 @@ class Orchestrator:
         Returns:
             Dict[str, Any]: Execution result from GUI command processing
         """
-        logger.info(f"[{execution_id}] Processing GUI interaction command: '{command}'")
+        start_time = time.time()
         
-        # Create execution context for legacy processing
-        execution_context = {
-            "execution_id": execution_id,
-            "command": command,
-            "start_time": time.time(),
-            "status": CommandStatus.PROCESSING,
-            "steps_completed": [],
-            "errors": [],
-            "warnings": [],
-            "validation_result": None,
-            "screen_context": None,
-            "action_plan": None,
-            "execution_results": None
-        }
-        
-        # Use the legacy execution logic for GUI commands
-        return self._legacy_execute_command_internal(command, execution_context)
+        try:
+            logger.info(f"[{execution_id}] Processing GUI interaction command: '{command}'")
+            
+            # Input validation
+            if not command or not command.strip():
+                raise ValueError("Empty GUI command provided")
+            
+            # Check system health before GUI interaction
+            system_health = self.get_system_health()
+            if system_health['overall_health'] == 'critical':
+                logger.warning(f"[{execution_id}] System health is critical, attempting recovery")
+                
+                if self.error_recovery_enabled:
+                    recovery_result = self.attempt_system_recovery()
+                    if not recovery_result.get('recovery_successful', False):
+                        raise RuntimeError("System health is critical and recovery failed")
+                else:
+                    raise RuntimeError("System health is critical")
+            
+            # Create execution context for legacy processing
+            execution_context = {
+                "execution_id": execution_id,
+                "command": command,
+                "start_time": start_time,
+                "status": CommandStatus.PROCESSING,
+                "steps_completed": [],
+                "errors": [],
+                "warnings": [],
+                "validation_result": None,
+                "screen_context": None,
+                "action_plan": None,
+                "execution_results": None,
+                "error_recovery_attempted": False,
+                "fallback_strategy_used": None
+            }
+            
+            # Check for required modules
+            required_modules = ['vision', 'reasoning', 'automation']
+            unavailable_modules = []
+            
+            for module in required_modules:
+                if not self.module_availability.get(module, False):
+                    unavailable_modules.append(module)
+            
+            # Attempt recovery for unavailable modules if enabled
+            if unavailable_modules and self.error_recovery_enabled:
+                logger.info(f"[{execution_id}] Attempting recovery for unavailable modules: {unavailable_modules}")
+                execution_context["error_recovery_attempted"] = True
+                
+                for module in unavailable_modules:
+                    recovery_result = self.attempt_system_recovery(module)
+                    if recovery_result.get('recovery_successful', False):
+                        execution_context["warnings"].append(f"Recovered {module} module")
+                        unavailable_modules.remove(module)
+            
+            # Check if critical modules are still unavailable
+            if unavailable_modules:
+                critical_modules = [m for m in unavailable_modules if m in ['vision', 'automation']]
+                if critical_modules:
+                    execution_context["fallback_strategy_used"] = "critical_modules_unavailable"
+                    execution_context["warnings"].append(f"Critical modules unavailable: {critical_modules}")
+                    
+                    # Provide user feedback about limitations
+                    if self.feedback_module:
+                        try:
+                            limitation_message = f"Some system components are unavailable. GUI automation may be limited."
+                            self.feedback_module.speak(limitation_message, FeedbackPriority.NORMAL)
+                        except Exception as audio_error:
+                            logger.warning(f"[{execution_id}] Audio feedback failed: {audio_error}")
+            
+            # Use the legacy execution logic for GUI commands with error handling
+            try:
+                result = self._legacy_execute_command_internal(command, execution_context)
+                
+                # Validate result
+                if not result or not isinstance(result, dict):
+                    raise ValueError("Invalid result from legacy execution")
+                
+                # Add error handling metadata to result
+                result.update({
+                    "error_recovery_attempted": execution_context.get("error_recovery_attempted", False),
+                    "fallback_strategy_used": execution_context.get("fallback_strategy_used"),
+                    "system_health": system_health.get('overall_health', 'unknown'),
+                    "total_duration": time.time() - start_time
+                })
+                
+                logger.info(f"[{execution_id}] GUI interaction completed successfully in {result.get('total_duration', 0):.2f}s")
+                return result
+                
+            except Exception as execution_error:
+                logger.error(f"[{execution_id}] Legacy execution failed: {execution_error}")
+                execution_context["errors"].append(f"Execution error: {str(execution_error)}")
+                
+                # Attempt graceful degradation
+                execution_context["fallback_strategy_used"] = "execution_error_fallback"
+                
+                # Provide user feedback about failure
+                if self.feedback_module:
+                    try:
+                        if "vision" in str(execution_error).lower():
+                            error_message = "I'm having trouble seeing the screen. Please try again or check if the application is visible."
+                        elif "automation" in str(execution_error).lower():
+                            error_message = "I'm having trouble controlling the interface. Please try again or check system permissions."
+                        elif "timeout" in str(execution_error).lower():
+                            error_message = "The command is taking too long to complete. Please try a simpler action."
+                        else:
+                            error_message = "I encountered an error while trying to perform that action. Please try again."
+                        
+                        self.feedback_module.speak(error_message, FeedbackPriority.HIGH)
+                        
+                        # Play failure sound
+                        from config import SOUNDS
+                        if "failure" in SOUNDS:
+                            try:
+                                self.feedback_module.play_sound(SOUNDS["failure"])
+                            except Exception as sound_error:
+                                logger.debug(f"[{execution_id}] Failed to play failure sound: {sound_error}")
+                                
+                    except Exception as audio_error:
+                        logger.warning(f"[{execution_id}] Error feedback audio failed: {audio_error}")
+                
+                # Return error result
+                return {
+                    "status": "failed",
+                    "execution_id": execution_id,
+                    "command": command,
+                    "error": str(execution_error),
+                    "user_message": "The GUI command could not be completed. Please try again.",
+                    "errors": execution_context["errors"],
+                    "warnings": execution_context["warnings"],
+                    "error_recovery_attempted": execution_context.get("error_recovery_attempted", False),
+                    "fallback_strategy_used": execution_context.get("fallback_strategy_used"),
+                    "total_duration": time.time() - start_time,
+                    "success": False
+                }
+            
+        except Exception as e:
+            # Handle GUI interaction failure with comprehensive error handling
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_handle_gui_interaction",
+                category=ErrorCategory.PROCESSING_ERROR,
+                severity=ErrorSeverity.HIGH,
+                context={
+                    "execution_id": execution_id,
+                    "command": command[:100] if command else "",
+                    "duration": time.time() - start_time
+                }
+            )
+            
+            logger.error(f"[{execution_id}] GUI interaction handler failed: {error_info.message}")
+            
+            # Provide comprehensive error feedback
+            if self.feedback_module:
+                try:
+                    if isinstance(e, ValueError) and "empty" in str(e).lower():
+                        error_response = "I didn't receive a valid command. Please tell me what you'd like me to do."
+                    elif "critical" in str(e).lower():
+                        error_response = "System components are unavailable. Please try again later."
+                    elif "permission" in str(e).lower():
+                        error_response = "I don't have the necessary permissions. Please check system settings."
+                    else:
+                        error_response = "I encountered an error while processing your command. Please try again."
+                    
+                    self.feedback_module.speak(error_response, FeedbackPriority.HIGH)
+                    
+                    # Play failure sound
+                    from config import SOUNDS
+                    if "failure" in SOUNDS:
+                        try:
+                            self.feedback_module.play_sound(SOUNDS["failure"])
+                        except Exception as sound_error:
+                            logger.debug(f"[{execution_id}] Failed to play failure sound: {sound_error}")
+                            
+                except Exception as audio_error:
+                    logger.warning(f"[{execution_id}] Error feedback audio failed: {audio_error}")
+            
+            # Return comprehensive error result
+            return {
+                "status": "failed",
+                "execution_id": execution_id,
+                "command": command,
+                "error": error_info.message,
+                "user_message": error_info.user_message,
+                "error_category": error_info.category.value,
+                "error_severity": error_info.severity.value,
+                "total_duration": time.time() - start_time,
+                "success": False,
+                "recoverable": error_info.recoverable
+            }
     
     def _execute_command_internal(self, command: str) -> Dict[str, Any]:
         """
