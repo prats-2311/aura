@@ -1019,8 +1019,18 @@ class AutomationModule:
             
             for i, line in enumerate(lines):
                 if line:  # Only type non-empty lines
+                    # INDENTATION DEBUG: Check line indentation before processing
+                    leading_spaces = len(line) - len(line.lstrip())
+                    if leading_spaces > 0:
+                        logger.debug(f"AppleScript typing line {i+1} with {leading_spaces} leading spaces: '{line}'")
+                    
                     # Escape special characters for AppleScript (but not newlines)
                     escaped_line = line.replace('\\', '\\\\').replace('"', '\\"').replace('\r', '\\r')
+                    
+                    # INDENTATION DEBUG: Verify spaces preserved after escaping
+                    escaped_spaces = len(escaped_line) - len(escaped_line.lstrip())
+                    if leading_spaces != escaped_spaces:
+                        logger.error(f"INDENTATION LOST during escaping! Original: {leading_spaces} spaces, Escaped: {escaped_spaces} spaces")
                     
                     # Type the line
                     applescript = f'''

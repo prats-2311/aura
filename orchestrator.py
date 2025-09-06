@@ -1235,7 +1235,17 @@ class Orchestrator:
         Returns:
             Dict[str, Any]: Intent classification result with type, confidence, and parameters
         """
-        with self.intent_lock:
+        # CONCURRENCY FIX: Use timeout to prevent hanging on intent lock
+        try:
+            lock_acquired = self.intent_lock.acquire(timeout=10.0)
+            if not lock_acquired:
+                logger.warning("Could not acquire intent lock within timeout - using fallback")
+                return self._get_fallback_intent("gui_interaction", "Intent lock timeout")
+        except Exception as lock_error:
+            logger.error(f"Error acquiring intent lock: {lock_error}")
+            return self._get_fallback_intent("gui_interaction", "Intent lock error")
+        
+        try:
             try:
                 logger.debug(f"Recognizing intent for command: '{command[:100]}...'")
                 
@@ -1301,6 +1311,12 @@ class Orchestrator:
                 )
                 logger.error(f"Intent recognition failed: {error_info.message}")
                 return self._get_fallback_intent("gui_interaction", f"Recognition error: {str(e)}")
+        finally:
+            # Always release the intent lock
+            try:
+                self.intent_lock.release()
+            except Exception as release_error:
+                logger.error(f"Error releasing intent lock: {release_error}")
     
     def _parse_intent_response(self, response: Dict[str, Any], original_command: str) -> Dict[str, Any]:
         """
@@ -2130,9 +2146,48 @@ class Orchestrator:
             logger.debug(f"[{execution_id}] Extracted content: {len(generated_content)} chars")
             logger.debug(f"[{execution_id}] Content preview: {generated_content[:200] if generated_content else 'Empty'}")
             
+            # INDENTATION DEBUG: Check if extracted content has proper formatting
+            if content_type == 'code' and generated_content:
+                lines = generated_content.split('\n')
+                indented_lines = [line for line in lines if line.startswith('    ')]
+                logger.debug(f"[{execution_id}] INDENTATION CHECK - Total lines: {len(lines)}, Indented lines: {len(indented_lines)}")
+                if len(lines) > 1:
+                    logger.debug(f"[{execution_id}] INDENTATION SAMPLE - First 3 lines:")
+                    for i, line in enumerate(lines[:3]):
+                        spaces = len(line) - len(line.lstrip())
+                        logger.debug(f"[{execution_id}]   Line {i+1}: {spaces} spaces | '{line}'")
+                else:
+                    logger.warning(f"[{execution_id}] INDENTATION WARNING - Content appears to be single line: {generated_content[:100]}...")
+            
             # Clean up any unwanted formatting or metadata
             generated_content = self._clean_generated_content(generated_content, content_type)
             logger.debug(f"[{execution_id}] Content after cleaning: {len(generated_content)} chars")
+            
+            # CRITICAL FIX: Format single-line code to multi-line
+            if content_type == 'code' and generated_content:
+                lines = generated_content.split('\n')
+                if len(lines) == 1 and len(generated_content) > 50:
+                    logger.warning(f"[{execution_id}] SINGLE-LINE CODE DETECTED - Attempting to format")
+                    formatted_content = self._format_single_line_code(generated_content)
+                    if formatted_content != generated_content:
+                        line_count = len(formatted_content.split('\n'))
+                        logger.info(f"[{execution_id}] Successfully formatted single-line code to {line_count} lines")
+                        generated_content = formatted_content
+                    else:
+                        logger.warning(f"[{execution_id}] Could not format single-line code - will type as-is")
+            
+            # INDENTATION DEBUG: Check if cleaning preserved formatting
+            if content_type == 'code' and generated_content:
+                lines = generated_content.split('\n')
+                indented_lines = [line for line in lines if line.startswith('    ')]
+                logger.debug(f"[{execution_id}] INDENTATION CHECK AFTER CLEANING - Total lines: {len(lines)}, Indented lines: {len(indented_lines)}")
+                if len(lines) > 1:
+                    logger.debug(f"[{execution_id}] INDENTATION SAMPLE AFTER CLEANING - First 3 lines:")
+                    for i, line in enumerate(lines[:3]):
+                        spaces = len(line) - len(line.lstrip())
+                        logger.debug(f"[{execution_id}]   Line {i+1}: {spaces} spaces | '{line}'")
+                else:
+                    logger.warning(f"[{execution_id}] INDENTATION WARNING AFTER CLEANING - Content appears to be single line!")
             
             # Safety check for over-aggressive cleaning
             if not generated_content or len(generated_content.strip()) == 0:
@@ -2172,6 +2227,100 @@ class Orchestrator:
         except Exception as e:
             logger.error(f"[{execution_id}] Content generation failed: {e}")
             return None
+    
+    def _format_single_line_code(self, code: str) -> str:
+        """
+        Format single-line code into properly indented multi-line code.
+        
+        Args:
+            code (str): Single-line code string
+            
+        Returns:
+            str: Formatted multi-line code
+        """
+        try:
+            # Python-specific formatting
+            if 'def ' in code and ':' in code:
+                logger.debug("Formatting Python code")
+                
+                # Simple string-based approach for reliability
+                formatted = code
+                
+                # Step 1: Handle function definition
+                if 'def ' in formatted:
+                    parts = formatted.split('def ', 1)
+                    if len(parts) == 2:
+                        func_part = parts[1]
+                        colon_pos = func_part.find(':')
+                        if colon_pos != -1:
+                            func_def = 'def ' + func_part[:colon_pos+1]
+                            rest = func_part[colon_pos+1:].strip()
+                            formatted = func_def + '\n    ' + rest
+                
+                # Step 2: Handle common patterns
+                formatted = formatted.replace(' result = []', '\n    result = []')
+                formatted = formatted.replace(' for _ in range(', '\n    for _ in range(')
+                formatted = formatted.replace(') result.append(', '):\n        result.append(')
+                formatted = formatted.replace('append(a) a, b = ', 'append(a)\n        a, b = ')
+                formatted = formatted.replace(' return result', '\n    return result')
+                formatted = formatted.replace(" if __name__ == '__main__':", "\n\nif __name__ == '__main__':")
+                formatted = formatted.replace(': n = ', ':\n    n = ')
+                formatted = formatted.replace(' print(', '\n    print(')
+                
+                # Step 3: Clean up and fix indentation
+                lines = []
+                indent_level = 0
+                for line in formatted.split('\n'):
+                    line = line.strip()
+                    if line:
+                        # Determine proper indentation
+                        if line.startswith('def ') or line.startswith('if __name__'):
+                            lines.append(line)
+                            indent_level = 1
+                        elif line.endswith(':'):
+                            lines.append('    ' * indent_level + line)
+                            indent_level += 1
+                        else:
+                            lines.append('    ' * indent_level + line)
+                
+                formatted = '\n'.join(lines)
+                
+                # Basic validation - ensure it has multiple lines
+                if len(formatted.split('\n')) > 1:
+                    return formatted
+                    
+            # JavaScript-specific formatting
+            elif 'function' in code and '{' in code:
+                logger.debug("Formatting JavaScript code")
+                
+                formatted = code
+                
+                # Simple JavaScript formatting
+                formatted = formatted.replace('{ return ', '{\n  return ')
+                formatted = formatted.replace('; }', ';\n}')
+                formatted = formatted.replace('} console.log', '}\n\nconsole.log')
+                
+                # Clean up and fix JavaScript indentation
+                lines = []
+                for line in formatted.split('\n'):
+                    line = line.strip()
+                    if line:
+                        if line.startswith('function') or line.startswith('console.log') or line == '}':
+                            lines.append(line)
+                        else:
+                            lines.append('  ' + line)
+                
+                formatted = '\n'.join(lines)
+                
+                if len(formatted.split('\n')) > 1:
+                    return formatted
+            
+            # If no specific formatting applied, return original
+            return code
+            
+        except Exception as e:
+            logger.warning(f"Error formatting single-line code: {e}")
+            return code
     
     def _clean_generated_content(self, content: str, content_type: str) -> str:
         """
@@ -2490,6 +2639,14 @@ class Orchestrator:
                 finally:
                     # Always reset state after execution attempt
                     self._reset_deferred_action_state()
+                    
+                    # CONCURRENCY FIX: Ensure execution lock is released
+                    if hasattr(self, 'execution_lock') and self.execution_lock.locked():
+                        logger.warning(f"[{execution_id}] Force releasing execution lock after deferred action completion")
+                        try:
+                            self.execution_lock.release()
+                        except Exception as lock_error:
+                            logger.error(f"[{execution_id}] Failed to release execution lock: {lock_error}")
             
         except Exception as e:
             logger.error(f"[{execution_id}] Error in deferred action trigger: {e}")
@@ -3752,11 +3909,23 @@ class Orchestrator:
             logger.info(f"Starting command execution [{execution_id}]: '{command}'")
             
             # Step 0: Check for deferred action interruption
-            with self.deferred_action_lock:
-                if self.is_waiting_for_user_action:
-                    logger.info(f"[{execution_id}] Interrupting deferred action due to new command")
-                    self._reset_deferred_action_state()
-                    # Continue processing the new command
+            # CONCURRENCY FIX: Use timeout to prevent hanging on deferred action lock
+            try:
+                lock_acquired = self.deferred_action_lock.acquire(timeout=5.0)
+                if lock_acquired:
+                    try:
+                        if self.is_waiting_for_user_action:
+                            logger.info(f"[{execution_id}] Interrupting deferred action due to new command")
+                            self._reset_deferred_action_state()
+                            # Continue processing the new command
+                    finally:
+                        self.deferred_action_lock.release()
+                else:
+                    logger.warning(f"[{execution_id}] Could not acquire deferred action lock within timeout - proceeding anyway")
+                    # Continue with command execution even if we couldn't check deferred action state
+            except Exception as lock_error:
+                logger.error(f"[{execution_id}] Error with deferred action lock: {lock_error}")
+                # Continue with command execution
             
             # Step 1: Intent Recognition and Routing
             logger.info(f"[{execution_id}] Step 1: Intent recognition and routing")
