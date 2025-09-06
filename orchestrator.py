@@ -198,6 +198,9 @@ class Orchestrator:
         # Initialize system health monitoring
         self._initialize_system_health()
         
+        # Initialize command handlers
+        self._initialize_handlers()
+        
         # Background preloading state
         self.last_active_app = None
         self.background_preload_enabled = True
@@ -206,6 +209,59 @@ class Orchestrator:
         self._start_periodic_state_validation()
         
         logger.info("Orchestrator initialized successfully")
+    
+    def _initialize_handlers(self):
+        """Initialize command handlers for the new modular architecture."""
+        try:
+            # Import handler classes
+            from handlers.gui_handler import GUIHandler
+            from handlers.conversation_handler import ConversationHandler
+            from handlers.deferred_action_handler import DeferredActionHandler
+            
+            # Initialize handlers with orchestrator reference
+            self.gui_handler = GUIHandler(self)
+            self.conversation_handler = ConversationHandler(self)
+            self.deferred_action_handler = DeferredActionHandler(self)
+            
+            logger.info("Command handlers initialized successfully")
+            
+        except ImportError as e:
+            logger.error(f"Failed to import handler classes: {e}")
+            # Set handlers to None so we can fall back to legacy methods
+            self.gui_handler = None
+            self.conversation_handler = None
+            self.deferred_action_handler = None
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize handlers: {e}")
+            # Set handlers to None so we can fall back to legacy methods
+            self.gui_handler = None
+            self.conversation_handler = None
+            self.deferred_action_handler = None
+    
+    def _get_handler_for_intent(self, intent: str):
+        """
+        Get the appropriate handler for an intent.
+        
+        Args:
+            intent: The recognized intent type
+            
+        Returns:
+            Handler instance or None if not available
+        """
+        handler_map = {
+            "gui_interaction": self.gui_handler,
+            "conversational_chat": self.conversation_handler,
+            "deferred_action": self.deferred_action_handler,
+            "question_answering": self.gui_handler  # Reuse GUI handler for now
+        }
+        
+        handler = handler_map.get(intent)
+        if handler is None:
+            logger.warning(f"No handler available for intent '{intent}', falling back to GUI handler")
+            return self.gui_handler
+        
+        return handler
     
     @measure_performance("parallel_perception_reasoning", include_system_metrics=True)
     def execute_parallel_perception_reasoning(self, command: str) -> Tuple[Optional[Dict], Optional[Dict]]:
@@ -3990,28 +4046,142 @@ class Orchestrator:
         intent_type = intent_result.get('intent', 'gui_interaction')
         
         try:
-            if intent_type == 'conversational_chat':
-                logger.info(f"[{execution_id}] Routing to conversational handler")
-                return self._handle_conversational_query(execution_id, command)
+            # Get the appropriate handler for this intent
+            handler = self._get_handler_for_intent(intent_type)
+            
+            if handler is not None:
+                logger.info(f"[{execution_id}] Routing to {handler.__class__.__name__} for intent '{intent_type}'")
                 
-            elif intent_type == 'deferred_action':
-                logger.info(f"[{execution_id}] Routing to deferred action handler")
-                return self._handle_deferred_action_request(execution_id, intent_result)
+                # Prepare context for handler
+                handler_context = {
+                    'intent': intent_result,
+                    'execution_id': execution_id,
+                    'timestamp': time.time(),
+                    'system_state': {
+                        'mode': self.system_mode,
+                        'is_waiting_for_user_action': self.is_waiting_for_user_action
+                    }
+                }
                 
-            elif intent_type == 'question_answering':
-                logger.info(f"[{execution_id}] Routing to question answering handler")
-                return self._route_to_question_answering(command, execution_context)
+                # Call the handler's handle method
+                result = handler.handle(command, handler_context)
+                
+                # Convert handler result to orchestrator format if needed
+                return self._convert_handler_result_to_orchestrator_format(result, execution_context)
                 
             else:
-                # For 'gui_interaction' or any other intent, use GUI handler
-                logger.info(f"[{execution_id}] Routing to GUI interaction handler (intent: {intent_type})")
-                return self._handle_gui_interaction(execution_id, command)
+                # Fallback to legacy methods if handlers are not available
+                logger.warning(f"[{execution_id}] Handler not available for intent '{intent_type}', using legacy methods")
+                return self._fallback_to_legacy_handler(execution_id, command, intent_type, intent_result, execution_context)
                 
         except Exception as e:
             logger.error(f"[{execution_id}] Handler routing failed for intent '{intent_type}': {e}")
-            # Fallback to GUI interaction handler for safety
-            logger.info(f"[{execution_id}] Falling back to GUI interaction handler")
-            return self._handle_gui_interaction(execution_id, command)
+            # Fallback to legacy methods for safety
+            logger.info(f"[{execution_id}] Falling back to legacy handler methods")
+            return self._fallback_to_legacy_handler(execution_id, command, intent_type, intent_result, execution_context)
+    
+    def _convert_handler_result_to_orchestrator_format(self, handler_result: Dict[str, Any], execution_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert handler result format to orchestrator execution result format.
+        
+        Args:
+            handler_result: Result from handler.handle() method
+            execution_context: Current execution context
+            
+        Returns:
+            Orchestrator-formatted execution result
+        """
+        try:
+            # Update execution context with handler result
+            execution_context["status"] = CommandStatus.COMPLETED if handler_result.get("status") == "success" else CommandStatus.FAILED
+            execution_context["end_time"] = time.time()
+            execution_context["total_duration"] = execution_context["end_time"] - execution_context["start_time"]
+            
+            # Add handler-specific information
+            if handler_result.get("status") == "success":
+                execution_context["steps_completed"].append(ExecutionStep.ACTION)
+                execution_context["execution_results"] = {
+                    "success": True,
+                    "message": handler_result.get("message", "Command executed successfully"),
+                    "method": handler_result.get("method", "handler"),
+                    "execution_time": handler_result.get("execution_time"),
+                    "metadata": handler_result.get("metadata", {})
+                }
+            else:
+                execution_context["errors"].append(handler_result.get("message", "Handler execution failed"))
+                execution_context["execution_results"] = {
+                    "success": False,
+                    "message": handler_result.get("message", "Command execution failed"),
+                    "error": handler_result.get("message")
+                }
+            
+            # Handle special case for deferred actions
+            if handler_result.get("status") == "waiting_for_user_action":
+                execution_context["status"] = CommandStatus.PROCESSING
+                execution_context["execution_results"] = {
+                    "success": True,
+                    "message": handler_result.get("message", "Waiting for user action"),
+                    "deferred_action": True,
+                    "content_preview": handler_result.get("content_preview"),
+                    "instructions": handler_result.get("instructions")
+                }
+                # Return the handler result directly for deferred actions
+                return handler_result
+            
+            # Update progress
+            final_status = CommandStatus.COMPLETED if handler_result.get("status") == "success" else CommandStatus.FAILED
+            self._update_progress(execution_context["execution_id"], final_status)
+            
+            # Add to command history
+            self.command_history.append(execution_context.copy())
+            
+            return self._format_execution_result(execution_context)
+            
+        except Exception as e:
+            logger.error(f"Error converting handler result: {e}")
+            # Return a basic error result
+            execution_context["status"] = CommandStatus.FAILED
+            execution_context["errors"].append(f"Result conversion failed: {str(e)}")
+            return self._format_execution_result(execution_context)
+    
+    def _fallback_to_legacy_handler(self, execution_id: str, command: str, intent_type: str, intent_result: Dict[str, Any], execution_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Fallback to legacy handler methods when new handlers are not available.
+        
+        Args:
+            execution_id: Unique execution identifier
+            command: Original user command
+            intent_type: Recognized intent type
+            intent_result: Result from intent recognition
+            execution_context: Current execution context
+            
+        Returns:
+            Execution result from legacy handler methods
+        """
+        try:
+            if intent_type == 'conversational_chat':
+                logger.info(f"[{execution_id}] Using legacy conversational handler")
+                return self._handle_conversational_query(execution_id, command)
+                
+            elif intent_type == 'deferred_action':
+                logger.info(f"[{execution_id}] Using legacy deferred action handler")
+                return self._handle_deferred_action_request(execution_id, intent_result)
+                
+            elif intent_type == 'question_answering':
+                logger.info(f"[{execution_id}] Using legacy question answering handler")
+                return self._route_to_question_answering(command, execution_context)
+                
+            else:
+                # For 'gui_interaction' or any other intent, use legacy GUI handler
+                logger.info(f"[{execution_id}] Using legacy GUI interaction handler (intent: {intent_type})")
+                return self._handle_gui_interaction(execution_id, command)
+                
+        except Exception as e:
+            logger.error(f"[{execution_id}] Legacy handler fallback failed: {e}")
+            # Final fallback - return error result
+            execution_context["status"] = CommandStatus.FAILED
+            execution_context["errors"].append(f"All handler methods failed: {str(e)}")
+            return self._format_execution_result(execution_context)
     
     def _legacy_execute_command_internal(self, command: str, execution_context: Dict[str, Any]) -> Dict[str, Any]:
         """

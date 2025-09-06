@@ -21,7 +21,7 @@
   - Add comprehensive error handling and logging consistent with new architecture
   - _Requirements: 1.3, 1.4, 10.1, 10.2_
 
-- [ ] 0.2 Create conversation and deferred action handler classes
+- [x] 0.2 Create conversation and deferred action handler classes
 
   - Create `handlers/conversation_handler.py` with basic structure for future conversational features
   - Create `handlers/deferred_action_handler.py` inheriting from `BaseHandler`
@@ -30,7 +30,7 @@
   - Add proper state management and cleanup methods
   - _Requirements: 1.5, 1.6_
 
-- [ ] 0.3 Refactor Orchestrator to use handler-based routing
+- [x] 0.3 Refactor Orchestrator to use handler-based routing
   - Simplify `Orchestrator._execute_command_internal` to focus on intent recognition and routing
   - Add handler initialization in `Orchestrator.__init__()`
   - Implement `_get_handler_for_intent()` method for routing commands to appropriate handlers
