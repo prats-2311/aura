@@ -163,7 +163,15 @@ class Orchestrator:
         self.pending_action_payload = None
         self.deferred_action_type = None
         self.deferred_action_start_time = None
+        self.deferred_action_timeout_time = None
         self.mouse_listener = None
+        self.mouse_listener_active = False
+        
+        # Enhanced state tracking for validation and consistency
+        self.system_mode = 'ready'  # 'ready', 'processing', 'waiting_for_user'
+        self.current_execution_id = None
+        self.state_transition_history = []
+        self.last_state_validation_time = None
         
         # Conversational context state
         self.conversation_history = []
@@ -173,6 +181,12 @@ class Orchestrator:
         self.intent_lock = threading.Lock()
         self.deferred_action_lock = threading.Lock()
         self.conversation_lock = threading.Lock()
+        self.state_validation_lock = threading.Lock()
+        
+        # Configuration for state management
+        self.deferred_action_timeout_seconds = 300.0  # 5 minutes default
+        self.state_validation_interval = 30.0  # Validate state every 30 seconds
+        self.max_state_history_entries = 50
         
         # Command validation patterns
         self._init_validation_patterns()
@@ -186,6 +200,9 @@ class Orchestrator:
         # Background preloading state
         self.last_active_app = None
         self.background_preload_enabled = True
+        
+        # Start periodic state validation
+        self._start_periodic_state_validation()
         
         logger.info("Orchestrator initialized successfully")
     
@@ -1562,11 +1579,16 @@ class Orchestrator:
             
             with self.deferred_action_lock:
                 try:
-                    # Store action state
+                    # Store action state with enhanced tracking
+                    current_time = time.time()
                     self.pending_action_payload = generated_content
                     self.deferred_action_type = 'type'  # Default action is typing
-                    self.deferred_action_start_time = time.time()
+                    self.deferred_action_start_time = current_time
+                    self.deferred_action_timeout_time = current_time + self.deferred_action_timeout_seconds
                     self.is_waiting_for_user_action = True
+                    self.mouse_listener_active = False  # Will be set to True when listener starts
+                    self.system_mode = 'waiting_for_user'
+                    self.current_execution_id = execution_id
                     
                     logger.debug(f"[{execution_id}] Deferred action state configured")
                     
@@ -1800,6 +1822,7 @@ class Orchestrator:
             # Create and start mouse listener
             self.mouse_listener = GlobalMouseListener(callback=on_deferred_action_trigger)
             self.mouse_listener.start()
+            self.mouse_listener_active = True
             
             logger.info(f"[{execution_id}] Global mouse listener started for deferred action")
             
@@ -2034,39 +2057,717 @@ class Orchestrator:
         """
         Reset all deferred action state variables and cleanup resources.
         
+        This method provides comprehensive state cleanup including:
+        - Mouse listener resource cleanup and validation
+        - State variable reset with consistency checking
+        - State transition logging and validation
+        - Thread-safe cleanup operations
+        
         This method should be called when:
         - A deferred action completes successfully
         - A deferred action is cancelled by a new command
         - An error occurs during deferred action processing
         - A timeout occurs while waiting for user action
         """
+        with self.deferred_action_lock:
+            try:
+                logger.debug("Starting comprehensive deferred action state reset")
+                
+                # Record state transition for validation
+                self._record_state_transition('deferred_action_reset', {
+                    'was_waiting': self.is_waiting_for_user_action,
+                    'had_payload': self.pending_action_payload is not None,
+                    'had_listener': self.mouse_listener is not None,
+                    'system_mode': self.system_mode
+                })
+                
+                # Step 1: Stop and cleanup mouse listener with validation
+                self._cleanup_mouse_listener()
+                
+                # Step 2: Reset all deferred action state variables
+                self._reset_deferred_action_variables()
+                
+                # Step 3: Update system mode and execution state
+                self._update_system_mode_after_reset()
+                
+                # Step 4: Validate state consistency after reset
+                validation_result = self._validate_deferred_action_state_consistency()
+                
+                if validation_result['is_consistent']:
+                    logger.debug("Deferred action state reset completed successfully")
+                else:
+                    logger.warning(f"State inconsistency detected after reset: {validation_result['issues']}")
+                    # Attempt to fix inconsistencies
+                    self._force_state_consistency()
+                
+                # Step 5: Update last validation time
+                self.last_state_validation_time = time.time()
+                
+            except Exception as e:
+                logger.error(f"Error during comprehensive deferred action state reset: {e}")
+                # Force reset critical variables even if cleanup fails
+                self._force_state_reset()
+    
+    def _cleanup_mouse_listener(self) -> None:
+        """
+        Cleanup mouse listener resources with proper validation and error handling.
+        """
         try:
-            logger.debug("Resetting deferred action state")
-            
-            # Stop mouse listener if active
             if self.mouse_listener is not None:
-                try:
-                    self.mouse_listener.stop()
-                    logger.debug("Mouse listener stopped")
-                except Exception as e:
-                    logger.warning(f"Error stopping mouse listener: {e}")
-                finally:
-                    self.mouse_listener = None
+                logger.debug("Stopping mouse listener")
+                
+                # Check if listener is actually active before stopping
+                if hasattr(self.mouse_listener, 'is_active') and self.mouse_listener.is_active():
+                    try:
+                        self.mouse_listener.stop()
+                        logger.debug("Mouse listener stopped successfully")
+                    except Exception as e:
+                        logger.warning(f"Error stopping active mouse listener: {e}")
+                else:
+                    logger.debug("Mouse listener was not active, skipping stop")
+                
+                # Always clear the reference
+                self.mouse_listener = None
+                self.mouse_listener_active = False
+                
+            else:
+                logger.debug("No mouse listener to cleanup")
+                
+        except Exception as e:
+            logger.error(f"Error during mouse listener cleanup: {e}")
+            # Force cleanup
+            self.mouse_listener = None
+            self.mouse_listener_active = False
+    
+    def _reset_deferred_action_variables(self) -> None:
+        """
+        Reset all deferred action state variables to their default values.
+        """
+        try:
+            logger.debug("Resetting deferred action state variables")
             
-            # Reset state variables
+            # Reset primary state variables
             self.is_waiting_for_user_action = False
             self.pending_action_payload = None
             self.deferred_action_type = None
             self.deferred_action_start_time = None
+            self.deferred_action_timeout_time = None
             
-            logger.debug("Deferred action state reset completed")
+            # Reset tracking variables
+            self.mouse_listener_active = False
+            
+            logger.debug("Deferred action variables reset completed")
             
         except Exception as e:
-            logger.error(f"Error resetting deferred action state: {e}")
-            # Force reset critical variables even if cleanup fails
+            logger.error(f"Error resetting deferred action variables: {e}")
+            raise
+    
+    def _update_system_mode_after_reset(self) -> None:
+        """
+        Update system mode and execution state after deferred action reset.
+        """
+        try:
+            # Update system mode back to ready if we were waiting for user
+            if self.system_mode == 'waiting_for_user':
+                self.system_mode = 'ready'
+                logger.debug("System mode updated from 'waiting_for_user' to 'ready'")
+            
+            # Clear current execution ID if no other operations are running
+            if not self._has_active_operations():
+                self.current_execution_id = None
+                logger.debug("Cleared current execution ID")
+                
+        except Exception as e:
+            logger.error(f"Error updating system mode after reset: {e}")
+    
+    def _validate_deferred_action_state_consistency(self) -> Dict[str, Any]:
+        """
+        Validate the consistency of deferred action state after reset.
+        
+        Returns:
+            Dictionary containing validation results and any issues found
+        """
+        try:
+            issues = []
+            
+            # Check that all deferred action variables are properly reset
+            if self.is_waiting_for_user_action:
+                issues.append("is_waiting_for_user_action should be False after reset")
+            
+            if self.pending_action_payload is not None:
+                issues.append("pending_action_payload should be None after reset")
+            
+            if self.deferred_action_type is not None:
+                issues.append("deferred_action_type should be None after reset")
+            
+            if self.deferred_action_start_time is not None:
+                issues.append("deferred_action_start_time should be None after reset")
+            
+            if self.deferred_action_timeout_time is not None:
+                issues.append("deferred_action_timeout_time should be None after reset")
+            
+            if self.mouse_listener is not None:
+                issues.append("mouse_listener should be None after reset")
+            
+            if self.mouse_listener_active:
+                issues.append("mouse_listener_active should be False after reset")
+            
+            # Check system mode consistency
+            if self.system_mode == 'waiting_for_user' and not self.is_waiting_for_user_action:
+                issues.append("system_mode is 'waiting_for_user' but is_waiting_for_user_action is False")
+            
+            return {
+                'is_consistent': len(issues) == 0,
+                'issues': issues,
+                'validation_time': time.time()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error validating state consistency: {e}")
+            return {
+                'is_consistent': False,
+                'issues': [f"Validation error: {str(e)}"],
+                'validation_time': time.time()
+            }
+    
+    def _force_state_consistency(self) -> None:
+        """
+        Force state consistency by resetting all variables to safe defaults.
+        """
+        try:
+            logger.warning("Forcing state consistency due to detected inconsistencies")
+            
+            # Force reset all deferred action variables
+            self.is_waiting_for_user_action = False
+            self.pending_action_payload = None
+            self.deferred_action_type = None
+            self.deferred_action_start_time = None
+            self.deferred_action_timeout_time = None
+            self.mouse_listener = None
+            self.mouse_listener_active = False
+            
+            # Force system mode to ready
+            self.system_mode = 'ready'
+            
+            logger.warning("State consistency forced - all variables reset to safe defaults")
+            
+        except Exception as e:
+            logger.error(f"Error forcing state consistency: {e}")
+    
+    def _force_state_reset(self) -> None:
+        """
+        Emergency state reset that forces all critical variables to safe values.
+        Used when normal cleanup fails.
+        """
+        try:
+            logger.error("Performing emergency state reset")
+            
+            # Force reset critical variables
             self.is_waiting_for_user_action = False
             self.mouse_listener = None
+            self.mouse_listener_active = False
+            self.system_mode = 'ready'
+            
+            # Clear other variables if possible
+            try:
+                self.pending_action_payload = None
+                self.deferred_action_type = None
+                self.deferred_action_start_time = None
+                self.deferred_action_timeout_time = None
+                self.current_execution_id = None
+            except:
+                pass  # Ignore errors during emergency reset
+            
+            logger.error("Emergency state reset completed")
+            
+        except Exception as e:
+            logger.critical(f"Emergency state reset failed: {e}")
     
+    def _record_state_transition(self, transition_type: str, context: Dict[str, Any]) -> None:
+        """
+        Record state transitions for debugging and validation purposes.
+        
+        Args:
+            transition_type: Type of state transition
+            context: Additional context about the transition
+        """
+        try:
+            with self.state_validation_lock:
+                transition_record = {
+                    'timestamp': time.time(),
+                    'transition_type': transition_type,
+                    'context': context.copy(),
+                    'system_mode': self.system_mode,
+                    'execution_id': self.current_execution_id
+                }
+                
+                self.state_transition_history.append(transition_record)
+                
+                # Limit history size
+                if len(self.state_transition_history) > self.max_state_history_entries:
+                    self.state_transition_history = self.state_transition_history[-self.max_state_history_entries:]
+                
+                logger.debug(f"Recorded state transition: {transition_type}")
+                
+        except Exception as e:
+            logger.warning(f"Error recording state transition: {e}")
+    
+    def _has_active_operations(self) -> bool:
+        """
+        Check if there are any active operations running.
+        
+        Returns:
+            True if there are active operations, False otherwise
+        """
+        try:
+            # Check if we're currently processing a command
+            if self.command_status in [CommandStatus.PROCESSING, CommandStatus.VALIDATING]:
+                return True
+            
+            # Check if we're waiting for user action
+            if self.is_waiting_for_user_action:
+                return True
+            
+            # Check if system mode indicates active operation
+            if self.system_mode in ['processing', 'waiting_for_user']:
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.warning(f"Error checking active operations: {e}")
+            return False
+    
+    def validate_system_state(self) -> Dict[str, Any]:
+        """
+        Validate the overall system state for consistency and detect potential issues.
+        
+        Returns:
+            Dictionary containing validation results and recommendations
+        """
+        try:
+            with self.state_validation_lock:
+                logger.debug("Performing comprehensive system state validation")
+                
+                validation_result = {
+                    'is_valid': True,
+                    'issues': [],
+                    'warnings': [],
+                    'recommendations': [],
+                    'validation_time': time.time(),
+                    'state_summary': {}
+                }
+                
+                # Validate deferred action state consistency
+                deferred_validation = self._validate_deferred_action_state_consistency()
+                if not deferred_validation['is_consistent']:
+                    validation_result['is_valid'] = False
+                    validation_result['issues'].extend(deferred_validation['issues'])
+                
+                # Validate system mode consistency
+                mode_issues = self._validate_system_mode_consistency()
+                if mode_issues:
+                    validation_result['warnings'].extend(mode_issues)
+                
+                # Check for timeout conditions
+                timeout_issues = self._check_timeout_conditions()
+                if timeout_issues:
+                    validation_result['issues'].extend(timeout_issues)
+                    validation_result['is_valid'] = False
+                
+                # Validate mouse listener state
+                listener_issues = self._validate_mouse_listener_state()
+                if listener_issues:
+                    validation_result['warnings'].extend(listener_issues)
+                
+                # Generate state summary
+                validation_result['state_summary'] = self._generate_state_summary()
+                
+                # Generate recommendations based on issues
+                if validation_result['issues'] or validation_result['warnings']:
+                    validation_result['recommendations'] = self._generate_state_recommendations(
+                        validation_result['issues'], validation_result['warnings']
+                    )
+                
+                # Update last validation time
+                self.last_state_validation_time = time.time()
+                
+                logger.debug(f"State validation completed: {'VALID' if validation_result['is_valid'] else 'INVALID'}")
+                
+                return validation_result
+                
+        except Exception as e:
+            logger.error(f"Error during state validation: {e}")
+            return {
+                'is_valid': False,
+                'issues': [f"Validation error: {str(e)}"],
+                'warnings': [],
+                'recommendations': ['Perform emergency state reset'],
+                'validation_time': time.time(),
+                'state_summary': {}
+            }
+    
+    def _validate_system_mode_consistency(self) -> List[str]:
+        """
+        Validate that system mode is consistent with other state variables.
+        
+        Returns:
+            List of consistency issues found
+        """
+        issues = []
+        
+        try:
+            # Check mode vs waiting state consistency
+            if self.system_mode == 'waiting_for_user' and not self.is_waiting_for_user_action:
+                issues.append("System mode is 'waiting_for_user' but is_waiting_for_user_action is False")
+            
+            if self.is_waiting_for_user_action and self.system_mode != 'waiting_for_user':
+                issues.append(f"is_waiting_for_user_action is True but system mode is '{self.system_mode}'")
+            
+            # Check processing state consistency
+            if self.system_mode == 'processing' and self.command_status not in [CommandStatus.PROCESSING, CommandStatus.VALIDATING]:
+                issues.append(f"System mode is 'processing' but command status is '{self.command_status.value}'")
+            
+            # Check ready state consistency
+            if (self.system_mode == 'ready' and 
+                (self.is_waiting_for_user_action or 
+                 self.command_status in [CommandStatus.PROCESSING, CommandStatus.VALIDATING])):
+                issues.append("System mode is 'ready' but there are active operations")
+            
+        except Exception as e:
+            issues.append(f"Error validating system mode consistency: {str(e)}")
+        
+        return issues
+    
+    def _check_timeout_conditions(self) -> List[str]:
+        """
+        Check for timeout conditions in deferred actions.
+        
+        Returns:
+            List of timeout issues found
+        """
+        issues = []
+        
+        try:
+            current_time = time.time()
+            
+            # Check deferred action timeout
+            if (self.is_waiting_for_user_action and 
+                self.deferred_action_start_time is not None):
+                
+                elapsed_time = current_time - self.deferred_action_start_time
+                
+                if elapsed_time > self.deferred_action_timeout_seconds:
+                    issues.append(f"Deferred action has timed out (elapsed: {elapsed_time:.1f}s, timeout: {self.deferred_action_timeout_seconds}s)")
+                
+                # Check if timeout time was set and exceeded
+                if (self.deferred_action_timeout_time is not None and 
+                    current_time > self.deferred_action_timeout_time):
+                    issues.append("Deferred action timeout time has been exceeded")
+            
+            # Check for stale state validation
+            if (self.last_state_validation_time is not None and 
+                current_time - self.last_state_validation_time > self.state_validation_interval * 2):
+                issues.append("State validation is overdue")
+            
+        except Exception as e:
+            issues.append(f"Error checking timeout conditions: {str(e)}")
+        
+        return issues
+    
+    def _validate_mouse_listener_state(self) -> List[str]:
+        """
+        Validate mouse listener state for consistency.
+        
+        Returns:
+            List of mouse listener issues found
+        """
+        issues = []
+        
+        try:
+            # Check listener state consistency
+            if self.mouse_listener_active and self.mouse_listener is None:
+                issues.append("mouse_listener_active is True but mouse_listener is None")
+            
+            if self.mouse_listener is not None and not self.mouse_listener_active:
+                issues.append("mouse_listener exists but mouse_listener_active is False")
+            
+            # Check if listener should be active based on waiting state
+            if self.is_waiting_for_user_action and self.mouse_listener is None:
+                issues.append("Waiting for user action but no mouse listener is active")
+            
+            if not self.is_waiting_for_user_action and self.mouse_listener is not None:
+                issues.append("Not waiting for user action but mouse listener is still active")
+            
+            # Check listener health if it exists
+            if self.mouse_listener is not None:
+                try:
+                    if hasattr(self.mouse_listener, 'is_active'):
+                        if not self.mouse_listener.is_active():
+                            issues.append("Mouse listener exists but is not active")
+                except Exception as e:
+                    issues.append(f"Error checking mouse listener health: {str(e)}")
+            
+        except Exception as e:
+            issues.append(f"Error validating mouse listener state: {str(e)}")
+        
+        return issues
+    
+    def _generate_state_summary(self) -> Dict[str, Any]:
+        """
+        Generate a summary of the current system state.
+        
+        Returns:
+            Dictionary containing state summary information
+        """
+        try:
+            return {
+                'system_mode': self.system_mode,
+                'command_status': self.command_status.value if self.command_status else None,
+                'is_waiting_for_user_action': self.is_waiting_for_user_action,
+                'has_pending_payload': self.pending_action_payload is not None,
+                'deferred_action_type': self.deferred_action_type,
+                'mouse_listener_active': self.mouse_listener_active,
+                'current_execution_id': self.current_execution_id,
+                'deferred_action_elapsed_time': (
+                    time.time() - self.deferred_action_start_time 
+                    if self.deferred_action_start_time else None
+                ),
+                'state_history_entries': len(self.state_transition_history),
+                'last_validation_age': (
+                    time.time() - self.last_state_validation_time 
+                    if self.last_state_validation_time else None
+                )
+            }
+        except Exception as e:
+            logger.warning(f"Error generating state summary: {e}")
+            return {'error': str(e)}
+    
+    def _generate_state_recommendations(self, issues: List[str], warnings: List[str]) -> List[str]:
+        """
+        Generate recommendations based on state validation issues.
+        
+        Args:
+            issues: List of critical issues found
+            warnings: List of warnings found
+            
+        Returns:
+            List of recommended actions
+        """
+        recommendations = []
+        
+        try:
+            # Recommendations for critical issues
+            if any('timeout' in issue.lower() for issue in issues):
+                recommendations.append("Reset deferred action state due to timeout")
+            
+            if any('mouse listener' in issue.lower() for issue in issues):
+                recommendations.append("Cleanup and reset mouse listener")
+            
+            if any('consistency' in issue.lower() for issue in issues):
+                recommendations.append("Force state consistency reset")
+            
+            if any('validation error' in issue.lower() for issue in issues):
+                recommendations.append("Perform emergency state reset")
+            
+            # Recommendations for warnings
+            if any('overdue' in warning.lower() for warning in warnings):
+                recommendations.append("Increase state validation frequency")
+            
+            if any('mode' in warning.lower() for warning in warnings):
+                recommendations.append("Verify system mode transitions")
+            
+            # General recommendations
+            if issues and not recommendations:
+                recommendations.append("Perform comprehensive state reset")
+            
+            if warnings and not issues:
+                recommendations.append("Monitor state more closely")
+            
+        except Exception as e:
+            logger.warning(f"Error generating recommendations: {e}")
+            recommendations.append("Manual state inspection required")
+        
+        return recommendations
+    
+    def handle_deferred_action_timeout(self) -> Dict[str, Any]:
+        """
+        Handle timeout conditions for deferred actions.
+        
+        Returns:
+            Dictionary containing timeout handling results
+        """
+        try:
+            logger.warning("Handling deferred action timeout")
+            
+            timeout_result = {
+                'timeout_handled': True,
+                'was_waiting': self.is_waiting_for_user_action,
+                'elapsed_time': None,
+                'cleanup_successful': False,
+                'timestamp': time.time()
+            }
+            
+            # Calculate elapsed time if available
+            if self.deferred_action_start_time:
+                timeout_result['elapsed_time'] = time.time() - self.deferred_action_start_time
+            
+            # Provide timeout feedback to user
+            try:
+                if self.feedback_module and self.module_availability.get('feedback', False):
+                    self.feedback_module.speak(
+                        "Deferred action timed out. Returning to normal operation.",
+                        priority=FeedbackPriority.HIGH
+                    )
+            except Exception as e:
+                logger.warning(f"Error providing timeout feedback: {e}")
+            
+            # Reset deferred action state
+            try:
+                self._reset_deferred_action_state()
+                timeout_result['cleanup_successful'] = True
+                logger.info("Deferred action timeout handled successfully")
+            except Exception as e:
+                logger.error(f"Error during timeout cleanup: {e}")
+                timeout_result['cleanup_successful'] = False
+                # Force emergency reset
+                self._force_state_reset()
+            
+            return timeout_result
+            
+        except Exception as e:
+            logger.error(f"Error handling deferred action timeout: {e}")
+            # Emergency cleanup
+            self._force_state_reset()
+            return {
+                'timeout_handled': False,
+                'error': str(e),
+                'cleanup_successful': False,
+                'timestamp': time.time()
+            }
+    
+    def get_state_diagnostics(self) -> Dict[str, Any]:
+        """
+        Get comprehensive state diagnostics for debugging and monitoring.
+        
+        Returns:
+            Dictionary containing detailed state information
+        """
+        try:
+            with self.state_validation_lock:
+                diagnostics = {
+                    'timestamp': time.time(),
+                    'state_summary': self._generate_state_summary(),
+                    'validation_result': self.validate_system_state(),
+                    'recent_transitions': self.state_transition_history[-10:] if self.state_transition_history else [],
+                    'configuration': {
+                        'deferred_action_timeout_seconds': self.deferred_action_timeout_seconds,
+                        'state_validation_interval': self.state_validation_interval,
+                        'max_state_history_entries': self.max_state_history_entries
+                    },
+                    'thread_info': {
+                        'deferred_action_lock_acquired': not self.deferred_action_lock.acquire(blocking=False),
+                        'state_validation_lock_acquired': not self.state_validation_lock.acquire(blocking=False)
+                    }
+                }
+                
+                # Release locks if we acquired them for testing
+                try:
+                    self.deferred_action_lock.release()
+                except:
+                    pass
+                try:
+                    self.state_validation_lock.release()
+                except:
+                    pass
+                
+                return diagnostics
+                
+        except Exception as e:
+            logger.error(f"Error getting state diagnostics: {e}")
+            return {
+                'timestamp': time.time(),
+                'error': str(e),
+                'emergency_state': {
+                    'is_waiting_for_user_action': getattr(self, 'is_waiting_for_user_action', None),
+                    'system_mode': getattr(self, 'system_mode', None),
+                    'mouse_listener': getattr(self, 'mouse_listener', None) is not None
+                }
+            }
+    
+    def _start_periodic_state_validation(self) -> None:
+        """
+        Start periodic state validation in a background thread.
+        """
+        try:
+            def validation_worker():
+                """Background worker for periodic state validation."""
+                while True:
+                    try:
+                        time.sleep(self.state_validation_interval)
+                        
+                        # Only validate if we have active operations
+                        if self._has_active_operations():
+                            validation_result = self.validate_system_state()
+                            
+                            # Handle critical issues
+                            if not validation_result['is_valid']:
+                                logger.warning(f"State validation failed: {validation_result['issues']}")
+                                
+                                # Check for timeout conditions and handle them
+                                if any('timeout' in issue.lower() for issue in validation_result['issues']):
+                                    self.handle_deferred_action_timeout()
+                                
+                                # Handle other critical issues
+                                elif any('consistency' in issue.lower() for issue in validation_result['issues']):
+                                    logger.warning("Forcing state consistency due to validation failure")
+                                    self._force_state_consistency()
+                            
+                            # Log warnings
+                            if validation_result['warnings']:
+                                logger.debug(f"State validation warnings: {validation_result['warnings']}")
+                    
+                    except Exception as e:
+                        logger.error(f"Error in periodic state validation: {e}")
+                        # Continue running despite errors
+                        continue
+            
+            # Start validation thread as daemon
+            validation_thread = threading.Thread(
+                target=validation_worker,
+                daemon=True,
+                name="StateValidationWorker"
+            )
+            validation_thread.start()
+            
+            logger.debug("Periodic state validation started")
+            
+        except Exception as e:
+            logger.warning(f"Failed to start periodic state validation: {e}")
+    
+    def cleanup_orchestrator_resources(self) -> None:
+        """
+        Cleanup all orchestrator resources when shutting down.
+        """
+        try:
+            logger.info("Cleaning up orchestrator resources")
+            
+            # Reset deferred action state
+            self._reset_deferred_action_state()
+            
+            # Cleanup thread pool
+            if hasattr(self, 'thread_pool') and self.thread_pool:
+                self.thread_pool.shutdown(wait=True)
+            
+            # Clear state history
+            with self.state_validation_lock:
+                self.state_transition_history.clear()
+            
+            logger.info("Orchestrator resources cleaned up successfully")
+            
+        except Exception as e:
+            logger.error(f"Error cleaning up orchestrator resources: {e}")
+
     def _handle_gui_interaction(self, execution_id: str, command: str) -> Dict[str, Any]:
         """
         Handle GUI interaction commands using the preserved legacy execution logic.
