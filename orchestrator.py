@@ -2067,13 +2067,19 @@ class Orchestrator:
                 return None
             
             # Generate content using reasoning module
-            response = self.reasoning_module.reason(formatted_prompt)
+            response = self.reasoning_module._make_api_request(formatted_prompt)
             
-            if not response or not response.get('response'):
-                logger.warning(f"[{execution_id}] Empty response from reasoning module")
+            if not response or not isinstance(response, dict):
+                logger.warning(f"[{execution_id}] Empty or invalid response from reasoning module")
                 return None
             
-            generated_content = response['response'].strip()
+            # Extract content from OpenAI format response
+            try:
+                generated_content = response['choices'][0]['message']['content'].strip()
+            except (KeyError, IndexError, TypeError) as e:
+                logger.warning(f"[{execution_id}] Failed to extract content from response: {e}")
+                logger.debug(f"[{execution_id}] Response structure: {response}")
+                return None
             
             # Basic validation of generated content
             if len(generated_content) < 5:
@@ -2339,9 +2345,13 @@ class Orchestrator:
                     logger.debug(f"[{execution_id}] Clicking at coordinates ({x}, {y}) before typing")
                     
                     # Use automation module to click at the coordinates
-                    click_result = self.automation_module.click(x, y)
-                    if not click_result.get('success', False):
-                        logger.warning(f"[{execution_id}] Click at coordinates failed, proceeding with typing anyway")
+                    click_action = {
+                        "action": "click",
+                        "coordinates": [int(x), int(y)]
+                    }
+                    
+                    self.automation_module.execute_action(click_action)
+                    logger.debug(f"[{execution_id}] Successfully clicked at coordinates ({x}, {y})")
                     
                     # Small delay to ensure click is processed
                     time.sleep(0.2)
@@ -2352,14 +2362,15 @@ class Orchestrator:
             # Execute the main action (typically typing)
             if action_type == 'type' and self.module_availability.get('automation', False):
                 try:
-                    type_result = self.automation_module.type_text(content)
+                    # Use automation module to type the content
+                    type_action = {
+                        "action": "type",
+                        "text": content
+                    }
                     
-                    if type_result.get('success', False):
-                        logger.info(f"[{execution_id}] Successfully typed {len(content)} characters")
-                        return True
-                    else:
-                        logger.error(f"[{execution_id}] Type action failed: {type_result.get('error', 'Unknown error')}")
-                        return False
+                    self.automation_module.execute_action(type_action)
+                    logger.info(f"[{execution_id}] Successfully typed {len(content)} characters")
+                    return True
                         
                 except Exception as e:
                     logger.error(f"[{execution_id}] Error during type action: {e}")
@@ -2748,11 +2759,12 @@ class Orchestrator:
                     'state_summary': {}
                 }
                 
-                # Validate deferred action state consistency
-                deferred_validation = self._validate_deferred_action_state_consistency()
-                if not deferred_validation['is_consistent']:
-                    validation_result['is_valid'] = False
-                    validation_result['issues'].extend(deferred_validation['issues'])
+                # Validate deferred action state consistency (only when not actively waiting)
+                if not self.is_waiting_for_user_action:
+                    deferred_validation = self._validate_deferred_action_state_consistency()
+                    if not deferred_validation['is_consistent']:
+                        validation_result['is_valid'] = False
+                        validation_result['issues'].extend(deferred_validation['issues'])
                 
                 # Validate system mode consistency
                 mode_issues = self._validate_system_mode_consistency()
@@ -3254,8 +3266,11 @@ class Orchestrator:
                             if not validation_result['is_valid']:
                                 logger.warning(f"State validation failed: {validation_result['issues']}")
                                 
-                                # Check for timeout conditions and handle them
-                                if any('timeout' in issue.lower() for issue in validation_result['issues']):
+                                # Check for timeout conditions and handle them (only for actual timeouts, not state validation issues)
+                                actual_timeout_issues = [issue for issue in validation_result['issues'] 
+                                                       if 'timed out' in issue.lower() or 'timeout time has been exceeded' in issue.lower()]
+                                if actual_timeout_issues:
+                                    logger.warning(f"Handling actual timeout conditions: {actual_timeout_issues}")
                                     self.handle_deferred_action_timeout()
                                 
                                 # Handle other critical issues
