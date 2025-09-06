@@ -164,6 +164,7 @@ class Orchestrator:
         self.deferred_action_type = None
         self.deferred_action_start_time = None
         self.deferred_action_timeout_time = None
+        self.current_deferred_content_type = None  # Track content type for enhanced feedback
         self.mouse_listener = None
         self.mouse_listener_active = False
         
@@ -1487,14 +1488,23 @@ class Orchestrator:
                     execution_context["response"] = fallback_response
                     execution_context["fallback_strategy_used"] = "static_fallback_response"
                 
-                # Provide audio feedback if available
+                # Provide enhanced conversational audio feedback if available
                 if self.feedback_module and execution_context["response"]:
                     try:
-                        self.feedback_module.speak(execution_context["response"], FeedbackPriority.NORMAL)
+                        self.feedback_module.provide_conversational_feedback(
+                            message=execution_context["response"],
+                            priority=FeedbackPriority.NORMAL,
+                            include_thinking_sound=False  # Response already generated
+                        )
                         execution_context["audio_feedback_provided"] = True
                     except Exception as audio_error:
-                        logger.warning(f"[{execution_id}] Audio feedback failed: {audio_error}")
-                        execution_context["warnings"].append(f"Audio feedback failed: {str(audio_error)}")
+                        logger.warning(f"[{execution_id}] Enhanced audio feedback failed, falling back to basic: {audio_error}")
+                        try:
+                            self.feedback_module.speak(execution_context["response"], FeedbackPriority.NORMAL)
+                            execution_context["audio_feedback_provided"] = True
+                        except Exception as fallback_error:
+                            logger.warning(f"[{execution_id}] Fallback audio feedback also failed: {fallback_error}")
+                            execution_context["warnings"].append(f"Audio feedback failed: {str(fallback_error)}")
                 
                 execution_context["status"] = CommandStatus.COMPLETED
                 execution_context["warnings"].append("Used fallback response due to reasoning module unavailability")
@@ -1509,15 +1519,24 @@ class Orchestrator:
                     if not response or len(response.strip()) < 3:
                         raise ValueError("Received empty or invalid response from reasoning module")
                     
-                    # Provide audio feedback
+                    # Provide enhanced conversational audio feedback
                     if self.feedback_module and response:
                         try:
-                            logger.info(f"[{execution_id}] Providing audio feedback for conversational response")
-                            self.feedback_module.speak(response, FeedbackPriority.NORMAL)
+                            logger.info(f"[{execution_id}] Providing enhanced conversational audio feedback")
+                            self.feedback_module.provide_conversational_feedback(
+                                message=response,
+                                priority=FeedbackPriority.NORMAL,
+                                include_thinking_sound=False  # Response already generated
+                            )
                             execution_context["audio_feedback_provided"] = True
                         except Exception as audio_error:
-                            logger.warning(f"[{execution_id}] Audio feedback failed: {audio_error}")
-                            execution_context["warnings"].append(f"Audio feedback failed: {str(audio_error)}")
+                            logger.warning(f"[{execution_id}] Enhanced audio feedback failed, falling back to basic: {audio_error}")
+                            try:
+                                self.feedback_module.speak(response, FeedbackPriority.NORMAL)
+                                execution_context["audio_feedback_provided"] = True
+                            except Exception as fallback_error:
+                                logger.warning(f"[{execution_id}] Fallback audio feedback also failed: {fallback_error}")
+                                execution_context["warnings"].append(f"Audio feedback failed: {str(fallback_error)}")
                     
                     execution_context["status"] = CommandStatus.COMPLETED
                     logger.info(f"[{execution_id}] Conversational query processed successfully")
@@ -1605,23 +1624,24 @@ class Orchestrator:
             execution_context["response"] = error_response
             execution_context["fallback_strategy_used"] = "comprehensive_error_fallback"
             
-            # Provide audio error feedback
+            # Provide enhanced audio error feedback
             if self.feedback_module:
                 try:
-                    self.feedback_module.speak(error_response, FeedbackPriority.HIGH)
+                    self.feedback_module.provide_enhanced_error_feedback(
+                        error_message=error_response,
+                        error_context="conversational",
+                        priority=FeedbackPriority.HIGH
+                    )
                     execution_context["audio_feedback_provided"] = True
                     
-                    # Play failure sound if available
-                    from config import SOUNDS
-                    if "failure" in SOUNDS:
-                        try:
-                            self.feedback_module.play_sound(SOUNDS["failure"])
-                        except Exception as sound_error:
-                            logger.debug(f"[{execution_id}] Failed to play failure sound: {sound_error}")
-                            
                 except Exception as audio_error:
-                    logger.warning(f"[{execution_id}] Error feedback audio failed: {audio_error}")
-                    execution_context["warnings"].append(f"Error feedback audio failed: {str(audio_error)}")
+                    logger.warning(f"[{execution_id}] Enhanced error feedback failed, falling back to basic: {audio_error}")
+                    try:
+                        self.feedback_module.play_with_message("failure", error_response, FeedbackPriority.HIGH)
+                        execution_context["audio_feedback_provided"] = True
+                    except Exception as fallback_error:
+                        logger.warning(f"[{execution_id}] Basic error feedback also failed: {fallback_error}")
+                        execution_context["warnings"].append(f"Error feedback audio failed: {str(fallback_error)}")
             
             # Update progress to failed
             self._update_progress(execution_id, CommandStatus.FAILED, None, 100, error=str(e))
@@ -1680,6 +1700,9 @@ class Orchestrator:
             content_request = parameters.get('target', '')
             content_type = parameters.get('content_type', 'code')
             original_command = intent_data.get('original_command', '')
+            
+            # Store content type for enhanced feedback
+            self.current_deferred_content_type = content_type
             
             if not content_request:
                 content_request = original_command
@@ -1864,22 +1887,22 @@ class Orchestrator:
             # Ensure state is clean on any failure
             self._reset_deferred_action_state()
             
-            # Provide audio error feedback
+            # Provide enhanced audio error feedback
             if self.feedback_module:
                 try:
                     error_message = "The deferred action could not be started. Please try again."
-                    self.feedback_module.speak(error_message, FeedbackPriority.HIGH)
+                    self.feedback_module.provide_enhanced_error_feedback(
+                        error_message=error_message,
+                        error_context="deferred_action",
+                        priority=FeedbackPriority.HIGH
+                    )
                     
-                    # Play failure sound
-                    from config import SOUNDS
-                    if "failure" in SOUNDS:
-                        try:
-                            self.feedback_module.play_sound(SOUNDS["failure"])
-                        except Exception as sound_error:
-                            logger.debug(f"[{execution_id}] Failed to play failure sound: {sound_error}")
-                            
                 except Exception as audio_error:
-                    logger.warning(f"[{execution_id}] Error feedback audio failed: {audio_error}")
+                    logger.warning(f"[{execution_id}] Enhanced error feedback failed, falling back to basic: {audio_error}")
+                    try:
+                        self.feedback_module.play_with_message("failure", error_message, FeedbackPriority.HIGH)
+                    except Exception as fallback_error:
+                        logger.warning(f"[{execution_id}] Basic error feedback also failed: {fallback_error}")
             
             # Provide specific error messages based on error type
             if isinstance(e, ValueError):
@@ -2200,22 +2223,27 @@ class Orchestrator:
             else:
                 instruction_message = "Content generated successfully. Click where you want me to place it."
             
-            # Use feedback module for audio instructions if available
+            # Use enhanced feedback module for audio instructions if available
             if self.module_availability.get('feedback', False):
                 try:
-                    self.feedback_module.provide_feedback(
-                        message=instruction_message,
-                        priority=FeedbackPriority.HIGH,
-                        include_audio=True
+                    self.feedback_module.provide_deferred_action_instructions(
+                        content_type=content_type,
+                        priority=FeedbackPriority.HIGH
                     )
-                    logger.debug(f"[{execution_id}] Audio instructions provided via feedback module")
+                    logger.debug(f"[{execution_id}] Enhanced deferred action instructions provided")
                 except Exception as e:
-                    logger.warning(f"[{execution_id}] Failed to provide audio feedback: {e}")
+                    logger.warning(f"[{execution_id}] Enhanced instructions failed, falling back to basic: {e}")
+                    # Fallback to basic instruction delivery
+                    try:
+                        self.feedback_module.speak(instruction_message, FeedbackPriority.HIGH)
+                        logger.debug(f"[{execution_id}] Basic audio instructions provided via feedback module")
+                    except Exception as fallback_error:
+                        logger.warning(f"[{execution_id}] Basic feedback also failed: {fallback_error}")
             
             # Also use audio module directly as fallback
             elif self.module_availability.get('audio', False):
                 try:
-                    self.audio_module.speak(instruction_message)
+                    self.audio_module.text_to_speech(instruction_message)
                     logger.debug(f"[{execution_id}] Audio instructions provided via audio module")
                 except Exception as e:
                     logger.warning(f"[{execution_id}] Failed to provide audio instructions: {e}")
@@ -2361,23 +2389,31 @@ class Orchestrator:
                 message = "Failed to place content. Please try again."
                 sound_type = "failure"
             
-            # Provide audio feedback
+            # Provide enhanced audio feedback
             if self.module_availability.get('feedback', False):
                 try:
-                    self.feedback_module.provide_feedback(
-                        message=message,
-                        priority=FeedbackPriority.HIGH,
-                        include_audio=True,
-                        sound_type=sound_type
+                    # Determine content type from current deferred action context
+                    content_type = getattr(self, 'current_deferred_content_type', 'content')
+                    
+                    self.feedback_module.provide_deferred_action_completion_feedback(
+                        success=success,
+                        content_type=content_type,
+                        priority=FeedbackPriority.HIGH
                     )
-                    logger.debug(f"[{execution_id}] Completion feedback provided via feedback module")
+                    logger.debug(f"[{execution_id}] Enhanced completion feedback provided")
                 except Exception as e:
-                    logger.warning(f"[{execution_id}] Failed to provide completion feedback: {e}")
+                    logger.warning(f"[{execution_id}] Enhanced completion feedback failed, falling back to basic: {e}")
+                    # Fallback to basic completion feedback
+                    try:
+                        self.feedback_module.play_with_message(sound_type, message, FeedbackPriority.HIGH)
+                        logger.debug(f"[{execution_id}] Basic completion feedback provided via feedback module")
+                    except Exception as fallback_error:
+                        logger.warning(f"[{execution_id}] Basic completion feedback also failed: {fallback_error}")
             
             # Fallback to audio module
             elif self.module_availability.get('audio', False):
                 try:
-                    self.audio_module.speak(message)
+                    self.audio_module.text_to_speech(message)
                     logger.debug(f"[{execution_id}] Completion feedback provided via audio module")
                 except Exception as e:
                     logger.warning(f"[{execution_id}] Failed to provide audio completion feedback: {e}")
@@ -2505,6 +2541,7 @@ class Orchestrator:
             self.deferred_action_type = None
             self.deferred_action_start_time = None
             self.deferred_action_timeout_time = None
+            self.current_deferred_content_type = None  # Reset content type for enhanced feedback
             
             # Reset tracking variables
             self.mouse_listener_active = False
@@ -2886,22 +2923,24 @@ class Orchestrator:
             if self.deferred_action_start_time:
                 elapsed_time = time.time() - self.deferred_action_start_time
             
-            # Provide audio feedback about timeout
+            # Provide enhanced audio feedback about timeout
             if self.feedback_module:
                 try:
-                    timeout_message = f"The deferred action has timed out after {elapsed_time:.0f} seconds. The action has been cancelled."
-                    self.feedback_module.speak(timeout_message, FeedbackPriority.HIGH)
+                    # Use enhanced timeout feedback
+                    self.feedback_module.provide_deferred_action_timeout_feedback(
+                        elapsed_time=elapsed_time,
+                        priority=FeedbackPriority.HIGH
+                    )
+                    logger.debug(f"[{execution_id}] Enhanced timeout feedback provided")
                     
-                    # Play failure sound
-                    from config import SOUNDS
-                    if "failure" in SOUNDS:
-                        try:
-                            self.feedback_module.play_sound(SOUNDS["failure"])
-                        except Exception as sound_error:
-                            logger.debug(f"[{execution_id}] Failed to play timeout sound: {sound_error}")
-                            
                 except Exception as audio_error:
-                    logger.warning(f"[{execution_id}] Timeout audio feedback failed: {audio_error}")
+                    logger.warning(f"[{execution_id}] Enhanced timeout feedback failed, falling back to basic: {audio_error}")
+                    # Fallback to basic timeout feedback
+                    try:
+                        timeout_message = f"The deferred action has timed out after {elapsed_time:.0f} seconds. The action has been cancelled."
+                        self.feedback_module.play_with_message("failure", timeout_message, FeedbackPriority.HIGH)
+                    except Exception as fallback_error:
+                        logger.warning(f"[{execution_id}] Basic timeout feedback also failed: {fallback_error}")
             
             # Log timeout event with context
             error_info = global_error_handler.handle_error(
@@ -3666,9 +3705,12 @@ class Orchestrator:
                     execution_context["fast_path_result"] = fast_path_result
                     execution_context["steps_completed"].extend([ExecutionStep.PERCEPTION, ExecutionStep.REASONING, ExecutionStep.ACTION])
                     
-                    # Provide success feedback
+                    # Provide enhanced success feedback
                     if self.feedback_module:
-                        self.feedback_module.play("success", FeedbackPriority.HIGH)
+                        self.feedback_module.provide_success_feedback(
+                            success_context="gui_interaction",
+                            priority=FeedbackPriority.HIGH
+                        )
                     
                     # Final progress update
                     self._update_progress(execution_id, CommandStatus.COMPLETED, None, 100)
@@ -3729,9 +3771,12 @@ class Orchestrator:
             # Final progress update
             self._update_progress(execution_id, CommandStatus.COMPLETED, ExecutionStep.CLEANUP, 100)
             
-            # Provide success feedback
+            # Provide enhanced success feedback
             if self.feedback_module:
-                self.feedback_module.play("success", FeedbackPriority.NORMAL)
+                self.feedback_module.provide_success_feedback(
+                    success_context="gui_interaction",
+                    priority=FeedbackPriority.NORMAL
+                )
             
             # Add to history
             self.command_history.append(execution_context.copy())

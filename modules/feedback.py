@@ -228,7 +228,7 @@ class FeedbackModule:
     
     def _execute_feedback(self, feedback_item: Dict[str, Any]) -> None:
         """
-        Execute a single feedback item.
+        Execute a single feedback item with enhanced conversational and deferred action support.
         
         Args:
             feedback_item: Dictionary containing feedback details
@@ -242,12 +242,20 @@ class FeedbackModule:
             if feedback_type == FeedbackType.SOUND:
                 self._play_sound_effect(feedback_item)
             elif feedback_type == FeedbackType.SPEECH:
-                self._play_speech(feedback_item)
+                self._play_enhanced_speech(feedback_item)
             elif feedback_type == FeedbackType.COMBINED:
-                # Play sound first, then speech
+                # Play sound first, then speech with enhanced timing
                 self._play_sound_effect(feedback_item)
-                time.sleep(0.1)  # Brief pause between sound and speech
-                self._play_speech(feedback_item)
+                
+                # Use custom pause timing if specified
+                pause_duration = feedback_item.get("pause_before_speech", 0.1)
+                if feedback_item.get("conversational_mode"):
+                    pause_duration = max(pause_duration, 0.3)  # Longer pause for conversations
+                elif feedback_item.get("deferred_action_mode"):
+                    pause_duration = max(pause_duration, 0.2)  # Medium pause for deferred actions
+                
+                time.sleep(pause_duration)
+                self._play_enhanced_speech(feedback_item)
             elif feedback_type == FeedbackType.HYBRID_FAST:
                 if hybrid_config.get('fast_path_enabled', True):
                     self._play_hybrid_sound_effect(feedback_item)
@@ -256,13 +264,13 @@ class FeedbackModule:
                     self._play_hybrid_sound_effect(feedback_item)
                     if feedback_item.get("message"):
                         time.sleep(0.1)
-                        self._play_speech(feedback_item)
+                        self._play_enhanced_speech(feedback_item)
             elif feedback_type == FeedbackType.HYBRID_FALLBACK:
                 if hybrid_config.get('fallback_enabled', True):
                     self._play_hybrid_sound_effect(feedback_item)
                     if feedback_item.get("message"):
                         time.sleep(0.2)  # Longer pause for fallback
-                        self._play_speech(feedback_item)
+                        self._play_enhanced_speech(feedback_item)
             
         except Exception as e:
             logger.error(f"Error executing feedback: {e}")
@@ -316,6 +324,156 @@ class FeedbackModule:
             
         except Exception as e:
             logger.error(f"Error playing TTS message: {e}")
+    
+    def _play_enhanced_speech(self, feedback_item: Dict[str, Any]) -> None:
+        """
+        Play enhanced text-to-speech with conversational and deferred action optimizations.
+        
+        Args:
+            feedback_item: Dictionary containing enhanced speech details
+        """
+        try:
+            message = feedback_item.get("message")
+            if not message:
+                logger.warning("No message specified for enhanced speech")
+                return
+            
+            if not self.audio_module:
+                logger.warning("AudioModule not available for enhanced TTS")
+                return
+            
+            # Apply message enhancements based on mode
+            enhanced_message = self._enhance_speech_message(message, feedback_item)
+            
+            # Configure TTS settings based on feedback type
+            tts_config = self._get_tts_configuration(feedback_item)
+            
+            # Use AudioModule for enhanced TTS
+            if hasattr(self.audio_module, 'text_to_speech_enhanced'):
+                # Use enhanced TTS if available
+                self.audio_module.text_to_speech_enhanced(enhanced_message, **tts_config)
+            else:
+                # Fall back to standard TTS
+                self.audio_module.text_to_speech(enhanced_message)
+            
+            # Log feedback details
+            mode_info = []
+            if feedback_item.get("conversational_mode"):
+                mode_info.append("conversational")
+            if feedback_item.get("deferred_action_mode"):
+                mode_info.append("deferred_action")
+            if feedback_item.get("completion_feedback"):
+                mode_info.append("completion")
+            if feedback_item.get("timeout_feedback"):
+                mode_info.append("timeout")
+            
+            mode_str = f" ({', '.join(mode_info)})" if mode_info else ""
+            logger.debug(f"Played enhanced TTS message{mode_str}: {enhanced_message[:50]}...")
+            
+        except Exception as e:
+            logger.error(f"Error playing enhanced TTS message: {e}")
+            # Fall back to basic speech
+            try:
+                self._play_speech(feedback_item)
+            except Exception as fallback_error:
+                logger.error(f"Fallback speech also failed: {fallback_error}")
+    
+    def _enhance_speech_message(self, message: str, feedback_item: Dict[str, Any]) -> str:
+        """
+        Enhance speech message based on feedback context and mode.
+        
+        Args:
+            message: Original message text
+            feedback_item: Feedback item containing context
+            
+        Returns:
+            Enhanced message text
+        """
+        try:
+            enhanced_message = message.strip()
+            
+            # Apply conversational enhancements
+            if feedback_item.get("conversational_mode"):
+                # Add natural conversational markers
+                if not enhanced_message.endswith(('.', '!', '?')):
+                    enhanced_message += '.'
+                
+                # Add slight emphasis for natural speech
+                if feedback_item.get("natural_intonation"):
+                    # Add pauses for natural speech rhythm
+                    enhanced_message = enhanced_message.replace(', ', ', ... ')
+                    enhanced_message = enhanced_message.replace('. ', '. ... ')
+            
+            # Apply deferred action enhancements
+            elif feedback_item.get("deferred_action_mode"):
+                # Emphasize key words for clarity
+                emphasis_words = feedback_item.get("emphasis_words", [])
+                for word in emphasis_words:
+                    # Simple emphasis by adding slight pause
+                    enhanced_message = enhanced_message.replace(
+                        word, f"... {word} ..."
+                    )
+                
+                # Add clear instruction markers
+                if feedback_item.get("completion_feedback"):
+                    enhanced_message = f"... {enhanced_message}"
+                elif feedback_item.get("timeout_feedback"):
+                    enhanced_message = f"Attention: {enhanced_message}"
+            
+            # Apply intent recognition enhancements
+            elif feedback_item.get("intent_recognition_mode"):
+                # Keep it subtle and brief
+                enhanced_message = enhanced_message.lower()
+            
+            return enhanced_message
+            
+        except Exception as e:
+            logger.warning(f"Error enhancing speech message: {e}")
+            return message  # Return original message on error
+    
+    def _get_tts_configuration(self, feedback_item: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Get TTS configuration based on feedback context.
+        
+        Args:
+            feedback_item: Feedback item containing context
+            
+        Returns:
+            Dictionary of TTS configuration parameters
+        """
+        try:
+            config = {}
+            
+            # Apply speech rate modifications
+            rate_modifier = feedback_item.get("speech_rate_modifier", 1.0)
+            if rate_modifier != 1.0:
+                config['rate_multiplier'] = rate_modifier
+            
+            # Apply volume modifications
+            volume_modifier = feedback_item.get("volume_modifier", 1.0)
+            if volume_modifier != 1.0:
+                config['volume_multiplier'] = volume_modifier
+            
+            # Apply mode-specific configurations
+            if feedback_item.get("conversational_mode"):
+                config['conversational_style'] = True
+                config['natural_pauses'] = True
+            
+            if feedback_item.get("deferred_action_mode"):
+                config['clear_articulation'] = True
+                config['instruction_style'] = True
+            
+            if feedback_item.get("completion_feedback"):
+                config['confirmation_style'] = True
+            
+            if feedback_item.get("timeout_feedback"):
+                config['alert_style'] = True
+            
+            return config
+            
+        except Exception as e:
+            logger.warning(f"Error getting TTS configuration: {e}")
+            return {}  # Return empty config on error
     
     def _play_hybrid_sound_effect(self, feedback_item: Dict[str, Any]) -> None:
         """
@@ -501,6 +659,341 @@ class FeedbackModule:
             
         except Exception as e:
             logger.error(f"Error queuing combined feedback: {e}")
+    
+    def provide_conversational_feedback(
+        self, 
+        message: str, 
+        priority: FeedbackPriority = FeedbackPriority.NORMAL,
+        include_thinking_sound: bool = False
+    ) -> None:
+        """
+        Provide audio feedback optimized for conversational interactions.
+        
+        Args:
+            message: Conversational response to speak
+            priority: Priority level for the feedback
+            include_thinking_sound: Whether to play thinking sound before speaking
+        """
+        if not message or not message.strip():
+            logger.warning("Empty conversational message provided")
+            return
+        
+        try:
+            if include_thinking_sound:
+                # Play thinking sound followed by conversational response
+                feedback_item = {
+                    "type": FeedbackType.COMBINED,
+                    "sound_name": "thinking",
+                    "message": message.strip(),
+                    "conversational_mode": True,
+                    "speech_rate_modifier": 1.0,  # Normal speech rate for conversations
+                    "pause_before_speech": 0.3    # Brief pause after thinking sound
+                }
+            else:
+                # Just speak the conversational response
+                feedback_item = {
+                    "type": FeedbackType.SPEECH,
+                    "message": message.strip(),
+                    "conversational_mode": True,
+                    "speech_rate_modifier": 1.0,
+                    "natural_intonation": True
+                }
+            
+            self._add_to_queue(feedback_item, priority)
+            logger.debug(f"Queued conversational feedback: {message[:50]}... with priority {priority.name}")
+            
+        except Exception as e:
+            logger.error(f"Error queuing conversational feedback: {e}")
+    
+    def provide_deferred_action_instructions(
+        self, 
+        content_type: str = "content",
+        priority: FeedbackPriority = FeedbackPriority.HIGH
+    ) -> None:
+        """
+        Provide audio instructions for deferred action workflows.
+        
+        Args:
+            content_type: Type of content generated (code, text, content)
+            priority: Priority level for the feedback
+        """
+        try:
+            # Determine appropriate instruction message based on content type
+            if content_type == 'code':
+                instruction_message = "Code generated successfully. Click where you want me to type it."
+                sound_name = "success"
+            elif content_type == 'text':
+                instruction_message = "Text generated successfully. Click where you want me to type it."
+                sound_name = "success"
+            else:
+                instruction_message = "Content generated successfully. Click where you want me to place it."
+                sound_name = "success"
+            
+            # Create deferred action instruction feedback
+            feedback_item = {
+                "type": FeedbackType.COMBINED,
+                "sound_name": sound_name,
+                "message": instruction_message,
+                "deferred_action_mode": True,
+                "speech_rate_modifier": 0.9,  # Slightly slower for clarity
+                "emphasis_words": ["click", "where", "want"],  # Emphasize key words
+                "pause_before_speech": 0.2
+            }
+            
+            self._add_to_queue(feedback_item, priority)
+            logger.debug(f"Queued deferred action instructions for {content_type}")
+            
+        except Exception as e:
+            logger.error(f"Error queuing deferred action instructions: {e}")
+    
+    def provide_deferred_action_completion_feedback(
+        self, 
+        success: bool, 
+        content_type: str = "content",
+        priority: FeedbackPriority = FeedbackPriority.HIGH
+    ) -> None:
+        """
+        Provide audio feedback when deferred action completes.
+        
+        Args:
+            success: Whether the action completed successfully
+            content_type: Type of content that was placed
+            priority: Priority level for the feedback
+        """
+        try:
+            if success:
+                if content_type == 'code':
+                    message = "Code placed successfully."
+                elif content_type == 'text':
+                    message = "Text placed successfully."
+                else:
+                    message = "Content placed successfully."
+                sound_name = "success"
+            else:
+                message = "Failed to place content. Please try again."
+                sound_name = "failure"
+            
+            # Create completion feedback
+            feedback_item = {
+                "type": FeedbackType.COMBINED,
+                "sound_name": sound_name,
+                "message": message,
+                "deferred_action_mode": True,
+                "completion_feedback": True,
+                "speech_rate_modifier": 1.0,
+                "pause_before_speech": 0.1
+            }
+            
+            self._add_to_queue(feedback_item, priority)
+            logger.debug(f"Queued deferred action completion feedback: success={success}")
+            
+        except Exception as e:
+            logger.error(f"Error queuing deferred action completion feedback: {e}")
+    
+    def provide_deferred_action_timeout_feedback(
+        self, 
+        elapsed_time: float,
+        priority: FeedbackPriority = FeedbackPriority.HIGH
+    ) -> None:
+        """
+        Provide audio feedback when deferred action times out.
+        
+        Args:
+            elapsed_time: Time elapsed before timeout
+            priority: Priority level for the feedback
+        """
+        try:
+            timeout_message = f"The deferred action has timed out after {elapsed_time:.0f} seconds. The action has been cancelled."
+            
+            feedback_item = {
+                "type": FeedbackType.COMBINED,
+                "sound_name": "failure",
+                "message": timeout_message,
+                "deferred_action_mode": True,
+                "timeout_feedback": True,
+                "speech_rate_modifier": 0.9,  # Slower for important timeout info
+                "pause_before_speech": 0.3
+            }
+            
+            self._add_to_queue(feedback_item, priority)
+            logger.debug(f"Queued deferred action timeout feedback: {elapsed_time:.1f}s")
+            
+        except Exception as e:
+            logger.error(f"Error queuing deferred action timeout feedback: {e}")
+    
+    def provide_intent_recognition_feedback(
+        self, 
+        intent_type: str, 
+        confidence: float,
+        priority: FeedbackPriority = FeedbackPriority.LOW
+    ) -> None:
+        """
+        Provide subtle audio feedback for intent recognition (optional/debug mode).
+        
+        Args:
+            intent_type: Recognized intent type
+            confidence: Confidence level of recognition
+            priority: Priority level for the feedback
+        """
+        try:
+            # Only provide feedback in debug mode or for low confidence
+            if confidence < 0.7:
+                # Low confidence - provide subtle thinking sound
+                feedback_item = {
+                    "type": FeedbackType.SOUND,
+                    "sound_name": "thinking",
+                    "intent_recognition_mode": True,
+                    "volume_modifier": 0.5,  # Quieter for subtle feedback
+                    "duration_modifier": 0.3  # Shorter duration
+                }
+                
+                self._add_to_queue(feedback_item, priority)
+                logger.debug(f"Queued low-confidence intent recognition feedback: {intent_type} ({confidence:.2f})")
+            
+        except Exception as e:
+            logger.error(f"Error queuing intent recognition feedback: {e}")
+    
+    def provide_mode_transition_feedback(
+        self, 
+        from_mode: str, 
+        to_mode: str,
+        priority: FeedbackPriority = FeedbackPriority.LOW
+    ) -> None:
+        """
+        Provide audio feedback for mode transitions (optional/subtle).
+        
+        Args:
+            from_mode: Previous interaction mode
+            to_mode: New interaction mode
+            priority: Priority level for the feedback
+        """
+        try:
+            # Only provide feedback for significant mode changes
+            significant_transitions = [
+                ("ready", "waiting_for_user"),
+                ("waiting_for_user", "ready"),
+                ("processing", "waiting_for_user")
+            ]
+            
+            if (from_mode, to_mode) in significant_transitions:
+                if to_mode == "waiting_for_user":
+                    # Entering waiting state - subtle success sound
+                    sound_name = "success"
+                    volume_modifier = 0.6
+                elif from_mode == "waiting_for_user":
+                    # Exiting waiting state - subtle thinking sound
+                    sound_name = "thinking"
+                    volume_modifier = 0.4
+                else:
+                    return  # No feedback for other transitions
+                
+                feedback_item = {
+                    "type": FeedbackType.SOUND,
+                    "sound_name": sound_name,
+                    "mode_transition": True,
+                    "volume_modifier": volume_modifier,
+                    "duration_modifier": 0.5
+                }
+                
+                self._add_to_queue(feedback_item, priority)
+                logger.debug(f"Queued mode transition feedback: {from_mode} -> {to_mode}")
+            
+        except Exception as e:
+            logger.error(f"Error queuing mode transition feedback: {e}")
+    
+    def provide_enhanced_error_feedback(
+        self, 
+        error_message: str, 
+        error_context: str = "general",
+        priority: FeedbackPriority = FeedbackPriority.HIGH
+    ) -> None:
+        """
+        Provide enhanced audio feedback for errors with context-appropriate messaging.
+        
+        Args:
+            error_message: Error message to speak
+            error_context: Context of the error (conversational, deferred_action, gui_interaction, general)
+            priority: Priority level for the feedback
+        """
+        try:
+            # Enhance error message based on context
+            if error_context == "conversational":
+                enhanced_message = f"I'm sorry, I had trouble with that conversation. {error_message}"
+            elif error_context == "deferred_action":
+                enhanced_message = f"There was an issue with the deferred action. {error_message}"
+            elif error_context == "gui_interaction":
+                enhanced_message = f"I couldn't complete that action on screen. {error_message}"
+            else:
+                enhanced_message = error_message
+            
+            # Create enhanced error feedback
+            feedback_item = {
+                "type": FeedbackType.COMBINED,
+                "sound_name": "failure",
+                "message": enhanced_message,
+                "error_feedback": True,
+                "error_context": error_context,
+                "speech_rate_modifier": 0.9,  # Slightly slower for clarity
+                "pause_before_speech": 0.2
+            }
+            
+            self._add_to_queue(feedback_item, priority)
+            logger.debug(f"Queued enhanced error feedback for {error_context}: {error_message[:50]}...")
+            
+        except Exception as e:
+            logger.error(f"Error queuing enhanced error feedback: {e}")
+    
+    def provide_success_feedback(
+        self, 
+        success_message: str = None, 
+        success_context: str = "general",
+        priority: FeedbackPriority = FeedbackPriority.NORMAL
+    ) -> None:
+        """
+        Provide enhanced audio feedback for successful operations.
+        
+        Args:
+            success_message: Optional success message to speak
+            success_context: Context of the success (gui_interaction, deferred_action, conversational, general)
+            priority: Priority level for the feedback
+        """
+        try:
+            # Determine appropriate success message if not provided
+            if not success_message:
+                if success_context == "gui_interaction":
+                    success_message = "Action completed successfully."
+                elif success_context == "deferred_action":
+                    success_message = "Deferred action completed successfully."
+                elif success_context == "conversational":
+                    success_message = None  # No default message for conversations
+                else:
+                    success_message = "Operation completed successfully."
+            
+            # Create success feedback
+            if success_message:
+                feedback_item = {
+                    "type": FeedbackType.COMBINED,
+                    "sound_name": "success",
+                    "message": success_message,
+                    "success_feedback": True,
+                    "success_context": success_context,
+                    "speech_rate_modifier": 1.0,
+                    "pause_before_speech": 0.1
+                }
+            else:
+                # Just play success sound without message
+                feedback_item = {
+                    "type": FeedbackType.SOUND,
+                    "sound_name": "success",
+                    "success_feedback": True,
+                    "success_context": success_context
+                }
+            
+            self._add_to_queue(feedback_item, priority)
+            logger.debug(f"Queued success feedback for {success_context}")
+            
+        except Exception as e:
+            logger.error(f"Error queuing success feedback: {e}")
     
     def _add_to_queue(self, feedback_item: Dict[str, Any], priority: FeedbackPriority) -> None:
         """
