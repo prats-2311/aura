@@ -115,12 +115,36 @@ User request: {request}
 Context: {context}
 
 Generate clean, well-formatted code that directly addresses the user's request. 
-- Provide only the code without explanations or markdown formatting
-- Ensure the code is ready to be typed directly into an editor
+- Provide ONLY the code without any explanations, comments, or markdown formatting
+- Ensure proper indentation and formatting for the target language
+- Use 4 spaces for indentation in Python, 2 spaces for JavaScript/HTML/CSS
+- Include proper line breaks and structure
+- Make the code ready to be typed directly into an editor
 - Focus on practical, working code
 - Keep it concise but complete
+- Do NOT include any metadata, descriptions, or surrounding text
 
 Generate the requested code:
+"""
+
+# Text generation prompt for essays, articles, and other text content
+TEXT_GENERATION_PROMPT = """
+You are AURA, an AI assistant helping with text generation. The user has requested text content that will be typed at a location they specify by clicking.
+
+User request: {request}
+Context: {context}
+
+Generate clean, well-formatted text that directly addresses the user's request.
+- Provide ONLY the text content without any explanations or metadata
+- Use proper paragraph structure with line breaks between paragraphs
+- Ensure proper grammar, spelling, and punctuation
+- Make the text ready to be typed directly into a document or text field
+- Focus on clear, engaging, and well-structured content
+- Keep it appropriately detailed for the request
+- Do NOT include any titles, headers, metadata, or surrounding explanations
+- Do NOT include phrases like "Here is the essay" or "The following text"
+
+Generate the requested text:
 """
 
 # Detailed prompt for comprehensive analysis (when user specifically asks for details)
@@ -771,7 +795,8 @@ def validate_conversational_config():
     required_prompts = {
         'INTENT_RECOGNITION_PROMPT': INTENT_RECOGNITION_PROMPT,
         'CONVERSATIONAL_PROMPT': CONVERSATIONAL_PROMPT,
-        'CODE_GENERATION_PROMPT': CODE_GENERATION_PROMPT
+        'CODE_GENERATION_PROMPT': CODE_GENERATION_PROMPT,
+        'TEXT_GENERATION_PROMPT': TEXT_GENERATION_PROMPT
     }
     
     for prompt_name, prompt_value in required_prompts.items():
@@ -785,7 +810,7 @@ def validate_conversational_config():
             errors.append(f"{prompt_name} must contain '{{command}}' placeholder")
         elif prompt_name == 'CONVERSATIONAL_PROMPT' and '{query}' not in prompt_value:
             errors.append(f"{prompt_name} must contain '{{query}}' placeholder")
-        elif prompt_name == 'CODE_GENERATION_PROMPT' and ('{request}' not in prompt_value or '{context}' not in prompt_value):
+        elif prompt_name in ['CODE_GENERATION_PROMPT', 'TEXT_GENERATION_PROMPT'] and ('{request}' not in prompt_value or '{context}' not in prompt_value):
             errors.append(f"{prompt_name} must contain '{{request}}' and '{{context}}' placeholders")
     
     # Check pynput dependency

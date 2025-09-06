@@ -1180,33 +1180,47 @@ class Orchestrator:
             else:
                 raise OrchestratorError(f"System unavailable: {error_info.user_message}")
         
-        # Ensure only one command executes at a time
-        with self.execution_lock:
-            try:
-                return self._execute_command_internal(command.strip())
-            except Exception as e:
-                # Handle execution errors with potential recovery
-                error_info = global_error_handler.handle_error(
-                    error=e,
-                    module="orchestrator",
-                    function="execute_command",
-                    category=ErrorCategory.PROCESSING_ERROR,
-                    context={"command": command[:100]}  # Limit context size
-                )
+        # Ensure only one command executes at a time, but handle deferred actions specially
+        self.execution_lock.acquire()
+        try:
+            result = self._execute_command_internal(command.strip())
+            
+            # For deferred actions, release the lock early to allow subsequent commands
+            if isinstance(result, dict) and result.get('status') == 'waiting_for_user_action':
+                logger.debug(f"Releasing execution lock early for deferred action: {result.get('execution_id')}")
+                self.execution_lock.release()
+                return result
+            else:
+                # For non-deferred actions, keep the lock until we return
+                self.execution_lock.release()
+                return result
                 
-                # Attempt recovery if enabled and error is recoverable
-                if self.error_recovery_enabled and error_info.recoverable:
-                    logger.warning(f"Command execution failed, attempting recovery: {error_info.message}")
-                    recovery_result = self.attempt_system_recovery()
-                    
-                    if recovery_result['recovery_successful']:
-                        logger.info("Recovery successful, retrying command execution")
-                        # Retry once after successful recovery
-                        try:
-                            return self._execute_command_internal(command.strip())
-                        except Exception as retry_error:
-                            logger.error(f"Command execution failed even after recovery: {retry_error}")
-                            raise OrchestratorError(f"Command execution failed: {error_info.user_message}")
+        except Exception as e:
+            # Always release the lock on exception
+            self.execution_lock.release()
+            
+            # Handle execution errors with potential recovery
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="execute_command",
+                category=ErrorCategory.PROCESSING_ERROR,
+                context={"command": command[:100]}  # Limit context size
+            )
+            
+            # Attempt recovery if enabled and error is recoverable
+            if self.error_recovery_enabled and error_info.recoverable:
+                logger.warning(f"Command execution failed, attempting recovery: {error_info.message}")
+                recovery_result = self.attempt_system_recovery()
+                
+                if recovery_result['recovery_successful']:
+                    logger.info("Recovery successful, retrying command execution")
+                    # Retry once after successful recovery
+                    try:
+                        return self._execute_command_internal(command.strip())
+                    except Exception as retry_error:
+                        logger.error(f"Command execution failed even after recovery: {retry_error}")
+                        raise OrchestratorError(f"Command execution failed: {error_info.user_message}")
                 
                 # Re-raise with user-friendly message
                 raise OrchestratorError(f"Command execution failed: {error_info.user_message}")
@@ -2046,7 +2060,7 @@ class Orchestrator:
             logger.debug(f"[{execution_id}] Generating {content_type} content for: {content_request}")
             
             # Import config here to avoid circular imports
-            from config import CODE_GENERATION_PROMPT
+            from config import CODE_GENERATION_PROMPT, TEXT_GENERATION_PROMPT
             
             # Prepare context for content generation
             context = {
@@ -2055,8 +2069,14 @@ class Orchestrator:
                 'timestamp': time.time()
             }
             
+            # Choose the appropriate prompt based on content type
+            if content_type == 'code':
+                prompt_template = CODE_GENERATION_PROMPT
+            else:  # text, essay, article, etc.
+                prompt_template = TEXT_GENERATION_PROMPT
+            
             # Format the prompt with the user's request
-            formatted_prompt = CODE_GENERATION_PROMPT.format(
+            formatted_prompt = prompt_template.format(
                 request=content_request,
                 context=str(context)
             )
@@ -2069,16 +2089,76 @@ class Orchestrator:
             # Generate content using reasoning module
             response = self.reasoning_module._make_api_request(formatted_prompt)
             
+            # Debug logging to understand what we're getting
+            logger.debug(f"[{execution_id}] Raw response type: {type(response)}")
+            logger.debug(f"[{execution_id}] Raw response: {response}")
+            
             if not response or not isinstance(response, dict):
                 logger.warning(f"[{execution_id}] Empty or invalid response from reasoning module")
                 return None
             
-            # Extract content from OpenAI format response
-            try:
-                generated_content = response['choices'][0]['message']['content'].strip()
-            except (KeyError, IndexError, TypeError) as e:
-                logger.warning(f"[{execution_id}] Failed to extract content from response: {e}")
-                logger.debug(f"[{execution_id}] Response structure: {response}")
+            # Extract the content from the response dictionary
+            # Handle various API response formats
+            if isinstance(response, dict) and 'choices' in response:
+                # Handle OpenAI-style response format: {'choices': [{'message': {'content': 'text'}}]}
+                choices = response.get('choices', [])
+                if choices and isinstance(choices, list) and len(choices) > 0:
+                    first_choice = choices[0]
+                    if isinstance(first_choice, dict) and 'message' in first_choice:
+                        message = first_choice.get('message', {})
+                        if isinstance(message, dict) and 'content' in message:
+                            generated_content = message.get('content', '').strip()
+                        else:
+                            generated_content = str(message).strip()
+                    else:
+                        generated_content = str(first_choice).strip()
+                else:
+                    generated_content = str(response).strip()
+            elif isinstance(response, dict) and 'message' in response:
+                # Handle direct message format: {'message': 'text'}
+                generated_content = response.get('message', '').strip()
+            elif isinstance(response, dict) and 'response' in response:
+                # Handle direct response format: {'response': 'text'}
+                generated_content = response.get('response', '').strip()
+            elif isinstance(response, str):
+                # Handle direct string response
+                generated_content = response.strip()
+            else:
+                # Try to get the response as string from the dict
+                generated_content = str(response).strip()
+            
+            logger.debug(f"[{execution_id}] Extracted content: {len(generated_content)} chars")
+            logger.debug(f"[{execution_id}] Content preview: {generated_content[:200] if generated_content else 'Empty'}")
+            
+            # Clean up any unwanted formatting or metadata
+            generated_content = self._clean_generated_content(generated_content, content_type)
+            logger.debug(f"[{execution_id}] Content after cleaning: {len(generated_content)} chars")
+            
+            # Safety check for over-aggressive cleaning
+            if not generated_content or len(generated_content.strip()) == 0:
+                logger.warning(f"[{execution_id}] Generated content is empty after processing")
+                # If cleaning made it empty, try to return the original content
+                if isinstance(response, dict):
+                    # Try OpenAI format first
+                    if 'choices' in response:
+                        choices = response.get('choices', [])
+                        if choices and len(choices) > 0:
+                            first_choice = choices[0]
+                            if isinstance(first_choice, dict) and 'message' in first_choice:
+                                message = first_choice.get('message', {})
+                                if isinstance(message, dict) and 'content' in message:
+                                    original_content = message.get('content', '').strip()
+                                    if original_content:
+                                        logger.info(f"[{execution_id}] Returning original OpenAI content due to over-aggressive cleaning")
+                                        return original_content
+                    # Try other formats
+                    original_content = response.get('message', response.get('response', str(response)))
+                    if original_content and original_content.strip():
+                        logger.info(f"[{execution_id}] Returning original content due to over-aggressive cleaning")
+                        return original_content.strip()
+                elif isinstance(response, str) and response.strip():
+                    logger.info(f"[{execution_id}] Returning original string content")
+                    return response.strip()
                 return None
             
             # Basic validation of generated content
@@ -2092,6 +2172,105 @@ class Orchestrator:
         except Exception as e:
             logger.error(f"[{execution_id}] Content generation failed: {e}")
             return None
+    
+    def _clean_generated_content(self, content: str, content_type: str) -> str:
+        """
+        Clean generated content to remove unwanted formatting or metadata.
+        
+        Args:
+            content: Raw generated content
+            content_type: Type of content (code, text, etc.)
+            
+        Returns:
+            Cleaned content ready for typing
+        """
+        try:
+            # Remove common unwanted prefixes and suffixes
+            unwanted_prefixes = [
+                "Here is the code:",
+                "Here is the essay:",
+                "Here is the article:",
+                "Here is the text:",
+                "The following code:",
+                "The following essay:",
+                "The following article:",
+                "The following text:",
+                "```python",
+                "```javascript",
+                "```html",
+                "```css",
+                "```",
+                "**Code:**",
+                "**Essay:**",
+                "**Article:**",
+                "**Text:**"
+            ]
+            
+            unwanted_suffixes = [
+                "```",
+                "**End of code**",
+                "**End of essay**",
+                "**End of article**",
+                "**End of text**"
+            ]
+            
+            # Clean the content
+            cleaned_content = content.strip()
+            
+            # Remove unwanted prefixes
+            for prefix in unwanted_prefixes:
+                if cleaned_content.lower().startswith(prefix.lower()):
+                    cleaned_content = cleaned_content[len(prefix):].strip()
+                    break
+            
+            # Remove unwanted suffixes
+            for suffix in unwanted_suffixes:
+                if cleaned_content.lower().endswith(suffix.lower()):
+                    cleaned_content = cleaned_content[:-len(suffix)].strip()
+                    break
+            
+            # For code content, ensure proper formatting
+            if content_type == 'code':
+                # Remove any remaining markdown code blocks
+                if cleaned_content.startswith('```') and cleaned_content.endswith('```'):
+                    lines = cleaned_content.split('\n')
+                    if len(lines) > 2:
+                        # Remove first and last lines if they're markdown markers
+                        if lines[0].startswith('```'):
+                            lines = lines[1:]
+                        if lines[-1].strip() == '```':
+                            lines = lines[:-1]
+                        cleaned_content = '\n'.join(lines)
+                
+                # Ensure proper indentation (convert tabs to spaces)
+                cleaned_content = cleaned_content.replace('\t', '    ')
+            
+            # For text content, ensure proper paragraph formatting
+            elif content_type == 'text':
+                # Ensure proper line breaks between paragraphs
+                lines = cleaned_content.split('\n')
+                formatted_lines = []
+                
+                for i, line in enumerate(lines):
+                    line = line.strip()
+                    if line:  # Non-empty line
+                        formatted_lines.append(line)
+                        # Add extra line break after paragraphs (except for the last line)
+                        if i < len(lines) - 1 and lines[i + 1].strip():
+                            # Check if next line starts a new paragraph
+                            next_line = lines[i + 1].strip()
+                            if next_line and not line.endswith('.') and not line.endswith('!') and not line.endswith('?'):
+                                continue  # Same paragraph
+                            elif next_line:
+                                formatted_lines.append('')  # Add paragraph break
+                
+                cleaned_content = '\n'.join(formatted_lines)
+            
+            return cleaned_content
+            
+        except Exception as e:
+            logger.warning(f"Error cleaning generated content: {e}")
+            return content  # Return original content if cleaning fails
     
     def _start_mouse_listener_for_deferred_action(self, execution_id: str) -> None:
         """

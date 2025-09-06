@@ -21892,3 +21892,964 @@ Screen Context: Co...'
 2025-09-06 08:25:51,725 - __main__ - INFO - Step 2: Running cleanup handlers...
 2025-09-06 08:25:51,725 - __main__ - INFO - Running 5 cleanup handlers...
 2025-09-06 08:25:51,727 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
+2025-09-06 08:37:13,862 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-09-06 08:37:13,862 - __main__ - INFO - Starting AURA application...
+2025-09-06 08:37:13,862 - __main__ - INFO - Step 1: Validating configuration...
+2025-09-06 08:37:21,916 - config - INFO - Available models in LM Studio: ['google/gemma-3-4b', 'text-embedding-nomic-embed-text-v1.5', 'smolvlm-500m-instruct', 'smolvlm2-2.2b-instruct', 'phi-3-vision-128k-instruct', 'microsoft/phi-4-mini-reasoning', 'qwen2.5-coder-7b-instruct-mlx', 'google/gemma-3-1b', 'phi-2', 'qwen/qwen3-4b', 'qwen3-8b-mlx', 'qwen2-7b-instruct']
+2025-09-06 08:37:21,917 - config - INFO - Selected vision model: google/gemma-3-4b
+2025-09-06 08:37:21,917 - __main__ - INFO - Step 2: Running startup checks...
+2025-09-06 08:37:21,917 - __main__ - INFO - Running 5 startup checks...
+2025-09-06 08:37:24,162 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-09-06 08:37:24,162 - __main__ - INFO - Step 3: Initializing core modules...
+2025-09-06 08:37:24,163 - modules.audio - INFO - Loading Whisper model...
+2025-09-06 08:37:26,574 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-06 08:37:26,575 - modules.audio - INFO - Initializing TTS engine...
+2025-09-06 08:37:27,231 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-06 08:37:27,231 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-06 08:37:27,273 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-06 08:37:27,274 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-06 08:37:27,274 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-06 08:37:27,274 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-06 08:37:27,274 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-06 08:37:29,204 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-06 08:37:29,205 - modules.feedback - INFO - Loading sound files...
+2025-09-06 08:37:29,211 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-06 08:37:29,211 - modules.feedback - INFO - Feedback processing loop started
+2025-09-06 08:37:29,211 - modules.feedback - INFO - Feedback processing thread started
+2025-09-06 08:37:29,212 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-06 08:37:29,212 - orchestrator - INFO - Initializing AURA modules...
+2025-09-06 08:37:29,212 - orchestrator - INFO - Initializing Vision Module...
+2025-09-06 08:37:29,222 - modules.vision - INFO - VisionModule initialized
+2025-09-06 08:37:29,222 - orchestrator - INFO - Vision Module initialized successfully
+2025-09-06 08:37:29,222 - orchestrator - INFO - Initializing Reasoning Module...
+2025-09-06 08:37:29,278 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-09-06 08:37:29,278 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-09-06 08:37:29,278 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-09-06 08:37:29,278 - orchestrator - INFO - Initializing Automation Module...
+2025-09-06 08:37:29,705 - modules.automation - INFO - AutomationModule initialized. Screen size: 2560x1600
+2025-09-06 08:37:29,705 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-09-06 08:37:29,706 - modules.automation - INFO - macOS detected - using cliclick as PRIMARY automation method
+2025-09-06 08:37:29,706 - modules.automation - INFO - AppleScript available as fallback only
+2025-09-06 08:37:29,706 - orchestrator - INFO - Automation Module initialized successfully
+2025-09-06 08:37:29,706 - orchestrator - INFO - Initializing Audio Module...
+2025-09-06 08:37:29,706 - modules.audio - INFO - Loading Whisper model...
+2025-09-06 08:37:31,825 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-06 08:37:31,826 - modules.audio - INFO - Initializing TTS engine...
+2025-09-06 08:37:32,378 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-06 08:37:32,379 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-06 08:37:32,383 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-06 08:37:32,383 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-06 08:37:32,384 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-06 08:37:32,384 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-06 08:37:32,384 - orchestrator - INFO - Audio Module initialized successfully
+2025-09-06 08:37:32,384 - orchestrator - INFO - Initializing Feedback Module...
+2025-09-06 08:37:32,384 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-06 08:37:32,384 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-06 08:37:32,384 - modules.feedback - INFO - Loading sound files...
+2025-09-06 08:37:32,386 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-06 08:37:32,386 - modules.feedback - INFO - Feedback processing loop started
+2025-09-06 08:37:32,386 - modules.feedback - INFO - Feedback processing thread started
+2025-09-06 08:37:32,386 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-06 08:37:32,386 - orchestrator - INFO - Feedback Module initialized successfully
+2025-09-06 08:37:32,386 - orchestrator - INFO - Initializing Accessibility Module...
+2025-09-06 08:37:32,417 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 08:37:32,459 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 08:37:32,459 - modules.accessibility - INFO - Permission validation: ✅ Accessibility permissions granted (FULL)
+2025-09-06 08:37:32,459 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-06 08:37:32,460 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 08:37:32,460 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 08:37:32,460 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 08:37:32,461 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 08:37:32,461 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 08:37:32,462 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 08:37:32,462 - modules.accessibility - INFO - Debugging tools initialized successfully
+2025-09-06 08:37:32,462 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-06 08:37:32,462 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-06 08:37:32,462 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-06 08:37:32,462 - orchestrator - INFO - Accessibility Module initialized successfully
+2025-09-06 08:37:32,462 - orchestrator - INFO - Initializing debugging and diagnostic tools...
+2025-09-06 08:37:32,462 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 08:37:32,462 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 08:37:32,462 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 08:37:32,462 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 08:37:32,462 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 08:37:32,462 - orchestrator - INFO - Debugging tools initialized successfully
+2025-09-06 08:37:32,462 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback, accessibility
+2025-09-06 08:37:32,463 - orchestrator - INFO - All modules initialized successfully
+2025-09-06 08:37:32,463 - orchestrator - INFO - System health monitoring initialized
+2025-09-06 08:37:32,463 - orchestrator - INFO - Orchestrator initialized successfully
+2025-09-06 08:37:32,463 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-09-06 08:37:32,463 - __main__ - INFO - All modules verified successfully
+2025-09-06 08:37:32,463 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-09-06 08:37:32,463 - __main__ - INFO - Health monitoring started
+2025-09-06 08:37:32,463 - __main__ - INFO - Step 6: Startup completed successfully
+2025-09-06 08:37:32,464 - __main__ - INFO - AURA application startup completed in 18.60s
+2025-09-06 08:37:32,464 - __main__ - INFO - Starting main application loop...
+2025-09-06 08:37:32,464 - modules.audio - INFO - Converting text to speech: 'AURA is ready. Say 'computer' to activate....'
+2025-09-06 08:37:32,464 - __main__ - INFO - Wake word monitoring started
+2025-09-06 08:37:32,466 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:37:35,427 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 08:37:37,365 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-06 08:37:37,366 - modules.audio - INFO - Providing wake word confirmation
+2025-09-06 08:37:37,490 - __main__ - INFO - Wake word detected (#1)
+2025-09-06 08:37:37,491 - __main__ - INFO - Processing voice command...
+2025-09-06 08:37:37,491 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 08:37:37,491 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-06 08:37:37,491 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-06 08:37:45,704 - modules.audio - INFO - Audio recording completed:
+2025-09-06 08:37:45,708 - modules.audio - INFO -   Duration: 8.00s
+2025-09-06 08:37:45,708 - modules.audio - INFO -   Samples: 128000
+2025-09-06 08:37:45,708 - modules.audio - INFO -   RMS volume: 0.0216
+2025-09-06 08:37:45,708 - modules.audio - INFO -   Max volume: 0.1894
+2025-09-06 08:37:45,708 - modules.audio - INFO - Good audio level detected (RMS: 0.0216)
+2025-09-06 08:37:45,709 - modules.audio - INFO - Applying gain factor: 1.58 (original max volume: 0.1894)
+2025-09-06 08:37:45,709 - modules.audio - INFO - After gain - RMS: 0.0341, Max: 0.3000
+2025-09-06 08:37:45,710 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-06 08:37:45,787 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmph_6k54i5.wav
+2025-09-06 08:37:45,787 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-06 08:37:45,787 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-06 08:37:45,787 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-06 08:37:45,787 - modules.audio - INFO -   Channels: 1
+2025-09-06 08:37:45,787 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-06 08:37:45,787 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-06 08:37:45,787 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmph_6k54i5.wav
+2025-09-06 08:37:45,789 - modules.audio - INFO - Running Whisper transcription...
+2025-09-06 08:37:51,923 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-06 08:37:51,925 - modules.audio - INFO - Whisper transcription completed
+2025-09-06 08:37:51,925 - modules.audio - INFO - Whisper result details:
+2025-09-06 08:37:51,925 - modules.audio - INFO -   Text: 'Write me a python function for Fibonacci sequence.'
+2025-09-06 08:37:51,925 - modules.audio - INFO -   Language: en
+2025-09-06 08:37:51,925 - modules.audio - INFO -   Segments: 1
+2025-09-06 08:37:51,926 - modules.audio - INFO -     Segment 1: 'Write me a python function for Fibonacci sequence.' (0.00-5.00s, prob: -0.489)
+2025-09-06 08:37:51,926 - modules.audio - INFO - Transcription result: 'Write me a python function for Fibonacci sequence.'
+2025-09-06 08:37:51,927 - __main__ - INFO - Command received: 'Write me a python function for Fibonacci sequence.'
+2025-09-06 08:37:51,927 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 08:37:51,927 - orchestrator - INFO - Starting command execution [cmd_1757128071927]: 'Write me a python function for Fibonacci sequence.'
+2025-09-06 08:37:51,927 - orchestrator - INFO - [cmd_1757128071927] Step 1: Intent recognition and routing
+2025-09-06 08:37:54,922 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-06 08:37:54,932 - orchestrator - INFO - Intent recognized: deferred_action (confidence: 0.97)
+2025-09-06 08:37:54,932 - orchestrator - INFO - [cmd_1757128071927] Intent recognized: deferred_action (confidence: 0.97)
+2025-09-06 08:37:54,932 - orchestrator - INFO - [cmd_1757128071927] Routing to deferred action handler
+2025-09-06 08:37:54,932 - orchestrator - INFO - [cmd_1757128071927] Starting deferred action workflow
+2025-09-06 08:37:54,932 - orchestrator - INFO - [cmd_1757128071927] Content request: python function for Fibonacci sequence, Type: code
+2025-09-06 08:37:58,770 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-06 08:37:58,773 - orchestrator - WARNING - [cmd_1757128071927] Empty or invalid response from reasoning module
+2025-09-06 08:37:58,774 - orchestrator - ERROR - [cmd_1757128071927] Content generation failed: Content generation returned empty result
+2025-09-06 08:37:58,782 - modules.error_handler - WARNING - [orchestrator__handle_deferred_action_request_1757128078] PROCESSING_ERROR in orchestrator._handle_deferred_action_request: Content generation returned empty result
+2025-09-06 08:37:58,782 - __main__ - WARNING - Command execution had issues: []
+2025-09-06 08:37:58,782 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:38:03,937 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 08:38:04,057 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:38:09,155 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 08:38:09,279 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:38:14,383 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 08:38:14,507 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:38:19,597 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 08:38:19,715 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:38:23,510 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-09-06 08:38:23,511 - __main__ - INFO - Initiating AURA shutdown...
+2025-09-06 08:38:23,511 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-09-06 08:38:24,806 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 08:38:24,927 - __main__ - INFO - Wake word monitoring stopped
+2025-09-06 08:38:24,928 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-09-06 08:38:24,928 - __main__ - INFO - Running 5 cleanup handlers...
+2025-09-06 08:38:24,929 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
+2025-09-06 08:45:02,389 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-09-06 08:45:02,389 - __main__ - INFO - Starting AURA application...
+2025-09-06 08:45:02,389 - __main__ - INFO - Step 1: Validating configuration...
+2025-09-06 08:45:02,972 - config - INFO - Detected currently loaded model: google/gemma-3-4b
+2025-09-06 08:45:02,972 - config - INFO - Currently loaded model is vision-capable: google/gemma-3-4b
+2025-09-06 08:45:02,973 - __main__ - INFO - Step 2: Running startup checks...
+2025-09-06 08:45:02,973 - __main__ - INFO - Running 5 startup checks...
+2025-09-06 08:45:05,182 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-09-06 08:45:05,182 - __main__ - INFO - Step 3: Initializing core modules...
+2025-09-06 08:45:05,184 - modules.audio - INFO - Loading Whisper model...
+2025-09-06 08:45:07,747 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-06 08:45:07,748 - modules.audio - INFO - Initializing TTS engine...
+2025-09-06 08:45:08,516 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-06 08:45:08,517 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-06 08:45:08,560 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-06 08:45:08,561 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-06 08:45:08,561 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-06 08:45:08,561 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-06 08:45:08,561 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-06 08:45:10,659 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-06 08:45:10,661 - modules.feedback - INFO - Loading sound files...
+2025-09-06 08:45:10,670 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-06 08:45:10,670 - modules.feedback - INFO - Feedback processing loop started
+2025-09-06 08:45:10,670 - modules.feedback - INFO - Feedback processing thread started
+2025-09-06 08:45:10,671 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-06 08:45:10,672 - orchestrator - INFO - Initializing AURA modules...
+2025-09-06 08:45:10,673 - orchestrator - INFO - Initializing Vision Module...
+2025-09-06 08:45:10,728 - modules.vision - INFO - VisionModule initialized
+2025-09-06 08:45:10,728 - orchestrator - INFO - Vision Module initialized successfully
+2025-09-06 08:45:10,728 - orchestrator - INFO - Initializing Reasoning Module...
+2025-09-06 08:45:10,762 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-09-06 08:45:10,762 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-09-06 08:45:10,762 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-09-06 08:45:10,762 - orchestrator - INFO - Initializing Automation Module...
+2025-09-06 08:45:11,104 - modules.automation - INFO - AutomationModule initialized. Screen size: 2560x1600
+2025-09-06 08:45:11,104 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-09-06 08:45:11,104 - modules.automation - INFO - macOS detected - using cliclick as PRIMARY automation method
+2025-09-06 08:45:11,104 - modules.automation - INFO - AppleScript available as fallback only
+2025-09-06 08:45:11,105 - orchestrator - INFO - Automation Module initialized successfully
+2025-09-06 08:45:11,105 - orchestrator - INFO - Initializing Audio Module...
+2025-09-06 08:45:11,105 - modules.audio - INFO - Loading Whisper model...
+2025-09-06 08:45:13,806 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-06 08:45:13,806 - modules.audio - INFO - Initializing TTS engine...
+2025-09-06 08:45:14,661 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-06 08:45:14,665 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-06 08:45:14,680 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-06 08:45:14,680 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-06 08:45:14,680 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-06 08:45:14,681 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-06 08:45:14,681 - orchestrator - INFO - Audio Module initialized successfully
+2025-09-06 08:45:14,681 - orchestrator - INFO - Initializing Feedback Module...
+2025-09-06 08:45:14,681 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-06 08:45:14,681 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-06 08:45:14,681 - modules.feedback - INFO - Loading sound files...
+2025-09-06 08:45:14,686 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-06 08:45:14,686 - modules.feedback - INFO - Feedback processing loop started
+2025-09-06 08:45:14,686 - modules.feedback - INFO - Feedback processing thread started
+2025-09-06 08:45:14,686 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-06 08:45:14,686 - orchestrator - INFO - Feedback Module initialized successfully
+2025-09-06 08:45:14,686 - orchestrator - INFO - Initializing Accessibility Module...
+2025-09-06 08:45:14,696 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 08:45:14,728 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 08:45:14,731 - modules.accessibility - INFO - Permission validation: ✅ Accessibility permissions granted (FULL)
+2025-09-06 08:45:14,731 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-06 08:45:14,731 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 08:45:14,732 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 08:45:14,732 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 08:45:14,732 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 08:45:14,732 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 08:45:14,732 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 08:45:14,732 - modules.accessibility - INFO - Debugging tools initialized successfully
+2025-09-06 08:45:14,732 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-06 08:45:14,733 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-06 08:45:14,733 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-06 08:45:14,733 - orchestrator - INFO - Accessibility Module initialized successfully
+2025-09-06 08:45:14,733 - orchestrator - INFO - Initializing debugging and diagnostic tools...
+2025-09-06 08:45:14,733 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 08:45:14,733 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 08:45:14,733 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 08:45:14,733 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 08:45:14,733 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 08:45:14,733 - orchestrator - INFO - Debugging tools initialized successfully
+2025-09-06 08:45:14,733 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback, accessibility
+2025-09-06 08:45:14,733 - orchestrator - INFO - All modules initialized successfully
+2025-09-06 08:45:14,733 - orchestrator - INFO - System health monitoring initialized
+2025-09-06 08:45:14,734 - orchestrator - INFO - Orchestrator initialized successfully
+2025-09-06 08:45:14,734 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-09-06 08:45:14,734 - __main__ - INFO - All modules verified successfully
+2025-09-06 08:45:14,734 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-09-06 08:45:14,734 - __main__ - INFO - Health monitoring started
+2025-09-06 08:45:14,734 - __main__ - INFO - Step 6: Startup completed successfully
+2025-09-06 08:45:14,735 - __main__ - INFO - AURA application startup completed in 12.35s
+2025-09-06 08:45:14,735 - __main__ - INFO - Starting main application loop...
+2025-09-06 08:45:14,735 - modules.audio - INFO - Converting text to speech: 'AURA is ready. Say 'computer' to activate....'
+2025-09-06 08:45:14,735 - __main__ - INFO - Wake word monitoring started
+2025-09-06 08:45:14,735 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:45:17,991 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 08:45:19,915 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 08:45:20,038 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:45:20,312 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-06 08:45:20,312 - modules.audio - INFO - Providing wake word confirmation
+2025-09-06 08:45:20,425 - __main__ - INFO - Wake word detected (#1)
+2025-09-06 08:45:20,425 - __main__ - INFO - Processing voice command...
+2025-09-06 08:45:20,426 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 08:45:20,426 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-06 08:45:20,426 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-06 08:45:28,687 - modules.audio - INFO - Audio recording completed:
+2025-09-06 08:45:28,689 - modules.audio - INFO -   Duration: 8.00s
+2025-09-06 08:45:28,689 - modules.audio - INFO -   Samples: 128000
+2025-09-06 08:45:28,689 - modules.audio - INFO -   RMS volume: 0.0214
+2025-09-06 08:45:28,689 - modules.audio - INFO -   Max volume: 0.1656
+2025-09-06 08:45:28,689 - modules.audio - INFO - Good audio level detected (RMS: 0.0214)
+2025-09-06 08:45:28,689 - modules.audio - INFO - Applying gain factor: 1.81 (original max volume: 0.1656)
+2025-09-06 08:45:28,690 - modules.audio - INFO - After gain - RMS: 0.0388, Max: 0.3000
+2025-09-06 08:45:28,691 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-06 08:45:28,749 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp_ers24rt.wav
+2025-09-06 08:45:28,749 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-06 08:45:28,749 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-06 08:45:28,749 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-06 08:45:28,749 - modules.audio - INFO -   Channels: 1
+2025-09-06 08:45:28,750 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-06 08:45:28,750 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-06 08:45:28,750 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp_ers24rt.wav
+2025-09-06 08:45:28,751 - modules.audio - INFO - Running Whisper transcription...
+2025-09-06 08:45:30,377 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-06 08:45:30,377 - modules.audio - INFO - Whisper transcription completed
+2025-09-06 08:45:30,377 - modules.audio - INFO - Whisper result details:
+2025-09-06 08:45:30,377 - modules.audio - INFO -   Text: 'Write me a python function for fibonacci sequence.'
+2025-09-06 08:45:30,377 - modules.audio - INFO -   Language: en
+2025-09-06 08:45:30,377 - modules.audio - INFO -   Segments: 1
+2025-09-06 08:45:30,377 - modules.audio - INFO -     Segment 1: 'Write me a python function for fibonacci sequence.' (0.00-6.00s, prob: -0.468)
+2025-09-06 08:45:30,377 - modules.audio - INFO - Transcription result: 'Write me a python function for fibonacci sequence.'
+2025-09-06 08:45:30,378 - __main__ - INFO - Command received: 'Write me a python function for fibonacci sequence.'
+2025-09-06 08:45:30,378 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 08:45:30,378 - orchestrator - INFO - Starting command execution [cmd_1757128530378]: 'Write me a python function for fibonacci sequence.'
+2025-09-06 08:45:30,378 - orchestrator - INFO - [cmd_1757128530378] Step 1: Intent recognition and routing
+2025-09-06 08:45:33,127 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-06 08:45:33,129 - orchestrator - INFO - Intent recognized: deferred_action (confidence: 0.96)
+2025-09-06 08:45:33,129 - orchestrator - INFO - [cmd_1757128530378] Intent recognized: deferred_action (confidence: 0.96)
+2025-09-06 08:45:33,129 - orchestrator - INFO - [cmd_1757128530378] Routing to deferred action handler
+2025-09-06 08:45:33,129 - orchestrator - INFO - [cmd_1757128530378] Starting deferred action workflow
+2025-09-06 08:45:33,129 - orchestrator - INFO - [cmd_1757128530378] Content request: python function for fibonacci sequence, Type: code
+2025-09-06 08:45:34,972 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-06 08:45:34,973 - orchestrator - WARNING - [cmd_1757128530378] Empty or invalid response from reasoning module
+2025-09-06 08:45:34,973 - orchestrator - ERROR - [cmd_1757128530378] Content generation failed: Content generation returned empty result
+2025-09-06 08:45:34,976 - modules.error_handler - WARNING - [orchestrator__handle_deferred_action_request_1757128534] PROCESSING_ERROR in orchestrator._handle_deferred_action_request: Content generation returned empty result
+2025-09-06 08:45:34,976 - __main__ - WARNING - Command execution had issues: []
+2025-09-06 08:45:34,977 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:45:40,088 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 08:45:40,201 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:45:45,301 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 08:45:45,418 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 08:45:49,450 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-09-06 08:45:49,451 - __main__ - INFO - Initiating AURA shutdown...
+2025-09-06 08:45:49,451 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-09-06 08:45:50,511 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 08:45:50,622 - __main__ - INFO - Wake word monitoring stopped
+2025-09-06 08:45:50,622 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-09-06 08:45:50,622 - __main__ - INFO - Running 5 cleanup handlers...
+2025-09-06 08:45:50,622 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
+2025-09-06 09:00:09,522 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-09-06 09:00:09,522 - __main__ - INFO - Starting AURA application...
+2025-09-06 09:00:09,522 - __main__ - INFO - Step 1: Validating configuration...
+2025-09-06 09:00:17,595 - config - INFO - Available models in LM Studio: ['google/gemma-3-4b', 'text-embedding-nomic-embed-text-v1.5', 'smolvlm-500m-instruct', 'smolvlm2-2.2b-instruct', 'phi-3-vision-128k-instruct', 'microsoft/phi-4-mini-reasoning', 'qwen2.5-coder-7b-instruct-mlx', 'google/gemma-3-1b', 'phi-2', 'qwen/qwen3-4b', 'qwen3-8b-mlx', 'qwen2-7b-instruct']
+2025-09-06 09:00:17,595 - config - INFO - Selected vision model: google/gemma-3-4b
+2025-09-06 09:00:17,595 - __main__ - INFO - Step 2: Running startup checks...
+2025-09-06 09:00:17,595 - __main__ - INFO - Running 5 startup checks...
+2025-09-06 09:00:19,467 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-09-06 09:00:19,467 - __main__ - INFO - Step 3: Initializing core modules...
+2025-09-06 09:00:19,467 - modules.audio - INFO - Loading Whisper model...
+2025-09-06 09:00:21,722 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-06 09:00:21,722 - modules.audio - INFO - Initializing TTS engine...
+2025-09-06 09:00:22,553 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-06 09:00:22,553 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-06 09:00:22,605 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-06 09:00:22,605 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-06 09:00:22,605 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-06 09:00:22,605 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-06 09:00:22,605 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-06 09:00:24,558 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-06 09:00:24,559 - modules.feedback - INFO - Loading sound files...
+2025-09-06 09:00:24,578 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-06 09:00:24,583 - modules.feedback - INFO - Feedback processing loop started
+2025-09-06 09:00:24,583 - modules.feedback - INFO - Feedback processing thread started
+2025-09-06 09:00:24,583 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-06 09:00:24,585 - orchestrator - INFO - Initializing AURA modules...
+2025-09-06 09:00:24,585 - orchestrator - INFO - Initializing Vision Module...
+2025-09-06 09:00:24,591 - modules.vision - INFO - VisionModule initialized
+2025-09-06 09:00:24,591 - orchestrator - INFO - Vision Module initialized successfully
+2025-09-06 09:00:24,591 - orchestrator - INFO - Initializing Reasoning Module...
+2025-09-06 09:00:24,623 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-09-06 09:00:24,623 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-09-06 09:00:24,623 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-09-06 09:00:24,623 - orchestrator - INFO - Initializing Automation Module...
+2025-09-06 09:00:25,031 - modules.automation - INFO - AutomationModule initialized. Screen size: 2560x1600
+2025-09-06 09:00:25,031 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-09-06 09:00:25,031 - modules.automation - INFO - macOS detected - using cliclick as PRIMARY automation method
+2025-09-06 09:00:25,031 - modules.automation - INFO - AppleScript available as fallback only
+2025-09-06 09:00:25,031 - orchestrator - INFO - Automation Module initialized successfully
+2025-09-06 09:00:25,031 - orchestrator - INFO - Initializing Audio Module...
+2025-09-06 09:00:25,031 - modules.audio - INFO - Loading Whisper model...
+2025-09-06 09:00:26,909 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-06 09:00:26,910 - modules.audio - INFO - Initializing TTS engine...
+2025-09-06 09:00:27,385 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-06 09:00:27,385 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-06 09:00:27,410 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-06 09:00:27,410 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-06 09:00:27,410 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-06 09:00:27,410 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-06 09:00:27,411 - orchestrator - INFO - Audio Module initialized successfully
+2025-09-06 09:00:27,411 - orchestrator - INFO - Initializing Feedback Module...
+2025-09-06 09:00:27,411 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-06 09:00:27,412 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-06 09:00:27,412 - modules.feedback - INFO - Loading sound files...
+2025-09-06 09:00:27,415 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-06 09:00:27,416 - modules.feedback - INFO - Feedback processing loop started
+2025-09-06 09:00:27,416 - modules.feedback - INFO - Feedback processing thread started
+2025-09-06 09:00:27,416 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-06 09:00:27,416 - orchestrator - INFO - Feedback Module initialized successfully
+2025-09-06 09:00:27,416 - orchestrator - INFO - Initializing Accessibility Module...
+2025-09-06 09:00:27,447 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 09:00:27,494 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:00:27,495 - modules.accessibility - INFO - Permission validation: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:00:27,495 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-06 09:00:27,495 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 09:00:27,496 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 09:00:27,496 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 09:00:27,496 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 09:00:27,497 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 09:00:27,497 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 09:00:27,497 - modules.accessibility - INFO - Debugging tools initialized successfully
+2025-09-06 09:00:27,498 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-06 09:00:27,498 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-06 09:00:27,498 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-06 09:00:27,498 - orchestrator - INFO - Accessibility Module initialized successfully
+2025-09-06 09:00:27,498 - orchestrator - INFO - Initializing debugging and diagnostic tools...
+2025-09-06 09:00:27,498 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 09:00:27,498 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 09:00:27,498 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 09:00:27,498 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 09:00:27,498 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 09:00:27,498 - orchestrator - INFO - Debugging tools initialized successfully
+2025-09-06 09:00:27,498 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback, accessibility
+2025-09-06 09:00:27,498 - orchestrator - INFO - All modules initialized successfully
+2025-09-06 09:00:27,498 - orchestrator - INFO - System health monitoring initialized
+2025-09-06 09:00:27,499 - orchestrator - INFO - Orchestrator initialized successfully
+2025-09-06 09:00:27,499 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-09-06 09:00:27,499 - __main__ - INFO - All modules verified successfully
+2025-09-06 09:00:27,499 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-09-06 09:00:27,499 - __main__ - INFO - Health monitoring started
+2025-09-06 09:00:27,499 - __main__ - INFO - Step 6: Startup completed successfully
+2025-09-06 09:00:27,500 - __main__ - INFO - AURA application startup completed in 17.98s
+2025-09-06 09:00:27,500 - modules.audio - INFO - Converting text to speech: 'AURA is ready. Say 'computer' to activate....'
+2025-09-06 09:00:27,501 - __main__ - INFO - Starting main application loop...
+2025-09-06 09:00:27,501 - __main__ - INFO - Wake word monitoring started
+2025-09-06 09:00:27,512 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:00:30,437 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 09:00:32,628 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:00:32,760 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:00:32,971 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-06 09:00:32,974 - modules.audio - INFO - Providing wake word confirmation
+2025-09-06 09:00:33,093 - __main__ - INFO - Wake word detected (#1)
+2025-09-06 09:00:33,093 - __main__ - INFO - Processing voice command...
+2025-09-06 09:00:33,094 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:00:33,094 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-06 09:00:33,094 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-06 09:00:41,295 - modules.audio - INFO - Audio recording completed:
+2025-09-06 09:00:41,296 - modules.audio - INFO -   Duration: 8.00s
+2025-09-06 09:00:41,296 - modules.audio - INFO -   Samples: 128000
+2025-09-06 09:00:41,296 - modules.audio - INFO -   RMS volume: 0.0143
+2025-09-06 09:00:41,296 - modules.audio - INFO -   Max volume: 0.1066
+2025-09-06 09:00:41,296 - modules.audio - INFO - Good audio level detected (RMS: 0.0143)
+2025-09-06 09:00:41,297 - modules.audio - INFO - Applying gain factor: 2.82 (original max volume: 0.1066)
+2025-09-06 09:00:41,297 - modules.audio - INFO - After gain - RMS: 0.0401, Max: 0.3000
+2025-09-06 09:00:41,298 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-06 09:00:41,369 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmps34c7pjo.wav
+2025-09-06 09:00:41,369 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-06 09:00:41,369 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-06 09:00:41,369 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-06 09:00:41,369 - modules.audio - INFO -   Channels: 1
+2025-09-06 09:00:41,369 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-06 09:00:41,369 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-06 09:00:41,370 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmps34c7pjo.wav
+2025-09-06 09:00:41,371 - modules.audio - INFO - Running Whisper transcription...
+2025-09-06 09:00:45,358 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-06 09:00:45,358 - modules.audio - INFO - Whisper transcription completed
+2025-09-06 09:00:45,358 - modules.audio - INFO - Whisper result details:
+2025-09-06 09:00:45,358 - modules.audio - INFO -   Text: 'Write me a function in Python for Fibonacci Sequence.'
+2025-09-06 09:00:45,358 - modules.audio - INFO -   Language: en
+2025-09-06 09:00:45,358 - modules.audio - INFO -   Segments: 1
+2025-09-06 09:00:45,358 - modules.audio - INFO -     Segment 1: 'Write me a function in Python for Fibonacci Sequence.' (0.00-8.00s, prob: -0.343)
+2025-09-06 09:00:45,359 - modules.audio - INFO - Transcription result: 'Write me a function in Python for Fibonacci Sequence.'
+2025-09-06 09:00:45,359 - __main__ - INFO - Command received: 'Write me a function in Python for Fibonacci Sequence.'
+2025-09-06 09:00:45,359 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:00:45,359 - orchestrator - INFO - Starting command execution [cmd_1757129445359]: 'Write me a function in Python for Fibonacci Sequence.'
+2025-09-06 09:00:45,359 - orchestrator - INFO - [cmd_1757129445359] Step 1: Intent recognition and routing
+2025-09-06 09:00:47,987 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-06 09:00:47,989 - orchestrator - INFO - Intent recognized: deferred_action (confidence: 0.95)
+2025-09-06 09:00:47,989 - orchestrator - INFO - [cmd_1757129445359] Intent recognized: deferred_action (confidence: 0.95)
+2025-09-06 09:00:47,989 - orchestrator - INFO - [cmd_1757129445359] Routing to deferred action handler
+2025-09-06 09:00:47,990 - orchestrator - INFO - [cmd_1757129445359] Starting deferred action workflow
+2025-09-06 09:00:47,990 - orchestrator - INFO - [cmd_1757129445359] Content request: Python function implementing the Fibonacci sequence, Type: code
+2025-09-06 09:00:50,549 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-06 09:00:50,551 - orchestrator - INFO - [cmd_1757129445359] Content generation successful (140 chars)
+2025-09-06 09:00:50,551 - orchestrator - INFO - [cmd_1757129445359] Content generated successfully (140 characters)
+2025-09-06 09:00:50,555 - utils.mouse_listener - INFO - Starting global mouse listener
+2025-09-06 09:00:50,661 - utils.mouse_listener - INFO - Global mouse listener started successfully
+2025-09-06 09:00:50,866 - orchestrator - INFO - [cmd_1757129445359] Global mouse listener started successfully for deferred action
+2025-09-06 09:00:50,869 - orchestrator - INFO - [cmd_1757129445359] Deferred action workflow initiated successfully
+2025-09-06 09:00:50,869 - __main__ - WARNING - Command execution had issues: []
+2025-09-06 09:00:50,869 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:00:51,074 - modules.audio - INFO - Converting text to speech: 'Code generated successfully. Click ... where ... y...'
+2025-09-06 09:00:53,342 - utils.mouse_listener - INFO - Mouse click detected at (569.53515625, 406.8515625) with left button
+2025-09-06 09:00:53,342 - orchestrator - INFO - [cmd_1757129445359] Deferred action triggered by user click
+2025-09-06 09:00:53,343 - orchestrator - INFO - [cmd_1757129445359] Executing deferred action at coordinates: (569.53515625, 406.8515625)
+2025-09-06 09:00:53,343 - orchestrator - INFO - [cmd_1757129445359] Executing type action with 140 characters
+2025-09-06 09:00:53,343 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:00:53,343 - modules.automation - INFO - Executing action: click (attempt 1/4)
+2025-09-06 09:00:53,493 - modules.automation - INFO - cliclick SLOW PATH: Click succeeded at (569, 406) on 'unknown' in 0.149s
+2025-09-06 09:00:53,493 - modules.automation - INFO - Successfully executed action: click
+2025-09-06 09:00:53,699 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:00:53,699 - modules.automation - INFO - Executing action: type (attempt 1/4)
+2025-09-06 09:00:55,424 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 09:00:55,979 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:00:56,091 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:01:01,190 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:01:01,308 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:01:02,390 - modules.automation - INFO - cliclick SLOW PATH: Typing succeeded on 'unknown' in 8.691s: '{'choices': [{'message': {'con...'
+2025-09-06 09:01:02,390 - modules.automation - INFO - Successfully executed action: type
+2025-09-06 09:01:02,390 - orchestrator - INFO - [cmd_1757129445359] Successfully typed 140 characters
+2025-09-06 09:01:02,391 - orchestrator - INFO - [cmd_1757129445359] Deferred action completed successfully
+2025-09-06 09:01:02,596 - modules.audio - INFO - Converting text to speech: '... Code placed successfully....'
+2025-09-06 09:01:04,897 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 09:01:06,426 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:01:06,549 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:01:11,653 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:01:11,777 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:01:15,948 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-06 09:01:15,949 - modules.audio - INFO - Providing wake word confirmation
+2025-09-06 09:01:16,074 - __main__ - INFO - Wake word detected (#2)
+2025-09-06 09:01:16,074 - __main__ - INFO - Processing voice command...
+2025-09-06 09:01:16,075 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:01:16,075 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-06 09:01:16,075 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-06 09:01:24,280 - modules.audio - INFO - Audio recording completed:
+2025-09-06 09:01:24,281 - modules.audio - INFO -   Duration: 8.00s
+2025-09-06 09:01:24,281 - modules.audio - INFO -   Samples: 128000
+2025-09-06 09:01:24,281 - modules.audio - INFO -   RMS volume: 0.0155
+2025-09-06 09:01:24,281 - modules.audio - INFO -   Max volume: 0.1005
+2025-09-06 09:01:24,282 - modules.audio - INFO - Good audio level detected (RMS: 0.0155)
+2025-09-06 09:01:24,282 - modules.audio - INFO - Applying gain factor: 2.99 (original max volume: 0.1005)
+2025-09-06 09:01:24,283 - modules.audio - INFO - After gain - RMS: 0.0464, Max: 0.3000
+2025-09-06 09:01:24,284 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-06 09:01:24,353 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp7pvt43f5.wav
+2025-09-06 09:01:24,353 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-06 09:01:24,353 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-06 09:01:24,353 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-06 09:01:24,353 - modules.audio - INFO -   Channels: 1
+2025-09-06 09:01:24,354 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-06 09:01:24,354 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-06 09:01:24,355 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp7pvt43f5.wav
+2025-09-06 09:01:24,356 - modules.audio - INFO - Running Whisper transcription...
+2025-09-06 09:01:26,074 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-06 09:01:26,074 - modules.audio - INFO - Whisper transcription completed
+2025-09-06 09:01:26,074 - modules.audio - INFO - Whisper result details:
+2025-09-06 09:01:26,074 - modules.audio - INFO -   Text: 'Write me a small essay on climate change in less than 50 words.'
+2025-09-06 09:01:26,074 - modules.audio - INFO -   Language: en
+2025-09-06 09:01:26,074 - modules.audio - INFO -   Segments: 1
+2025-09-06 09:01:26,074 - modules.audio - INFO -     Segment 1: 'Write me a small essay on climate change in less than 50 words.' (0.00-8.00s, prob: -0.211)
+2025-09-06 09:01:26,074 - modules.audio - INFO - Transcription result: 'Write me a small essay on climate change in less than 50 words.'
+2025-09-06 09:01:26,075 - __main__ - INFO - Command received: 'Write me a small essay on climate change in less than 50 words.'
+2025-09-06 09:01:26,075 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:01:26,075 - orchestrator - INFO - Starting command execution [cmd_1757129486075]: 'Write me a small essay on climate change in less than 50 words.'
+2025-09-06 09:01:27,524 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:02:27,547 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:03:27,572 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:04:27,601 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:04:28,029 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-09-06 09:04:28,030 - __main__ - INFO - Initiating AURA shutdown...
+2025-09-06 09:04:28,030 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-09-06 09:04:33,033 - __main__ - WARNING - Wake word thread did not stop gracefully
+2025-09-06 09:04:33,034 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-09-06 09:04:33,035 - __main__ - INFO - Running 5 cleanup handlers...
+2025-09-06 09:04:33,041 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
+2025-09-06 09:10:48,269 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-09-06 09:10:48,269 - __main__ - INFO - Starting AURA application...
+2025-09-06 09:10:48,269 - __main__ - INFO - Step 1: Validating configuration...
+2025-09-06 09:10:48,802 - config - INFO - Detected currently loaded model: google/gemma-3-4b
+2025-09-06 09:10:48,802 - config - INFO - Currently loaded model is vision-capable: google/gemma-3-4b
+2025-09-06 09:10:48,803 - __main__ - INFO - Step 2: Running startup checks...
+2025-09-06 09:10:48,803 - __main__ - INFO - Running 5 startup checks...
+2025-09-06 09:10:51,052 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-09-06 09:10:51,052 - __main__ - INFO - Step 3: Initializing core modules...
+2025-09-06 09:10:51,052 - modules.audio - INFO - Loading Whisper model...
+2025-09-06 09:10:53,221 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-06 09:10:53,221 - modules.audio - INFO - Initializing TTS engine...
+2025-09-06 09:10:53,873 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-06 09:10:53,873 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-06 09:10:53,882 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-06 09:10:53,882 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-06 09:10:53,882 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-06 09:10:53,882 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-06 09:10:53,882 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-06 09:10:55,766 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-06 09:10:55,766 - modules.feedback - INFO - Loading sound files...
+2025-09-06 09:10:55,769 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-06 09:10:55,769 - modules.feedback - INFO - Feedback processing loop started
+2025-09-06 09:10:55,769 - modules.feedback - INFO - Feedback processing thread started
+2025-09-06 09:10:55,770 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-06 09:10:55,770 - orchestrator - INFO - Initializing AURA modules...
+2025-09-06 09:10:55,770 - orchestrator - INFO - Initializing Vision Module...
+2025-09-06 09:10:55,772 - modules.vision - INFO - VisionModule initialized
+2025-09-06 09:10:55,772 - orchestrator - INFO - Vision Module initialized successfully
+2025-09-06 09:10:55,772 - orchestrator - INFO - Initializing Reasoning Module...
+2025-09-06 09:10:55,792 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-09-06 09:10:55,792 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-09-06 09:10:55,792 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-09-06 09:10:55,792 - orchestrator - INFO - Initializing Automation Module...
+2025-09-06 09:10:56,156 - modules.automation - INFO - AutomationModule initialized. Screen size: 2560x1600
+2025-09-06 09:10:56,156 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-09-06 09:10:56,156 - modules.automation - INFO - macOS detected - using cliclick as PRIMARY automation method
+2025-09-06 09:10:56,156 - modules.automation - INFO - AppleScript available as fallback only
+2025-09-06 09:10:56,156 - orchestrator - INFO - Automation Module initialized successfully
+2025-09-06 09:10:56,156 - orchestrator - INFO - Initializing Audio Module...
+2025-09-06 09:10:56,157 - modules.audio - INFO - Loading Whisper model...
+2025-09-06 09:10:57,953 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-06 09:10:57,954 - modules.audio - INFO - Initializing TTS engine...
+2025-09-06 09:10:58,441 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-06 09:10:58,441 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-06 09:10:58,446 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-06 09:10:58,446 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-06 09:10:58,446 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-06 09:10:58,446 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-06 09:10:58,446 - orchestrator - INFO - Audio Module initialized successfully
+2025-09-06 09:10:58,446 - orchestrator - INFO - Initializing Feedback Module...
+2025-09-06 09:10:58,446 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-06 09:10:58,446 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-06 09:10:58,446 - modules.feedback - INFO - Loading sound files...
+2025-09-06 09:10:58,450 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-06 09:10:58,450 - modules.feedback - INFO - Feedback processing loop started
+2025-09-06 09:10:58,450 - modules.feedback - INFO - Feedback processing thread started
+2025-09-06 09:10:58,450 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-06 09:10:58,450 - orchestrator - INFO - Feedback Module initialized successfully
+2025-09-06 09:10:58,450 - orchestrator - INFO - Initializing Accessibility Module...
+2025-09-06 09:10:58,457 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 09:10:58,489 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:10:58,489 - modules.accessibility - INFO - Permission validation: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:10:58,490 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-06 09:10:58,490 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 09:10:58,490 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 09:10:58,490 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 09:10:58,490 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 09:10:58,490 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 09:10:58,490 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 09:10:58,490 - modules.accessibility - INFO - Debugging tools initialized successfully
+2025-09-06 09:10:58,490 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-06 09:10:58,490 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-06 09:10:58,490 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-06 09:10:58,490 - orchestrator - INFO - Accessibility Module initialized successfully
+2025-09-06 09:10:58,490 - orchestrator - INFO - Initializing debugging and diagnostic tools...
+2025-09-06 09:10:58,491 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 09:10:58,491 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 09:10:58,491 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 09:10:58,491 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 09:10:58,491 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 09:10:58,491 - orchestrator - INFO - Debugging tools initialized successfully
+2025-09-06 09:10:58,491 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback, accessibility
+2025-09-06 09:10:58,491 - orchestrator - INFO - All modules initialized successfully
+2025-09-06 09:10:58,491 - orchestrator - INFO - System health monitoring initialized
+2025-09-06 09:10:58,491 - orchestrator - INFO - Orchestrator initialized successfully
+2025-09-06 09:10:58,491 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-09-06 09:10:58,491 - __main__ - INFO - All modules verified successfully
+2025-09-06 09:10:58,491 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-09-06 09:10:58,491 - __main__ - INFO - Health monitoring started
+2025-09-06 09:10:58,491 - __main__ - INFO - Step 6: Startup completed successfully
+2025-09-06 09:10:58,491 - __main__ - INFO - AURA application startup completed in 10.22s
+2025-09-06 09:10:58,491 - modules.audio - INFO - Converting text to speech: 'AURA is ready. Say 'computer' to activate....'
+2025-09-06 09:10:58,491 - __main__ - INFO - Starting main application loop...
+2025-09-06 09:10:58,492 - __main__ - INFO - Wake word monitoring started
+2025-09-06 09:10:58,506 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:11:01,521 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 09:11:03,613 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:11:03,729 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:11:03,922 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-06 09:11:03,922 - modules.audio - INFO - Providing wake word confirmation
+2025-09-06 09:11:04,039 - __main__ - INFO - Wake word detected (#1)
+2025-09-06 09:11:04,039 - __main__ - INFO - Processing voice command...
+2025-09-06 09:11:04,039 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:11:04,040 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-06 09:11:04,040 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-06 09:11:12,221 - modules.audio - INFO - Audio recording completed:
+2025-09-06 09:11:12,222 - modules.audio - INFO -   Duration: 8.00s
+2025-09-06 09:11:12,222 - modules.audio - INFO -   Samples: 128000
+2025-09-06 09:11:12,222 - modules.audio - INFO -   RMS volume: 0.0226
+2025-09-06 09:11:12,222 - modules.audio - INFO -   Max volume: 0.1916
+2025-09-06 09:11:12,223 - modules.audio - INFO - Good audio level detected (RMS: 0.0226)
+2025-09-06 09:11:12,223 - modules.audio - INFO - Applying gain factor: 1.57 (original max volume: 0.1916)
+2025-09-06 09:11:12,223 - modules.audio - INFO - After gain - RMS: 0.0354, Max: 0.3000
+2025-09-06 09:11:12,224 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-06 09:11:12,294 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpgaj29n3t.wav
+2025-09-06 09:11:12,294 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-06 09:11:12,295 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-06 09:11:12,295 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-06 09:11:12,295 - modules.audio - INFO -   Channels: 1
+2025-09-06 09:11:12,295 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-06 09:11:12,295 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-06 09:11:12,296 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmpgaj29n3t.wav
+2025-09-06 09:11:12,296 - modules.audio - INFO - Running Whisper transcription...
+2025-09-06 09:11:13,942 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-06 09:11:13,942 - modules.audio - INFO - Whisper transcription completed
+2025-09-06 09:11:13,943 - modules.audio - INFO - Whisper result details:
+2025-09-06 09:11:13,943 - modules.audio - INFO -   Text: 'Write me a Python function for Fibonacci sequence.'
+2025-09-06 09:11:13,943 - modules.audio - INFO -   Language: en
+2025-09-06 09:11:13,943 - modules.audio - INFO -   Segments: 1
+2025-09-06 09:11:13,943 - modules.audio - INFO -     Segment 1: 'Write me a Python function for Fibonacci sequence.' (0.00-6.00s, prob: -0.430)
+2025-09-06 09:11:13,943 - modules.audio - INFO - Transcription result: 'Write me a Python function for Fibonacci sequence.'
+2025-09-06 09:11:13,943 - __main__ - INFO - Command received: 'Write me a Python function for Fibonacci sequence.'
+2025-09-06 09:11:13,943 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:11:13,943 - orchestrator - INFO - Starting command execution [cmd_1757130073943]: 'Write me a Python function for Fibonacci sequence.'
+2025-09-06 09:11:13,943 - orchestrator - INFO - [cmd_1757130073943] Step 1: Intent recognition and routing
+2025-09-06 09:11:16,011 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-06 09:11:16,013 - orchestrator - INFO - Intent recognized: deferred_action (confidence: 0.95)
+2025-09-06 09:11:16,013 - orchestrator - INFO - [cmd_1757130073943] Intent recognized: deferred_action (confidence: 0.95)
+2025-09-06 09:11:16,013 - orchestrator - INFO - [cmd_1757130073943] Routing to deferred action handler
+2025-09-06 09:11:16,013 - orchestrator - INFO - [cmd_1757130073943] Starting deferred action workflow
+2025-09-06 09:11:16,013 - orchestrator - INFO - [cmd_1757130073943] Content request: Python function for Fibonacci sequence, Type: code
+2025-09-06 09:11:19,337 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-06 09:11:19,339 - orchestrator - INFO - [cmd_1757130073943] Content generation successful (139 chars)
+2025-09-06 09:11:19,339 - orchestrator - INFO - [cmd_1757130073943] Content generated successfully (139 characters)
+2025-09-06 09:11:19,342 - utils.mouse_listener - INFO - Starting global mouse listener
+2025-09-06 09:11:19,448 - utils.mouse_listener - INFO - Global mouse listener started successfully
+2025-09-06 09:11:19,654 - orchestrator - INFO - [cmd_1757130073943] Global mouse listener started successfully for deferred action
+2025-09-06 09:11:19,655 - orchestrator - INFO - [cmd_1757130073943] Deferred action workflow initiated successfully
+2025-09-06 09:11:19,655 - __main__ - WARNING - Command execution had issues: []
+2025-09-06 09:11:19,655 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:11:19,855 - modules.audio - INFO - Converting text to speech: 'Code generated successfully. Click ... where ... y...'
+2025-09-06 09:11:22,009 - utils.mouse_listener - INFO - Mouse click detected at (723.97265625, 460.0078125) with left button
+2025-09-06 09:11:22,010 - orchestrator - INFO - [cmd_1757130073943] Deferred action triggered by user click
+2025-09-06 09:11:22,011 - orchestrator - INFO - [cmd_1757130073943] Executing deferred action at coordinates: (723.97265625, 460.0078125)
+2025-09-06 09:11:22,011 - orchestrator - INFO - [cmd_1757130073943] Executing type action with 139 characters
+2025-09-06 09:11:22,011 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:11:22,011 - modules.automation - INFO - Executing action: click (attempt 1/4)
+2025-09-06 09:11:22,165 - modules.automation - INFO - cliclick SLOW PATH: Click succeeded at (723, 460) on 'unknown' in 0.153s
+2025-09-06 09:11:22,165 - modules.automation - INFO - Successfully executed action: click
+2025-09-06 09:11:22,371 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:11:22,371 - modules.automation - INFO - Executing action: type (attempt 1/4)
+2025-09-06 09:11:24,183 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 09:11:24,758 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:11:24,865 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:11:29,953 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:11:30,064 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:11:30,646 - modules.automation - INFO - cliclick SLOW PATH: Typing succeeded on 'unknown' in 8.275s: 'def fibonacci(n):
+    a, b = 0...'
+2025-09-06 09:11:30,646 - modules.automation - INFO - Successfully executed action: type
+2025-09-06 09:11:30,646 - orchestrator - INFO - [cmd_1757130073943] Successfully typed 139 characters
+2025-09-06 09:11:30,646 - orchestrator - INFO - [cmd_1757130073943] Deferred action completed successfully
+2025-09-06 09:11:30,848 - modules.audio - INFO - Converting text to speech: '... Code placed successfully....'
+2025-09-06 09:11:32,926 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 09:11:35,147 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:11:35,257 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:11:40,340 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:11:40,450 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:11:45,553 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:11:45,670 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:11:50,747 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:11:50,859 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:11:52,438 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-06 09:11:52,438 - modules.audio - INFO - Providing wake word confirmation
+2025-09-06 09:11:52,557 - __main__ - INFO - Wake word detected (#2)
+2025-09-06 09:11:52,558 - __main__ - INFO - Processing voice command...
+2025-09-06 09:11:52,558 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:11:52,558 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-06 09:11:52,558 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-06 09:11:58,501 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:12:00,740 - modules.audio - INFO - Audio recording completed:
+2025-09-06 09:12:00,741 - modules.audio - INFO -   Duration: 8.00s
+2025-09-06 09:12:00,741 - modules.audio - INFO -   Samples: 128000
+2025-09-06 09:12:00,741 - modules.audio - INFO -   RMS volume: 0.0230
+2025-09-06 09:12:00,741 - modules.audio - INFO -   Max volume: 0.1515
+2025-09-06 09:12:00,741 - modules.audio - INFO - Good audio level detected (RMS: 0.0230)
+2025-09-06 09:12:00,741 - modules.audio - INFO - Applying gain factor: 1.98 (original max volume: 0.1515)
+2025-09-06 09:12:00,742 - modules.audio - INFO - After gain - RMS: 0.0456, Max: 0.3000
+2025-09-06 09:12:00,743 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-06 09:12:00,814 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp7zi5995n.wav
+2025-09-06 09:12:00,814 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-06 09:12:00,814 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-06 09:12:00,814 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-06 09:12:00,814 - modules.audio - INFO -   Channels: 1
+2025-09-06 09:12:00,814 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-06 09:12:00,814 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-06 09:12:00,815 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp7zi5995n.wav
+2025-09-06 09:12:00,815 - modules.audio - INFO - Running Whisper transcription...
+2025-09-06 09:12:02,015 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-06 09:12:02,015 - modules.audio - INFO - Whisper transcription completed
+2025-09-06 09:12:02,015 - modules.audio - INFO - Whisper result details:
+2025-09-06 09:12:02,015 - modules.audio - INFO -   Text: 'Write me a 50 word essay on climate change.'
+2025-09-06 09:12:02,015 - modules.audio - INFO -   Language: en
+2025-09-06 09:12:02,015 - modules.audio - INFO -   Segments: 1
+2025-09-06 09:12:02,015 - modules.audio - INFO -     Segment 1: 'Write me a 50 word essay on climate change.' (0.00-8.00s, prob: -0.446)
+2025-09-06 09:12:02,015 - modules.audio - INFO - Transcription result: 'Write me a 50 word essay on climate change.'
+2025-09-06 09:12:02,016 - __main__ - INFO - Command received: 'Write me a 50 word essay on climate change.'
+2025-09-06 09:12:02,016 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:12:02,016 - orchestrator - INFO - Starting command execution [cmd_1757130122016]: 'Write me a 50 word essay on climate change.'
+2025-09-06 09:12:52,049 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-09-06 09:12:52,051 - __main__ - INFO - Initiating AURA shutdown...
+2025-09-06 09:12:52,051 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-09-06 09:12:57,055 - __main__ - WARNING - Wake word thread did not stop gracefully
+2025-09-06 09:12:57,056 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-09-06 09:12:57,056 - __main__ - INFO - Running 5 cleanup handlers...
+2025-09-06 09:12:57,059 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
+2025-09-06 09:14:16,073 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-09-06 09:14:16,073 - __main__ - INFO - Starting AURA application...
+2025-09-06 09:14:16,073 - __main__ - INFO - Step 1: Validating configuration...
+2025-09-06 09:14:17,217 - config - INFO - Detected currently loaded model: google/gemma-3-4b
+2025-09-06 09:14:17,217 - config - INFO - Currently loaded model is vision-capable: google/gemma-3-4b
+2025-09-06 09:14:17,217 - __main__ - INFO - Step 2: Running startup checks...
+2025-09-06 09:14:17,217 - __main__ - INFO - Running 5 startup checks...
+2025-09-06 09:14:19,514 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-09-06 09:14:19,515 - __main__ - INFO - Step 3: Initializing core modules...
+2025-09-06 09:14:19,515 - modules.audio - INFO - Loading Whisper model...
+2025-09-06 09:14:21,779 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-06 09:14:21,780 - modules.audio - INFO - Initializing TTS engine...
+2025-09-06 09:14:22,534 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-06 09:14:22,534 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-06 09:14:22,545 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-06 09:14:22,545 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-06 09:14:22,545 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-06 09:14:22,545 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-06 09:14:22,545 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-06 09:14:22,781 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-06 09:14:22,781 - modules.feedback - INFO - Loading sound files...
+2025-09-06 09:14:22,788 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-06 09:14:22,789 - modules.feedback - INFO - Feedback processing loop started
+2025-09-06 09:14:22,789 - modules.feedback - INFO - Feedback processing thread started
+2025-09-06 09:14:22,789 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-06 09:14:22,789 - orchestrator - INFO - Initializing AURA modules...
+2025-09-06 09:14:22,789 - orchestrator - INFO - Initializing Vision Module...
+2025-09-06 09:14:22,795 - modules.vision - INFO - VisionModule initialized
+2025-09-06 09:14:22,795 - orchestrator - INFO - Vision Module initialized successfully
+2025-09-06 09:14:22,795 - orchestrator - INFO - Initializing Reasoning Module...
+2025-09-06 09:14:22,814 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-09-06 09:14:22,814 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-09-06 09:14:22,814 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-09-06 09:14:22,814 - orchestrator - INFO - Initializing Automation Module...
+2025-09-06 09:14:23,141 - modules.automation - INFO - AutomationModule initialized. Screen size: 2560x1600
+2025-09-06 09:14:23,142 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-09-06 09:14:23,142 - modules.automation - INFO - macOS detected - using cliclick as PRIMARY automation method
+2025-09-06 09:14:23,142 - modules.automation - INFO - AppleScript available as fallback only
+2025-09-06 09:14:23,142 - orchestrator - INFO - Automation Module initialized successfully
+2025-09-06 09:14:23,142 - orchestrator - INFO - Initializing Audio Module...
+2025-09-06 09:14:23,142 - modules.audio - INFO - Loading Whisper model...
+2025-09-06 09:14:24,867 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-06 09:14:24,867 - modules.audio - INFO - Initializing TTS engine...
+2025-09-06 09:14:25,033 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-06 09:14:25,033 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-06 09:14:25,037 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-06 09:14:25,037 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-06 09:14:25,037 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-06 09:14:25,037 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-06 09:14:25,037 - orchestrator - INFO - Audio Module initialized successfully
+2025-09-06 09:14:25,037 - orchestrator - INFO - Initializing Feedback Module...
+2025-09-06 09:14:25,037 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-06 09:14:25,037 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-06 09:14:25,037 - modules.feedback - INFO - Loading sound files...
+2025-09-06 09:14:25,039 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-06 09:14:25,039 - modules.feedback - INFO - Feedback processing loop started
+2025-09-06 09:14:25,039 - modules.feedback - INFO - Feedback processing thread started
+2025-09-06 09:14:25,039 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-06 09:14:25,039 - orchestrator - INFO - Feedback Module initialized successfully
+2025-09-06 09:14:25,039 - orchestrator - INFO - Initializing Accessibility Module...
+2025-09-06 09:14:25,041 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 09:14:25,057 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:14:25,057 - modules.accessibility - INFO - Permission validation: ✅ Accessibility permissions granted (FULL)
+2025-09-06 09:14:25,057 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-06 09:14:25,057 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 09:14:25,057 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 09:14:25,057 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 09:14:25,057 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 09:14:25,057 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 09:14:25,057 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 09:14:25,057 - modules.accessibility - INFO - Debugging tools initialized successfully
+2025-09-06 09:14:25,057 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-06 09:14:25,057 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-06 09:14:25,057 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-06 09:14:25,057 - orchestrator - INFO - Accessibility Module initialized successfully
+2025-09-06 09:14:25,058 - orchestrator - INFO - Initializing debugging and diagnostic tools...
+2025-09-06 09:14:25,058 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-06 09:14:25,058 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-06 09:14:25,058 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-06 09:14:25,058 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-06 09:14:25,058 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-06 09:14:25,058 - orchestrator - INFO - Debugging tools initialized successfully
+2025-09-06 09:14:25,058 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback, accessibility
+2025-09-06 09:14:25,058 - orchestrator - INFO - All modules initialized successfully
+2025-09-06 09:14:25,058 - orchestrator - INFO - System health monitoring initialized
+2025-09-06 09:14:25,058 - orchestrator - INFO - Orchestrator initialized successfully
+2025-09-06 09:14:25,058 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-09-06 09:14:25,058 - __main__ - INFO - All modules verified successfully
+2025-09-06 09:14:25,058 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-09-06 09:14:25,058 - __main__ - INFO - Health monitoring started
+2025-09-06 09:14:25,058 - __main__ - INFO - Step 6: Startup completed successfully
+2025-09-06 09:14:25,058 - __main__ - INFO - AURA application startup completed in 8.99s
+2025-09-06 09:14:25,058 - modules.audio - INFO - Converting text to speech: 'AURA is ready. Say 'computer' to activate....'
+2025-09-06 09:14:25,059 - __main__ - INFO - Starting main application loop...
+2025-09-06 09:14:25,059 - __main__ - INFO - Wake word monitoring started
+2025-09-06 09:14:25,072 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:14:27,909 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 09:14:30,161 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:14:30,283 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:14:30,529 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-06 09:14:30,530 - modules.audio - INFO - Providing wake word confirmation
+2025-09-06 09:14:30,662 - __main__ - INFO - Wake word detected (#1)
+2025-09-06 09:14:30,662 - __main__ - INFO - Processing voice command...
+2025-09-06 09:14:30,662 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:14:30,662 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-06 09:14:30,662 - modules.audio - INFO - Starting synchronous audio recording...
+2025-09-06 09:14:38,849 - modules.audio - INFO - Audio recording completed:
+2025-09-06 09:14:38,849 - modules.audio - INFO -   Duration: 8.00s
+2025-09-06 09:14:38,849 - modules.audio - INFO -   Samples: 128000
+2025-09-06 09:14:38,849 - modules.audio - INFO -   RMS volume: 0.0190
+2025-09-06 09:14:38,849 - modules.audio - INFO -   Max volume: 0.1416
+2025-09-06 09:14:38,849 - modules.audio - INFO - Good audio level detected (RMS: 0.0190)
+2025-09-06 09:14:38,850 - modules.audio - INFO - Applying gain factor: 2.12 (original max volume: 0.1416)
+2025-09-06 09:14:38,850 - modules.audio - INFO - After gain - RMS: 0.0402, Max: 0.3000
+2025-09-06 09:14:38,851 - modules.audio - INFO - Successfully recorded and processed 128000 audio samples
+2025-09-06 09:14:38,919 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp469y9o7s.wav
+2025-09-06 09:14:38,919 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-06 09:14:38,919 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-06 09:14:38,919 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-06 09:14:38,919 - modules.audio - INFO -   Channels: 1
+2025-09-06 09:14:38,920 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-06 09:14:38,920 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-06 09:14:38,920 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp469y9o7s.wav
+2025-09-06 09:14:38,920 - modules.audio - INFO - Running Whisper transcription...
+2025-09-06 09:14:40,361 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-06 09:14:40,361 - modules.audio - INFO - Whisper transcription completed
+2025-09-06 09:14:40,361 - modules.audio - INFO - Whisper result details:
+2025-09-06 09:14:40,361 - modules.audio - INFO -   Text: 'Write me a 50 word essay on climate change.'
+2025-09-06 09:14:40,361 - modules.audio - INFO -   Language: en
+2025-09-06 09:14:40,361 - modules.audio - INFO -   Segments: 1
+2025-09-06 09:14:40,361 - modules.audio - INFO -     Segment 1: 'Write me a 50 word essay on climate change.' (0.00-8.00s, prob: -0.537)
+2025-09-06 09:14:40,361 - modules.audio - INFO - Transcription result: 'Write me a 50 word essay on climate change.'
+2025-09-06 09:14:40,362 - __main__ - INFO - Command received: 'Write me a 50 word essay on climate change.'
+2025-09-06 09:14:40,362 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:14:40,362 - orchestrator - INFO - Starting command execution [cmd_1757130280362]: 'Write me a 50 word essay on climate change.'
+2025-09-06 09:14:40,362 - orchestrator - INFO - [cmd_1757130280362] Step 1: Intent recognition and routing
+2025-09-06 09:14:44,364 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-06 09:14:44,365 - orchestrator - INFO - Intent recognized: deferred_action (confidence: 0.98)
+2025-09-06 09:14:44,365 - orchestrator - INFO - [cmd_1757130280362] Intent recognized: deferred_action (confidence: 0.98)
+2025-09-06 09:14:44,366 - orchestrator - INFO - [cmd_1757130280362] Routing to deferred action handler
+2025-09-06 09:14:44,366 - orchestrator - INFO - [cmd_1757130280362] Starting deferred action workflow
+2025-09-06 09:14:44,366 - orchestrator - INFO - [cmd_1757130280362] Content request: Write a 50‑word essay on climate change, Type: text
+2025-09-06 09:14:50,950 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-06 09:14:50,957 - orchestrator - INFO - [cmd_1757130280362] Content generation successful (406 chars)
+2025-09-06 09:14:50,957 - orchestrator - INFO - [cmd_1757130280362] Content generated successfully (406 characters)
+2025-09-06 09:14:50,961 - utils.mouse_listener - INFO - Starting global mouse listener
+2025-09-06 09:14:51,067 - utils.mouse_listener - INFO - Global mouse listener started successfully
+2025-09-06 09:14:51,271 - orchestrator - INFO - [cmd_1757130280362] Global mouse listener started successfully for deferred action
+2025-09-06 09:14:51,272 - orchestrator - INFO - [cmd_1757130280362] Deferred action workflow initiated successfully
+2025-09-06 09:14:51,273 - __main__ - WARNING - Command execution had issues: []
+2025-09-06 09:14:51,273 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:14:51,475 - modules.audio - INFO - Converting text to speech: 'Text generated successfully. Click ... where ... y...'
+2025-09-06 09:14:53,749 - utils.mouse_listener - INFO - Mouse click detected at (564.47265625, 297.6875) with left button
+2025-09-06 09:14:53,750 - orchestrator - INFO - [cmd_1757130280362] Deferred action triggered by user click
+2025-09-06 09:14:53,750 - orchestrator - INFO - [cmd_1757130280362] Executing deferred action at coordinates: (564.47265625, 297.6875)
+2025-09-06 09:14:53,750 - orchestrator - INFO - [cmd_1757130280362] Executing type action with 406 characters
+2025-09-06 09:14:53,750 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:14:53,751 - modules.automation - INFO - Executing action: click (attempt 1/4)
+2025-09-06 09:14:53,888 - modules.automation - INFO - cliclick SLOW PATH: Click succeeded at (564, 297) on 'unknown' in 0.137s
+2025-09-06 09:14:53,889 - modules.automation - INFO - Successfully executed action: click
+2025-09-06 09:14:54,094 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-06 09:14:54,094 - modules.automation - INFO - Executing action: type (attempt 1/4)
+2025-09-06 09:14:55,875 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 09:14:56,367 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:14:56,483 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:15:00,227 - __main__ - INFO - AURA Status Report - Uptime: 44.2s, Wake words: 1 (81.5/hr), Commands: 1 (81.5/hr), Errors: 0, Threads: 13 (Wake: Running, Health: Stopped), Memory: 2845.6MB, CPU: 30.8%, Cache: 0.0% hit rate, Health: fair
+2025-09-06 09:15:01,560 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:15:01,669 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:15:04,110 - modules.automation - ERROR - cliclick SLOW PATH: Typing timed out after 10.016s
+2025-09-06 09:15:04,111 - modules.automation - WARNING - cliclick typing failed, trying AppleScript (FALLBACK)
+2025-09-06 09:15:05,006 - modules.automation - INFO - Successfully executed action: type
+2025-09-06 09:15:05,006 - orchestrator - INFO - [cmd_1757130280362] Successfully typed 406 characters
+2025-09-06 09:15:05,007 - orchestrator - INFO - [cmd_1757130280362] Deferred action completed successfully
+2025-09-06 09:15:05,212 - modules.audio - INFO - Converting text to speech: '... Text placed successfully....'
+2025-09-06 09:15:06,773 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:15:06,888 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:15:07,458 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-06 09:15:11,977 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:15:12,086 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:15:17,174 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:15:17,293 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-06 09:15:21,030 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-09-06 09:15:21,031 - __main__ - INFO - Initiating AURA shutdown...
+2025-09-06 09:15:21,031 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-09-06 09:15:22,396 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-06 09:15:22,519 - __main__ - INFO - Wake word monitoring stopped
+2025-09-06 09:15:22,520 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-09-06 09:15:22,520 - __main__ - INFO - Running 5 cleanup handlers...
+2025-09-06 09:15:22,521 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'

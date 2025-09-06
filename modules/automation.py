@@ -1013,31 +1013,56 @@ class AutomationModule:
     def _macos_type(self, text: str) -> bool:
         """Execute typing using AppleScript on macOS."""
         try:
-            # Escape special characters for AppleScript
-            escaped_text = text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
+            # For AppleScript, we need to handle newlines differently
+            # Split text by newlines and type each line separately with return key presses
+            lines = text.split('\n')
             
-            applescript = f'''
-            tell application "System Events"
-                keystroke "{escaped_text}"
-            end tell
-            '''
+            for i, line in enumerate(lines):
+                if line:  # Only type non-empty lines
+                    # Escape special characters for AppleScript (but not newlines)
+                    escaped_line = line.replace('\\', '\\\\').replace('"', '\\"').replace('\r', '\\r')
+                    
+                    # Type the line
+                    applescript = f'''
+                    tell application "System Events"
+                        keystroke "{escaped_line}"
+                    end tell
+                    '''
+                    
+                    result = subprocess.run(
+                        ['osascript', '-e', applescript],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                        check=False
+                    )
+                    
+                    if result.returncode != 0:
+                        logger.warning(f"AppleScript typing failed for line {i}: {result.stderr}")
+                        return False
+                
+                # Add newline (return key) after each line except the last one
+                if i < len(lines) - 1:
+                    return_applescript = '''
+                    tell application "System Events"
+                        key code 36
+                    end tell
+                    '''
+                    
+                    result = subprocess.run(
+                        ['osascript', '-e', return_applescript],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                        check=False
+                    )
+                    
+                    if result.returncode != 0:
+                        logger.warning(f"AppleScript return key failed after line {i}: {result.stderr}")
+                        return False
             
-            logger.debug(f"Executing macOS typing: {text[:50]}{'...' if len(text) > 50 else ''}")
-            
-            result = subprocess.run(
-                ['osascript', '-e', applescript],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False
-            )
-            
-            if result.returncode == 0:
-                logger.debug(f"macOS typing executed successfully")
-                return True
-            else:
-                logger.warning(f"AppleScript typing failed: {result.stderr}")
-                return False
+            logger.debug(f"macOS typing executed successfully: {len(text)} characters, {len(lines)} lines")
+            return True
             
         except subprocess.TimeoutExpired:
             logger.error(f"macOS typing timed out")
