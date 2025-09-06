@@ -276,18 +276,44 @@ LOG_FUZZY_MATCH_SCORES = False
 # -- Conversational Enhancement Settings --
 # Deferred action configuration
 DEFERRED_ACTION_TIMEOUT = 300.0  # Maximum wait time for user action (5 minutes)
-MOUSE_LISTENER_SENSITIVITY = 1.0  # Click detection sensitivity
+DEFERRED_ACTION_MAX_TIMEOUT = 600.0  # Absolute maximum timeout (10 minutes)
+DEFERRED_ACTION_MIN_TIMEOUT = 30.0   # Minimum timeout (30 seconds)
+MOUSE_LISTENER_SENSITIVITY = 1.0  # Click detection sensitivity (0.1 - 2.0)
+MOUSE_LISTENER_DOUBLE_CLICK_TIME = 0.5  # Time window for double-click detection
 DEFERRED_ACTION_AUDIO_CUES = True  # Enable audio guidance for deferred actions
+DEFERRED_ACTION_VISUAL_FEEDBACK = True  # Enable visual feedback during waiting
+DEFERRED_ACTION_RETRY_ATTEMPTS = 3  # Number of retry attempts for failed actions
+
+# Mouse listener configuration
+MOUSE_LISTENER_THREAD_TIMEOUT = 10.0  # Timeout for mouse listener thread operations
+MOUSE_LISTENER_CLEANUP_DELAY = 1.0    # Delay before cleaning up mouse listener resources
+MOUSE_LISTENER_ERROR_RECOVERY = True  # Enable automatic error recovery for mouse listener
+GLOBAL_MOUSE_EVENTS_ENABLED = True    # Enable global mouse event capture
 
 # Conversational settings
 CONVERSATION_CONTEXT_SIZE = 5  # Number of previous exchanges to remember
+CONVERSATION_MAX_CONTEXT_SIZE = 20  # Maximum context size limit
 CONVERSATION_PERSONALITY = "helpful"  # Response personality style
+CONVERSATION_RESPONSE_MAX_LENGTH = 500  # Maximum response length in characters
+CONVERSATION_TIMEOUT = 30.0  # Timeout for conversational response generation
 ENABLE_FOLLOW_UP_SUGGESTIONS = True  # Suggest related questions
+CONVERSATION_MEMORY_ENABLED = True   # Enable conversation memory across sessions
 
 # Intent recognition settings
 INTENT_RECOGNITION_ENABLED = True  # Enable intelligent intent classification
 INTENT_FALLBACK_TO_GUI = True  # Fallback to GUI interaction when intent unclear
 INTENT_CONFIDENCE_THRESHOLD = 0.7  # Minimum confidence for intent classification
+INTENT_RECOGNITION_TIMEOUT = 15.0  # Timeout for intent recognition processing
+INTENT_CLASSIFICATION_RETRIES = 2  # Number of retries for failed intent classification
+INTENT_CACHE_ENABLED = True  # Enable caching of intent classification results
+INTENT_CACHE_TTL = 300  # Intent cache time-to-live in seconds
+
+# Content generation settings
+CODE_GENERATION_MAX_LENGTH = 2000  # Maximum length for generated code
+CODE_GENERATION_TIMEOUT = 45.0     # Timeout for code generation
+TEXT_GENERATION_MAX_LENGTH = 1000  # Maximum length for generated text
+CONTENT_VALIDATION_ENABLED = True  # Enable validation of generated content
+CONTENT_SANITIZATION_ENABLED = True  # Enable sanitization of generated content
 
 # -- Audio Settings --
 # Path to sound effects for feedback
@@ -511,13 +537,27 @@ def print_setup_instructions():
     print("   conda activate aura")
     print("\n3. Install dependencies:")
     print("   pip install -r requirements.txt")
-    print("\n4. API keys are already configured in config.py")
+    print("\n4. Verify conversational enhancement dependencies:")
+    print("   python -c \"import pynput; print('✅ pynput installed')\"")
+    print("   python -c \"from pynput import mouse, keyboard; print('✅ pynput mouse/keyboard support')\"")
+    print("\n5. API keys are already configured in config.py")
     print("   To override, set environment variables:")
     print("   export REASONING_API_KEY='your_custom_api_key_here'")
     print("   export PORCUPINE_API_KEY='your_custom_porcupine_key_here'")
-    print("\n5. Run AURA:")
+    print("\n6. Configure conversational enhancement (optional):")
+    print("   - Adjust DEFERRED_ACTION_TIMEOUT for longer/shorter wait times")
+    print("   - Modify CONVERSATION_CONTEXT_SIZE for conversation memory")
+    print("   - Set INTENT_CONFIDENCE_THRESHOLD for intent recognition sensitivity")
+    print("\n7. Run AURA:")
     print("   python main.py")
     print("\n" + "="*60)
+    print("\nCONVERSATIONAL ENHANCEMENT FEATURES:")
+    print("- Intent-based command routing")
+    print("- Natural conversation capabilities") 
+    print("- Deferred action workflows (generate content, then click to place)")
+    print("- Global mouse event handling")
+    print("- Enhanced state management")
+    print("="*60)
 
 # -- Dynamic Model Detection --
 def get_active_vision_model():
@@ -676,6 +716,89 @@ def update_vision_model():
     return VISION_MODEL
 
 # -- Configuration Validation --
+def validate_conversational_config():
+    """Validate conversational enhancement configuration settings."""
+    errors = []
+    warnings = []
+    
+    # Validate deferred action settings
+    if not (DEFERRED_ACTION_MIN_TIMEOUT <= DEFERRED_ACTION_TIMEOUT <= DEFERRED_ACTION_MAX_TIMEOUT):
+        errors.append(f"DEFERRED_ACTION_TIMEOUT ({DEFERRED_ACTION_TIMEOUT}) must be between {DEFERRED_ACTION_MIN_TIMEOUT} and {DEFERRED_ACTION_MAX_TIMEOUT}")
+    
+    if not (0.1 <= MOUSE_LISTENER_SENSITIVITY <= 2.0):
+        errors.append(f"MOUSE_LISTENER_SENSITIVITY ({MOUSE_LISTENER_SENSITIVITY}) must be between 0.1 and 2.0")
+    
+    if not (0.1 <= MOUSE_LISTENER_DOUBLE_CLICK_TIME <= 2.0):
+        errors.append(f"MOUSE_LISTENER_DOUBLE_CLICK_TIME ({MOUSE_LISTENER_DOUBLE_CLICK_TIME}) must be between 0.1 and 2.0")
+    
+    if DEFERRED_ACTION_RETRY_ATTEMPTS < 1 or DEFERRED_ACTION_RETRY_ATTEMPTS > 10:
+        errors.append(f"DEFERRED_ACTION_RETRY_ATTEMPTS ({DEFERRED_ACTION_RETRY_ATTEMPTS}) must be between 1 and 10")
+    
+    # Validate conversational settings
+    if not (1 <= CONVERSATION_CONTEXT_SIZE <= CONVERSATION_MAX_CONTEXT_SIZE):
+        errors.append(f"CONVERSATION_CONTEXT_SIZE ({CONVERSATION_CONTEXT_SIZE}) must be between 1 and {CONVERSATION_MAX_CONTEXT_SIZE}")
+    
+    if CONVERSATION_RESPONSE_MAX_LENGTH < 50 or CONVERSATION_RESPONSE_MAX_LENGTH > 2000:
+        errors.append(f"CONVERSATION_RESPONSE_MAX_LENGTH ({CONVERSATION_RESPONSE_MAX_LENGTH}) must be between 50 and 2000")
+    
+    if CONVERSATION_TIMEOUT < 5.0 or CONVERSATION_TIMEOUT > 120.0:
+        errors.append(f"CONVERSATION_TIMEOUT ({CONVERSATION_TIMEOUT}) must be between 5.0 and 120.0 seconds")
+    
+    # Validate intent recognition settings
+    if not (0.1 <= INTENT_CONFIDENCE_THRESHOLD <= 1.0):
+        errors.append(f"INTENT_CONFIDENCE_THRESHOLD ({INTENT_CONFIDENCE_THRESHOLD}) must be between 0.1 and 1.0")
+    
+    if INTENT_RECOGNITION_TIMEOUT < 5.0 or INTENT_RECOGNITION_TIMEOUT > 60.0:
+        errors.append(f"INTENT_RECOGNITION_TIMEOUT ({INTENT_RECOGNITION_TIMEOUT}) must be between 5.0 and 60.0 seconds")
+    
+    if INTENT_CLASSIFICATION_RETRIES < 0 or INTENT_CLASSIFICATION_RETRIES > 5:
+        errors.append(f"INTENT_CLASSIFICATION_RETRIES ({INTENT_CLASSIFICATION_RETRIES}) must be between 0 and 5")
+    
+    if INTENT_CACHE_TTL < 60 or INTENT_CACHE_TTL > 3600:
+        warnings.append(f"INTENT_CACHE_TTL ({INTENT_CACHE_TTL}) should be between 60 and 3600 seconds for optimal performance")
+    
+    # Validate content generation settings
+    if CODE_GENERATION_MAX_LENGTH < 100 or CODE_GENERATION_MAX_LENGTH > 10000:
+        errors.append(f"CODE_GENERATION_MAX_LENGTH ({CODE_GENERATION_MAX_LENGTH}) must be between 100 and 10000")
+    
+    if TEXT_GENERATION_MAX_LENGTH < 50 or TEXT_GENERATION_MAX_LENGTH > 5000:
+        errors.append(f"TEXT_GENERATION_MAX_LENGTH ({TEXT_GENERATION_MAX_LENGTH}) must be between 50 and 5000")
+    
+    if CODE_GENERATION_TIMEOUT < 10.0 or CODE_GENERATION_TIMEOUT > 180.0:
+        errors.append(f"CODE_GENERATION_TIMEOUT ({CODE_GENERATION_TIMEOUT}) must be between 10.0 and 180.0 seconds")
+    
+    # Validate prompt templates
+    required_prompts = {
+        'INTENT_RECOGNITION_PROMPT': INTENT_RECOGNITION_PROMPT,
+        'CONVERSATIONAL_PROMPT': CONVERSATIONAL_PROMPT,
+        'CODE_GENERATION_PROMPT': CODE_GENERATION_PROMPT
+    }
+    
+    for prompt_name, prompt_value in required_prompts.items():
+        if not prompt_value or not isinstance(prompt_value, str):
+            errors.append(f"{prompt_name} is not properly configured")
+        elif len(prompt_value.strip()) < 50:
+            warnings.append(f"{prompt_name} seems too short, may not provide adequate instructions")
+        
+        # Check for required placeholders
+        if prompt_name == 'INTENT_RECOGNITION_PROMPT' and '{command}' not in prompt_value:
+            errors.append(f"{prompt_name} must contain '{{command}}' placeholder")
+        elif prompt_name == 'CONVERSATIONAL_PROMPT' and '{query}' not in prompt_value:
+            errors.append(f"{prompt_name} must contain '{{query}}' placeholder")
+        elif prompt_name == 'CODE_GENERATION_PROMPT' and ('{request}' not in prompt_value or '{context}' not in prompt_value):
+            errors.append(f"{prompt_name} must contain '{{request}}' and '{{context}}' placeholders")
+    
+    # Check pynput dependency
+    try:
+        import pynput
+        from pynput import mouse, keyboard
+    except ImportError as e:
+        errors.append(f"pynput dependency not available: {e}")
+    except Exception as e:
+        warnings.append(f"pynput import warning: {e}")
+    
+    return errors, warnings
+
 def validate_config():
     """Validate configuration settings and provide helpful error messages."""
     errors = []
@@ -708,6 +831,11 @@ def validate_config():
     
     if not REASONING_API_BASE or not REASONING_API_BASE.startswith('http'):
         errors.append("Invalid REASONING_API_BASE URL")
+    
+    # Validate conversational enhancement settings
+    conv_errors, conv_warnings = validate_conversational_config()
+    errors.extend(conv_errors)
+    warnings.extend(conv_warnings)
     
     # Check model names
     if not VISION_MODEL:
