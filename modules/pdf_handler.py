@@ -216,22 +216,64 @@ class PDFHandler:
             File path or None if not found
         """
         try:
-            # Adobe applications might have different AppleScript interfaces
-            script = '''
+            self.logger.debug("Attempting to get Adobe PDF file path")
+            
+            # Method 1: Try to get document path directly from Adobe Acrobat
+            acrobat_script = '''
+            try
+                tell application "Adobe Acrobat Pro"
+                    if (count of documents) > 0 then
+                        set activeDoc to document 1
+                        set docPath to file path of activeDoc
+                        return docPath
+                    end if
+                end tell
+            on error
+                try
+                    tell application "Adobe Acrobat Reader"
+                        if (count of documents) > 0 then
+                            set activeDoc to document 1
+                            set docPath to file path of activeDoc
+                            return docPath
+                        end if
+                    end tell
+                on error
+                    return ""
+                end try
+            end try
+            '''
+            
+            result = subprocess.run(
+                ['osascript', '-e', acrobat_script],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0 and result.stdout.strip():
+                file_path = result.stdout.strip()
+                if file_path and file_path != "":
+                    self.logger.debug(f"Got Adobe document path: {file_path}")
+                    return file_path
+            
+            # Method 2: Try to get window title and parse it
+            window_script = '''
             tell application "System Events"
                 set frontApp to name of first process whose frontmost is true
-                if frontApp contains "Adobe" then
+                if frontApp contains "Adobe" or frontApp contains "Acrobat" then
                     tell process frontApp
-                        set frontWindow to window 1
-                        set windowTitle to title of frontWindow
-                        return windowTitle
+                        if (count of windows) > 0 then
+                            set frontWindow to window 1
+                            set windowTitle to title of frontWindow
+                            return windowTitle
+                        end if
                     end tell
                 end if
             end tell
             '''
             
             result = subprocess.run(
-                ['osascript', '-e', script],
+                ['osascript', '-e', window_script],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -239,14 +281,24 @@ class PDFHandler:
             
             if result.returncode == 0 and result.stdout.strip():
                 window_title = result.stdout.strip()
-                # Adobe often shows filename in window title
-                # Try to extract file path or at least filename
+                self.logger.debug(f"Got Adobe window title: {window_title}")
+                
+                # Parse window title to extract filename/path
                 if '.pdf' in window_title.lower():
-                    # This is a simplified approach - in practice, we might need
-                    # more sophisticated parsing or different methods
-                    return window_title
+                    # Adobe often shows "filename.pdf - Adobe Acrobat Reader" or similar
+                    # Try to extract just the filename part
+                    if ' - ' in window_title:
+                        filename = window_title.split(' - ')[0].strip()
+                        if filename.lower().endswith('.pdf'):
+                            # Try to find this file in common locations
+                            return self._find_pdf_file_by_name(filename)
+                    else:
+                        # Window title might be just the filename
+                        if window_title.lower().endswith('.pdf'):
+                            return self._find_pdf_file_by_name(window_title)
             
-            return None
+            # Method 3: Try to get the most recently accessed PDF file
+            return self._get_recent_pdf_file()
             
         except Exception as e:
             self.logger.error(f"Error getting Adobe file path: {e}")
@@ -306,17 +358,36 @@ class PDFHandler:
             Extracted text content or None if extraction fails
         """
         try:
-            # First, try to get the file path
+            self.logger.info(f"Attempting to extract text from PDF in {app_name}")
+            
+            # Method 1: Try to get the exact file path and extract from file
             file_path = self.get_pdf_file_path_from_application(app_name)
             
             if file_path and os.path.exists(file_path):
                 self.logger.info(f"Found PDF file path: {file_path}")
-                return self.extract_text_from_file(file_path)
+                content = self.extract_text_from_file(file_path)
+                if content and len(content.strip()) > 50:  # Ensure we got substantial content
+                    return content
+                else:
+                    self.logger.warning("File extraction returned insufficient content, trying AppleScript")
             else:
-                self.logger.warning(f"Could not determine PDF file path from {app_name}")
-                
-                # Fallback: try to use AppleScript to get text content directly
-                return self._extract_text_via_applescript(app_name)
+                self.logger.warning(f"Could not determine exact PDF file path from {app_name}")
+            
+            # Method 2: Fallback to AppleScript accessibility extraction
+            self.logger.info("Attempting AppleScript extraction as fallback")
+            applescript_content = self._extract_text_via_applescript(app_name)
+            if applescript_content and len(applescript_content.strip()) > 50:
+                return applescript_content
+            
+            # Method 3: Try enhanced AppleScript methods for Adobe specifically
+            if 'adobe' in app_name.lower() or 'acrobat' in app_name.lower():
+                self.logger.info("Trying Adobe-specific extraction methods")
+                adobe_content = self._extract_text_from_adobe_direct(app_name)
+                if adobe_content and len(adobe_content.strip()) > 50:
+                    return adobe_content
+            
+            self.logger.error(f"All extraction methods failed for {app_name}")
+            return None
                 
         except Exception as e:
             self.logger.error(f"Error extracting text from open PDF in {app_name}: {e}")
@@ -335,15 +406,47 @@ class PDFHandler:
         try:
             self.logger.debug(f"Attempting AppleScript text extraction from {app_name}")
             
-            # This is a basic approach - different PDF readers may need different scripts
+            # Enhanced script that tries multiple approaches
             script = f'''
             tell application "System Events"
                 tell process "{app_name}"
                     if (count of windows) > 0 then
                         set frontWindow to window 1
-                        set textContent to value of every static text of frontWindow
+                        
+                        -- Try to get all text content from various UI elements
+                        set allText to {{}}
+                        
+                        -- Get static text elements
+                        try
+                            set staticTexts to value of every static text of frontWindow
+                            set allText to allText & staticTexts
+                        end try
+                        
+                        -- Get text from text areas and text fields
+                        try
+                            set textAreas to value of every text area of frontWindow
+                            set allText to allText & textAreas
+                        end try
+                        
+                        try
+                            set textFields to value of every text field of frontWindow
+                            set allText to allText & textFields
+                        end try
+                        
+                        -- Get text from scroll areas (common in PDF viewers)
+                        try
+                            set scrollAreas to every scroll area of frontWindow
+                            repeat with scrollArea in scrollAreas
+                                try
+                                    set scrollTexts to value of every static text of scrollArea
+                                    set allText to allText & scrollTexts
+                                end try
+                            end repeat
+                        end try
+                        
+                        -- Combine all text
                         set AppleScript's text item delimiters to " "
-                        set combinedText to textContent as string
+                        set combinedText to allText as string
                         set AppleScript's text item delimiters to ""
                         return combinedText
                     end if
@@ -370,6 +473,103 @@ class PDFHandler:
             
         except Exception as e:
             self.logger.error(f"Error in AppleScript text extraction: {e}")
+            return None
+    
+    def _extract_text_from_adobe_direct(self, app_name: str) -> Optional[str]:
+        """
+        Adobe-specific text extraction using direct AppleScript commands.
+        
+        Args:
+            app_name: Name of the Adobe application
+            
+        Returns:
+            Extracted text or None if extraction fails
+        """
+        try:
+            self.logger.debug(f"Attempting Adobe-specific text extraction from {app_name}")
+            
+            # Try Adobe-specific AppleScript commands
+            adobe_script = '''
+            try
+                tell application "Adobe Acrobat Pro"
+                    if (count of documents) > 0 then
+                        set activeDoc to document 1
+                        set docText to text of activeDoc
+                        return docText
+                    end if
+                end tell
+            on error
+                try
+                    tell application "Adobe Acrobat Reader"
+                        if (count of documents) > 0 then
+                            set activeDoc to document 1
+                            set docText to text of activeDoc
+                            return docText
+                        end if
+                    end tell
+                on error
+                    -- Fallback to accessibility approach for Adobe
+                    tell application "System Events"
+                        set adobeProcess to first process whose name contains "Adobe" or name contains "Acrobat"
+                        tell adobeProcess
+                            if (count of windows) > 0 then
+                                set frontWindow to window 1
+                                
+                                -- Try to find the main content area
+                                set allText to {}
+                                
+                                -- Look for groups that might contain PDF content
+                                try
+                                    set contentGroups to every group of frontWindow
+                                    repeat with contentGroup in contentGroups
+                                        try
+                                            set groupTexts to value of every static text of contentGroup
+                                            set allText to allText & groupTexts
+                                        end try
+                                    end repeat
+                                end try
+                                
+                                -- Also try scroll areas which often contain PDF content
+                                try
+                                    set scrollAreas to every scroll area of frontWindow
+                                    repeat with scrollArea in scrollAreas
+                                        try
+                                            set scrollTexts to value of every static text of scrollArea
+                                            set allText to allText & scrollTexts
+                                        end try
+                                    end repeat
+                                end try
+                                
+                                set AppleScript's text item delimiters to " "
+                                set combinedText to allText as string
+                                set AppleScript's text item delimiters to ""
+                                return combinedText
+                            end if
+                        end tell
+                    end tell
+                end try
+            end try
+            '''
+            
+            result = subprocess.run(
+                ['osascript', '-e', adobe_script],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0 and result.stdout.strip():
+                text_content = result.stdout.strip()
+                cleaned_content = self._clean_extracted_text(text_content)
+                
+                if len(cleaned_content) > 50:  # Only return if we got substantial content
+                    self.logger.info(f"Adobe-specific extraction successful: {len(cleaned_content)} characters")
+                    return cleaned_content
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error in Adobe-specific text extraction: {e}")
             return None
     
     def is_pdf_application(self, app_name: str, bundle_id: str = None) -> bool:
@@ -421,6 +621,105 @@ class PDFHandler:
                     return True
         
         return False
+    
+    def _find_pdf_file_by_name(self, filename: str) -> Optional[str]:
+        """
+        Find a PDF file by name in common locations.
+        
+        Args:
+            filename: Name of the PDF file to find
+            
+        Returns:
+            Full path to the file if found, None otherwise
+        """
+        try:
+            self.logger.debug(f"Searching for PDF file: {filename}")
+            
+            # Common locations where PDFs might be found
+            search_paths = [
+                os.path.expanduser("~/Downloads"),
+                os.path.expanduser("~/Documents"),
+                os.path.expanduser("~/Desktop"),
+                "/tmp",
+                "/var/tmp"
+            ]
+            
+            for search_path in search_paths:
+                if os.path.exists(search_path):
+                    potential_path = os.path.join(search_path, filename)
+                    if os.path.exists(potential_path):
+                        self.logger.debug(f"Found PDF file at: {potential_path}")
+                        return potential_path
+                    
+                    # Also search subdirectories (one level deep)
+                    try:
+                        for item in os.listdir(search_path):
+                            item_path = os.path.join(search_path, item)
+                            if os.path.isdir(item_path):
+                                potential_path = os.path.join(item_path, filename)
+                                if os.path.exists(potential_path):
+                                    self.logger.debug(f"Found PDF file at: {potential_path}")
+                                    return potential_path
+                    except (PermissionError, OSError):
+                        continue
+            
+            self.logger.warning(f"Could not find PDF file: {filename}")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error searching for PDF file {filename}: {e}")
+            return None
+    
+    def _get_recent_pdf_file(self) -> Optional[str]:
+        """
+        Get the most recently accessed PDF file as a fallback.
+        
+        Returns:
+            Path to the most recent PDF file, or None if not found
+        """
+        try:
+            self.logger.debug("Looking for recently accessed PDF files")
+            
+            # Search common locations for recently modified PDF files
+            search_paths = [
+                os.path.expanduser("~/Downloads"),
+                os.path.expanduser("~/Documents"),
+                os.path.expanduser("~/Desktop")
+            ]
+            
+            recent_pdfs = []
+            
+            for search_path in search_paths:
+                if os.path.exists(search_path):
+                    try:
+                        for root, dirs, files in os.walk(search_path):
+                            # Limit depth to avoid deep searches
+                            if root.count(os.sep) - search_path.count(os.sep) > 2:
+                                continue
+                                
+                            for file in files:
+                                if file.lower().endswith('.pdf'):
+                                    file_path = os.path.join(root, file)
+                                    try:
+                                        mtime = os.path.getmtime(file_path)
+                                        recent_pdfs.append((file_path, mtime))
+                                    except OSError:
+                                        continue
+                    except (PermissionError, OSError):
+                        continue
+            
+            if recent_pdfs:
+                # Sort by modification time (most recent first)
+                recent_pdfs.sort(key=lambda x: x[1], reverse=True)
+                most_recent = recent_pdfs[0][0]
+                self.logger.debug(f"Found most recent PDF: {most_recent}")
+                return most_recent
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error finding recent PDF files: {e}")
+            return None
     
     def get_installation_instructions(self) -> str:
         """

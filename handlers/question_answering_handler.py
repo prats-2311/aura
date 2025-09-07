@@ -8,8 +8,11 @@ and PDF text extraction capabilities before falling back to vision-based process
 
 import logging
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from handlers.base_handler import BaseHandler
+
+if TYPE_CHECKING:
+    from modules.application_detector import ApplicationInfo
 
 
 class QuestionAnsweringHandler(BaseHandler):
@@ -134,9 +137,46 @@ class QuestionAnsweringHandler(BaseHandler):
         self.logger.debug("Attempting fast path content extraction")
         self._fast_path_attempts += 1
         
-        # Placeholder implementation - will be implemented in later tasks
-        self.logger.debug("Fast path not yet implemented, returning None")
-        return None
+        try:
+            # Step 1: Detect active application
+            app_info = self._detect_active_application()
+            if not app_info:
+                self.logger.debug("Could not detect active application, falling back to vision")
+                return None
+            
+            # Step 2: Check if application is supported for fast path
+            if not self._is_supported_application(app_info):
+                self.logger.debug(f"Application {app_info.name} ({app_info.app_type.value}) not supported for fast path")
+                return None
+            
+            # Step 3: Get appropriate extraction method
+            extraction_method = self._get_extraction_method(app_info)
+            if not extraction_method:
+                self.logger.debug("No extraction method available for this application")
+                return None
+            
+            # Step 4: Extract content using the determined method
+            if extraction_method == "browser":
+                content = self._extract_browser_content()
+            elif extraction_method == "pdf":
+                content = self._extract_pdf_content()
+            else:
+                self.logger.warning(f"Unknown extraction method: {extraction_method}")
+                return None
+            
+            if not content:
+                self.logger.debug(f"Content extraction failed using {extraction_method} method")
+                return None
+            
+            self.logger.info(f"Successfully extracted content using {extraction_method} method ({len(content)} characters)")
+            
+            # Step 5: Summarize content (placeholder for now - will be implemented in later tasks)
+            # For now, return the extracted content directly
+            return content
+            
+        except Exception as e:
+            self.logger.error(f"Error in fast path processing: {e}")
+            return None
     
     def _extract_browser_content(self) -> Optional[str]:
         """
@@ -197,6 +237,102 @@ class QuestionAnsweringHandler(BaseHandler):
             method="vision_fallback",
             fallback_reason="not_implemented"
         )
+    
+    def _detect_active_application(self) -> Optional['ApplicationInfo']:
+        """
+        Detect the currently active application using ApplicationDetector.
+        
+        This method uses the ApplicationDetector module to get information about
+        the currently focused application, including its type and characteristics.
+        Implements comprehensive error handling with fallback mechanisms.
+        
+        Returns:
+            ApplicationInfo object if detection succeeds, None if it fails
+        """
+        try:
+            self.logger.debug("Detecting active application")
+            
+            # Initialize ApplicationDetector if not already done
+            if not self._application_detector:
+                from modules.application_detector import ApplicationDetector
+                self._application_detector = ApplicationDetector()
+                self.logger.debug("ApplicationDetector initialized")
+            
+            # Get active application info
+            app_info = self._application_detector.get_active_application_info()
+            
+            if app_info:
+                self.logger.info(f"Detected active application: {app_info.name} ({app_info.app_type.value})")
+                if app_info.browser_type:
+                    self.logger.debug(f"Browser type: {app_info.browser_type.value}")
+                return app_info
+            else:
+                self.logger.warning("Could not detect active application")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error detecting active application: {e}")
+            return None
+    
+    def _is_supported_application(self, app_info: 'ApplicationInfo') -> bool:
+        """
+        Check if the detected application is supported for fast-path content extraction.
+        
+        This method determines whether the application type supports fast text extraction
+        methods (browser accessibility APIs or PDF text extraction).
+        
+        Args:
+            app_info: ApplicationInfo object from application detection
+            
+        Returns:
+            True if application supports fast path extraction, False otherwise
+        """
+        try:
+            from modules.application_detector import ApplicationType
+            
+            # Check if application type is supported
+            supported_types = [ApplicationType.WEB_BROWSER, ApplicationType.PDF_READER]
+            
+            if app_info.app_type in supported_types:
+                self.logger.debug(f"Application type {app_info.app_type.value} is supported for fast path")
+                return True
+            else:
+                self.logger.debug(f"Application type {app_info.app_type.value} is not supported for fast path")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error checking application support: {e}")
+            return False
+    
+    def _get_extraction_method(self, app_info: 'ApplicationInfo') -> Optional[str]:
+        """
+        Determine the appropriate content extraction method based on application type.
+        
+        This method returns the extraction strategy to use based on the detected
+        application type and characteristics.
+        
+        Args:
+            app_info: ApplicationInfo object from application detection
+            
+        Returns:
+            String indicating extraction method ("browser", "pdf") or None if unsupported
+        """
+        try:
+            from modules.application_detector import ApplicationType
+            
+            if app_info.app_type == ApplicationType.WEB_BROWSER:
+                self.logger.debug("Selected browser extraction method")
+                return "browser"
+            elif app_info.app_type == ApplicationType.PDF_READER:
+                self.logger.debug("Selected PDF extraction method")
+                return "pdf"
+            else:
+                self.logger.debug(f"No extraction method available for application type: {app_info.app_type.value}")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error determining extraction method: {e}")
+            return None
     
     def get_performance_stats(self) -> Dict[str, Any]:
         """
