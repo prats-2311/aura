@@ -240,6 +240,197 @@ class Orchestrator:
             self.conversation_handler = None
             self.deferred_action_handler = None
     
+    def _recognize_intent(self, command: str) -> Dict[str, Any]:
+        """
+        Recognize the intent of a user command using LLM-based classification.
+        
+        Args:
+            command: The user command to classify
+            
+        Returns:
+            Dictionary containing intent classification results
+        """
+        try:
+            from config import INTENT_RECOGNITION_PROMPT
+            # Set a reasonable timeout for intent recognition
+            INTENT_RECOGNITION_TIMEOUT = 15.0
+            
+            logger.debug(f"Recognizing intent for command: {command}")
+            
+            # Check if reasoning module is available
+            if not self.reasoning_module or not self.module_availability.get('reasoning', False):
+                logger.warning("Reasoning module unavailable, defaulting to GUI interaction intent")
+                return {
+                    "intent": "gui_interaction",
+                    "confidence": 0.5,
+                    "parameters": {
+                        "action_type": "unknown",
+                        "target": command,
+                        "content_type": "unknown"
+                    },
+                    "reasoning": "Reasoning module unavailable, using fallback"
+                }
+            
+            # Format the prompt with the user command
+            formatted_prompt = INTENT_RECOGNITION_PROMPT.format(command=command)
+            
+            # Use reasoning module to classify intent
+            start_time = time.time()
+            response = self.reasoning_module._make_api_request(formatted_prompt)
+            
+            # Parse JSON response from API
+            try:
+                import json
+                
+                # Extract content from API response
+                if isinstance(response, dict):
+                    # Handle different response formats
+                    content = None
+                    if 'choices' in response and response['choices']:
+                        # OpenAI-style response
+                        content = response['choices'][0].get('message', {}).get('content', '')
+                    elif 'response' in response:
+                        # Ollama-style response
+                        content = response['response']
+                    elif 'content' in response:
+                        # Direct content response
+                        content = response['content']
+                    else:
+                        # Try to use the response directly if it's a string
+                        content = str(response)
+                else:
+                    content = str(response)
+                
+                if not content:
+                    raise ValueError("Empty response content from reasoning module")
+                
+                # Try to extract JSON from the content
+                import re
+                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    intent_result = json.loads(json_str)
+                else:
+                    # Try parsing the entire content
+                    intent_result = json.loads(content)
+                
+                # Validate required fields
+                required_fields = ["intent", "confidence", "parameters", "reasoning"]
+                if not all(field in intent_result for field in required_fields):
+                    raise ValueError("Missing required fields in intent recognition response")
+                
+                # Validate intent type
+                valid_intents = ["gui_interaction", "conversational_chat", "deferred_action", "question_answering"]
+                if intent_result["intent"] not in valid_intents:
+                    logger.warning(f"Invalid intent type: {intent_result['intent']}, defaulting to gui_interaction")
+                    intent_result["intent"] = "gui_interaction"
+                
+                # Ensure confidence is within valid range
+                confidence = float(intent_result["confidence"])
+                if confidence < 0.0 or confidence > 1.0:
+                    confidence = max(0.0, min(1.0, confidence))
+                    intent_result["confidence"] = confidence
+                
+                processing_time = time.time() - start_time
+                logger.info(f"Intent recognized: {intent_result['intent']} (confidence: {confidence:.2f}, time: {processing_time:.2f}s)")
+                
+                return intent_result
+                
+            except (json.JSONDecodeError, ValueError, KeyError) as e:
+                logger.error(f"Failed to parse intent recognition response: {e}")
+                logger.debug(f"Raw response: {response}")
+                
+                # Fallback to simple heuristic classification
+                return self._fallback_intent_classification(command)
+                
+        except Exception as e:
+            logger.error(f"Intent recognition failed: {e}")
+            return self._fallback_intent_classification(command)
+    
+    def _fallback_intent_classification(self, command: str) -> Dict[str, Any]:
+        """
+        Fallback intent classification using simple heuristics.
+        
+        Args:
+            command: The user command to classify
+            
+        Returns:
+            Dictionary containing fallback intent classification
+        """
+        command_lower = command.lower().strip()
+        
+        # Conversational patterns
+        conversational_patterns = [
+            "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+            "how are you", "what's up", "thanks", "thank you", "goodbye", "bye",
+            "tell me about", "what do you think", "can you help", "i need help"
+        ]
+        
+        # Deferred action patterns
+        deferred_patterns = [
+            "write code", "generate code", "create a function", "write a script",
+            "write an essay", "create content", "generate text", "write a letter",
+            "compose", "draft"
+        ]
+        
+        # Question answering patterns
+        question_patterns = [
+            "what is", "what does", "how does", "why does", "where is",
+            "when is", "who is", "explain", "describe", "summarize",
+            "what's on the screen", "what do you see"
+        ]
+        
+        # Check for conversational intent
+        if any(pattern in command_lower for pattern in conversational_patterns):
+            return {
+                "intent": "conversational_chat",
+                "confidence": 0.8,
+                "parameters": {
+                    "action_type": "general_conversation",
+                    "target": command,
+                    "content_type": "conversation"
+                },
+                "reasoning": "Matched conversational patterns in fallback classification"
+            }
+        
+        # Check for deferred action intent
+        if any(pattern in command_lower for pattern in deferred_patterns):
+            return {
+                "intent": "deferred_action",
+                "confidence": 0.7,
+                "parameters": {
+                    "action_type": "generate_content",
+                    "target": command,
+                    "content_type": "code" if "code" in command_lower else "text"
+                },
+                "reasoning": "Matched content generation patterns in fallback classification"
+            }
+        
+        # Check for question answering intent
+        if any(pattern in command_lower for pattern in question_patterns):
+            return {
+                "intent": "question_answering",
+                "confidence": 0.7,
+                "parameters": {
+                    "action_type": "general_question",
+                    "target": command,
+                    "content_type": "explanation"
+                },
+                "reasoning": "Matched question patterns in fallback classification"
+            }
+        
+        # Default to GUI interaction
+        return {
+            "intent": "gui_interaction",
+            "confidence": 0.6,
+            "parameters": {
+                "action_type": "unknown",
+                "target": command,
+                "content_type": "unknown"
+            },
+            "reasoning": "No specific patterns matched, defaulting to GUI interaction"
+        }
+
     def _get_handler_for_intent(self, intent: str):
         """
         Get the appropriate handler for an intent.
@@ -1297,226 +1488,7 @@ class Orchestrator:
                 except Exception as lock_error:
                     logger.error(f"Failed to release execution lock in finally block: {lock_error}")
 
-    
-    def _recognize_intent(self, command: str) -> Dict[str, Any]:
-        """
-        Recognize the intent of a user command using LLM-based classification.
-        
-        Args:
-            command (str): The user command to analyze
-            
-        Returns:
-            Dict[str, Any]: Intent classification result with type, confidence, and parameters
-        """
-        # CONCURRENCY FIX: Use timeout to prevent hanging on intent lock
-        intent_lock_acquired = False
-        try:
-            logger.debug("Attempting to acquire intent recognition lock")
-            intent_lock_acquired = self.intent_lock.acquire(timeout=10.0)
-            if not intent_lock_acquired:
-                logger.warning("Could not acquire intent lock within 10 seconds - using fallback intent")
-                return self._get_fallback_intent("gui_interaction", "Intent lock timeout")
-            
-            logger.debug("Intent recognition lock acquired successfully")
-        except Exception as lock_error:
-            logger.error(f"Error acquiring intent lock: {lock_error}")
-            return self._get_fallback_intent("gui_interaction", "Intent lock error")
-        
-        try:
-            try:
-                logger.debug(f"Recognizing intent for command: '{command[:100]}...'")
-                
-                # Input validation
-                if not command or not command.strip():
-                    logger.warning("Empty command provided for intent recognition")
-                    return self._get_fallback_intent("gui_interaction", "Empty command")
-                
-                # Check if intent recognition is enabled
-                if not self.intent_recognition_enabled:
-                    logger.debug("Intent recognition disabled, defaulting to GUI interaction")
-                    return self._get_fallback_intent("gui_interaction", "Intent recognition disabled")
-                
-                # Check if reasoning module is available
-                if not self.reasoning_module or not self.module_availability.get('reasoning', False):
-                    logger.warning("Reasoning module unavailable for intent recognition")
-                    return self._get_fallback_intent("gui_interaction", "Reasoning module unavailable")
-                
-                # Import the intent recognition prompt from config
-                from config import INTENT_RECOGNITION_PROMPT, INTENT_CONFIDENCE_THRESHOLD
-                
-                # Build the prompt for intent recognition
-                prompt = INTENT_RECOGNITION_PROMPT.format(command=command.strip())
-                
-                # Make API request using reasoning module's infrastructure
-                try:
-                    # Use the reasoning module's internal API request method
-                    response = self.reasoning_module._make_api_request(prompt)
-                    
-                    # Parse the response
-                    intent_result = self._parse_intent_response(response, command)
-                    
-                    # Validate confidence threshold
-                    if intent_result.get('confidence', 0) < INTENT_CONFIDENCE_THRESHOLD:
-                        logger.info(f"Intent confidence {intent_result.get('confidence', 0)} below threshold {INTENT_CONFIDENCE_THRESHOLD}, using fallback")
-                        return self._get_fallback_intent("gui_interaction", "Low confidence")
-                    
-                    # Store the last recognized intent
-                    self.last_recognized_intent = intent_result
-                    
-                    logger.info(f"Intent recognized: {intent_result.get('intent', 'unknown')} (confidence: {intent_result.get('confidence', 0):.2f})")
-                    return intent_result
-                    
-                except Exception as api_error:
-                    error_info = global_error_handler.handle_error(
-                        error=api_error,
-                        module="orchestrator",
-                        function="_recognize_intent",
-                        category=ErrorCategory.API_ERROR,
-                        context={"command_length": len(command)}
-                    )
-                    logger.warning(f"Intent recognition API failed: {error_info.message}")
-                    return self._get_fallback_intent("gui_interaction", f"API error: {str(api_error)}")
-                
-            except Exception as e:
-                error_info = global_error_handler.handle_error(
-                    error=e,
-                    module="orchestrator",
-                    function="_recognize_intent",
-                    category=ErrorCategory.PROCESSING_ERROR,
-                    severity=ErrorSeverity.MEDIUM,
-                    context={"command": command[:100]}
-                )
-                logger.error(f"Intent recognition failed: {error_info.message}")
-                return self._get_fallback_intent("gui_interaction", f"Recognition error: {str(e)}")
-        finally:
-            # CONCURRENCY FIX: Always release the intent lock with proper logging
-            if intent_lock_acquired and self.intent_lock.locked():
-                try:
-                    logger.debug("Releasing intent recognition lock")
-                    self.intent_lock.release()
-                except Exception as release_error:
-                    logger.error(f"Error releasing intent lock: {release_error}")
-    
-    def _parse_intent_response(self, response: Dict[str, Any], original_command: str) -> Dict[str, Any]:
-        """
-        Parse the intent recognition response from the LLM.
-        
-        Args:
-            response (Dict[str, Any]): Raw response from the reasoning module
-            original_command (str): Original user command for context
-            
-        Returns:
-            Dict[str, Any]: Parsed intent result
-        """
-        try:
-            # Extract the response content
-            if isinstance(response, dict):
-                # Handle different response formats
-                content = None
-                if 'choices' in response and response['choices']:
-                    # OpenAI-style response
-                    content = response['choices'][0].get('message', {}).get('content', '')
-                elif 'response' in response:
-                    # Ollama-style response
-                    content = response['response']
-                elif 'content' in response:
-                    # Direct content response
-                    content = response['content']
-                else:
-                    # Try to use the response directly if it's a string
-                    content = str(response)
-            else:
-                content = str(response)
-            
-            if not content:
-                raise ValueError("Empty response content")
-            
-            # Try to parse JSON from the content
-            import json
-            import re
-            
-            # Clean up the content - remove any leading/trailing whitespace
-            content = content.strip()
-            
-            # Look for JSON in the response (handle cases where LLM adds extra text)
-            json_match = re.search(r'\{.*\}', content, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-                try:
-                    intent_data = json.loads(json_str)
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse extracted JSON: {e}")
-                    logger.debug(f"Extracted JSON string: {json_str}")
-                    raise ValueError(f"Invalid JSON extracted from response: {str(e)}")
-            else:
-                # If no JSON found, try parsing the entire content
-                try:
-                    intent_data = json.loads(content)
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse entire content as JSON: {e}")
-                    logger.debug(f"Full content: {content}")
-                    raise ValueError(f"No valid JSON found in response: {str(e)}")
-            
-            # Validate required fields
-            required_fields = ['intent', 'confidence']
-            for field in required_fields:
-                if field not in intent_data:
-                    raise ValueError(f"Missing required field: {field}")
-            
-            # Validate intent type
-            valid_intents = ['gui_interaction', 'conversational_chat', 'deferred_action', 'question_answering']
-            if intent_data['intent'] not in valid_intents:
-                logger.warning(f"Invalid intent type: {intent_data['intent']}, defaulting to gui_interaction")
-                intent_data['intent'] = 'gui_interaction'
-            
-            # Ensure confidence is a float between 0 and 1
-            try:
-                confidence = float(intent_data['confidence'])
-                intent_data['confidence'] = max(0.0, min(1.0, confidence))
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid confidence value: {intent_data['confidence']}, defaulting to 0.5")
-                intent_data['confidence'] = 0.5
-            
-            # Ensure parameters exist
-            if 'parameters' not in intent_data:
-                intent_data['parameters'] = {}
-            
-            # Add metadata
-            intent_data['original_command'] = original_command
-            intent_data['timestamp'] = time.time()
-            
-            return intent_data
-            
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse JSON from intent response: {e}")
-            logger.debug(f"Response content: {content}")
-            raise ValueError(f"Invalid JSON in intent response: {str(e)}")
-        except Exception as e:
-            logger.error(f"Error parsing intent response: {e}")
-            raise ValueError(f"Intent response parsing failed: {str(e)}")
-    
-    def _get_fallback_intent(self, intent_type: str = "gui_interaction", reason: str = "Unknown") -> Dict[str, Any]:
-        """
-        Generate a fallback intent result when intent recognition fails.
-        
-        Args:
-            intent_type (str): The fallback intent type
-            reason (str): Reason for fallback
-            
-        Returns:
-            Dict[str, Any]: Fallback intent result
-        """
-        return {
-            'intent': intent_type,
-            'confidence': 0.5,  # Medium confidence for fallback
-            'parameters': {
-                'fallback': True,
-                'reason': reason
-            },
-            'reasoning': f"Fallback to {intent_type}: {reason}",
-            'timestamp': time.time(),
-            'is_fallback': True
-        }
+
     
     def _handle_conversational_query(self, execution_id: str, query: str) -> Dict[str, Any]:
         """
