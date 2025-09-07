@@ -660,15 +660,12 @@ class AutomationModule:
         try:
             start_time = time.time()
             
-            # Optimize timeout for fast path
-            timeout = 8 if fast_path else 10
-            
             # cliclick uses 't:' for typing
+            # TIMEOUT REMOVED: Allow typing to complete without artificial time limits
             result = subprocess.run(
                 ['cliclick', f't:{text}'],
                 capture_output=True,
-                text=True,
-                timeout=timeout
+                text=True
             )
             
             execution_time = time.time() - start_time

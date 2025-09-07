@@ -160,6 +160,7 @@ class Orchestrator:
         
         # Deferred action state management
         self.is_waiting_for_user_action = False
+        self.deferred_action_executing = False  # NEW: Prevents race conditions during execution
         self.pending_action_payload = None
         self.deferred_action_type = None
         self.deferred_action_start_time = None
@@ -2550,6 +2551,8 @@ class Orchestrator:
                         self._reset_deferred_action_state()
                     except Exception as reset_error:
                         logger.error(f"[{execution_id}] Failed to reset state after callback error: {reset_error}")
+                    finally :
+                        self._reset_deferred_action_state()
             
             # Create mouse listener with error handling
             try:
@@ -2687,12 +2690,16 @@ class Orchestrator:
             if not execution_lock_acquired:
                 logger.error(f"[{execution_id}] Failed to acquire execution lock for deferred action completion")
                 self._provide_deferred_action_completion_feedback(execution_id, False, "System busy - could not complete action")
-                self._reset_deferred_action_state()
                 return
             
             logger.debug(f"[{execution_id}] Execution lock re-acquired successfully for deferred action")
             
             with self.deferred_action_lock:
+                # STATE MANAGEMENT FIX: Check for duplicate triggers
+                if self.deferred_action_executing:
+                    logger.warning(f"[{execution_id}] Deferred action already executing, ignoring duplicate trigger")
+                    return
+                
                 # Verify we're in the correct state
                 if not self.is_waiting_for_user_action:
                     logger.warning(f"[{execution_id}] Deferred action trigger called but not waiting for user action")
@@ -2700,8 +2707,10 @@ class Orchestrator:
                 
                 if not self.pending_action_payload:
                     logger.error(f"[{execution_id}] No pending action payload found")
-                    self._reset_deferred_action_state()
                     return
+                
+                # STATE MANAGEMENT FIX: Set executing flag to prevent race conditions
+                self.deferred_action_executing = True
                 
                 # Get click coordinates if available
                 click_coordinates = None
@@ -2726,17 +2735,16 @@ class Orchestrator:
                 except Exception as e:
                     logger.error(f"[{execution_id}] Error executing pending deferred action: {e}")
                     self._provide_deferred_action_completion_feedback(execution_id, False)
-                
-                finally:
-                    # Always reset state after execution attempt
-                    self._reset_deferred_action_state()
             
         except Exception as e:
             logger.error(f"[{execution_id}] Error in deferred action trigger: {e}")
-            # Ensure state is reset even on error
-            self._reset_deferred_action_state()
+            self._provide_deferred_action_completion_feedback(execution_id, False)
             
         finally:
+            # STATE MANAGEMENT FIX: Always reset state in finally block to guarantee cleanup
+            self.deferred_action_executing = False
+            self._reset_deferred_action_state()
+            
             # CONCURRENCY FIX: Always release execution lock when deferred action completes
             if execution_lock_acquired and self.execution_lock.locked():
                 try:
@@ -2977,6 +2985,7 @@ class Orchestrator:
             
             # Reset primary state variables
             self.is_waiting_for_user_action = False
+            self.deferred_action_executing = False  # STATE MANAGEMENT FIX: Reset executing flag
             self.pending_action_payload = None
             self.deferred_action_type = None
             self.deferred_action_start_time = None
@@ -3024,6 +3033,9 @@ class Orchestrator:
             if self.is_waiting_for_user_action:
                 issues.append("is_waiting_for_user_action should be False after reset")
             
+            if self.deferred_action_executing:
+                issues.append("deferred_action_executing should be False after reset")
+            
             if self.pending_action_payload is not None:
                 issues.append("pending_action_payload should be None after reset")
             
@@ -3069,6 +3081,7 @@ class Orchestrator:
             
             # Force reset all deferred action variables
             self.is_waiting_for_user_action = False
+            self.deferred_action_executing = False  # STATE MANAGEMENT FIX: Reset executing flag
             self.pending_action_payload = None
             self.deferred_action_type = None
             self.deferred_action_start_time = None
@@ -3094,6 +3107,7 @@ class Orchestrator:
             
             # Force reset critical variables
             self.is_waiting_for_user_action = False
+            self.deferred_action_executing = False  # STATE MANAGEMENT FIX: Reset executing flag
             self.mouse_listener = None
             self.mouse_listener_active = False
             self.system_mode = 'ready'

@@ -40,7 +40,7 @@
 
 ### Task 0.1: Fix Concurrency Deadlock in Deferred Actions
 
-- [ ] 0.4 Implement improved execution lock management
+- [x] 0.4 Implement improved execution lock management
 
   - Update `Orchestrator.execute_command()` to use timeout-based lock acquisition
   - Implement early lock release for deferred actions returning 'waiting_for_user_action' status
@@ -49,7 +49,7 @@
   - Add comprehensive logging for lock acquisition, release, and timeout events
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 0.5 Test and validate concurrent command handling
+- [x] 0.5 Test and validate concurrent command handling
   - Write unit tests for concurrent deferred action scenarios
   - Implement test cases for command interruption during deferred action wait states
   - Validate that second commands process while first waits for user input
