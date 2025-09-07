@@ -66,7 +66,8 @@ class DeferredActionHandler(BaseHandler):
                 feedback_module = self._get_module_safely('feedback_module')
                 if feedback_module:
                     try:
-                        feedback_module.speak("Previous action cancelled. Starting new deferred action.")
+                        from modules.feedback import FeedbackPriority
+                        feedback_module.speak("Previous action cancelled. Starting new deferred action.", FeedbackPriority.NORMAL)
                     except Exception as audio_error:
                         self.logger.warning(f"[{execution_id}] Audio feedback failed: {audio_error}")
             
@@ -728,8 +729,7 @@ class DeferredActionHandler(BaseHandler):
             
             # Create and start mouse listener
             self.orchestrator.mouse_listener = GlobalMouseListener(
-                on_click_callback=on_deferred_action_trigger,
-                execution_id=execution_id
+                callback=on_deferred_action_trigger
             )
             
             # Start the listener
@@ -759,25 +759,28 @@ class DeferredActionHandler(BaseHandler):
             else:
                 instruction_message = "Content generated successfully. Click where you want me to place it."
             
-            # Use enhanced feedback module for audio instructions if available
+            # Use feedback module for audio instructions if available
             feedback_module = self._get_module_safely('feedback_module')
             if feedback_module:
                 try:
-                    feedback_module.provide_deferred_action_instructions(
-                        content_type=content_type,
-                        priority=getattr(feedback_module, 'FeedbackPriority', {}).get('HIGH', 'high')
-                    )
-                    self.logger.debug(f"[{execution_id}] Enhanced deferred action instructions provided")
+                    # Import FeedbackPriority enum
+                    from modules.feedback import FeedbackPriority
+                    
+                    # Use the speak method with proper priority enum
+                    feedback_module.speak(instruction_message, FeedbackPriority.HIGH)
+                    self.logger.debug(f"[{execution_id}] Audio instructions provided via feedback module")
                 except Exception as e:
-                    self.logger.warning(f"[{execution_id}] Enhanced instructions failed, falling back to basic: {e}")
-                    # Fallback to basic instruction delivery
-                    try:
-                        feedback_module.speak(instruction_message)
-                        self.logger.debug(f"[{execution_id}] Basic audio instructions provided via feedback module")
-                    except Exception as fallback_error:
-                        self.logger.warning(f"[{execution_id}] Basic feedback also failed: {fallback_error}")
+                    self.logger.warning(f"[{execution_id}] Feedback module failed: {e}")
+                    # Try audio module as fallback
+                    audio_module = self._get_module_safely('audio_module')
+                    if audio_module:
+                        try:
+                            audio_module.text_to_speech(instruction_message)
+                            self.logger.debug(f"[{execution_id}] Audio instructions provided via audio module fallback")
+                        except Exception as audio_error:
+                            self.logger.warning(f"[{execution_id}] Audio module fallback also failed: {audio_error}")
             
-            # Also use audio module directly as fallback
+            # Use audio module directly if feedback module not available
             else:
                 audio_module = self._get_module_safely('audio_module')
                 if audio_module:
@@ -812,7 +815,8 @@ class DeferredActionHandler(BaseHandler):
                     feedback_module = self._get_module_safely('feedback_module')
                     if feedback_module:
                         try:
-                            feedback_module.speak("Action timed out. Please try again.")
+                            from modules.feedback import FeedbackPriority
+                            feedback_module.speak("Action timed out. Please try again.", FeedbackPriority.HIGH)
                         except Exception as e:
                             self.logger.warning(f"[{execution_id}] Failed to provide timeout feedback: {e}")
                             
@@ -967,27 +971,26 @@ class DeferredActionHandler(BaseHandler):
                 message = "Failed to place content. Please try again."
                 sound_type = "failure"
             
-            # Provide enhanced audio feedback
+            # Provide audio feedback
             feedback_module = self._get_module_safely('feedback_module')
             if feedback_module:
                 try:
-                    # Determine content type from current deferred action context
-                    content_type = getattr(self.orchestrator, 'current_deferred_content_type', 'content')
+                    # Import FeedbackPriority enum
+                    from modules.feedback import FeedbackPriority
                     
-                    feedback_module.provide_deferred_action_completion_feedback(
-                        success=success,
-                        content_type=content_type,
-                        priority=getattr(feedback_module, 'FeedbackPriority', {}).get('HIGH', 'high')
-                    )
-                    self.logger.debug(f"[{execution_id}] Enhanced completion feedback provided")
+                    # Use the play_with_message method with proper priority
+                    feedback_module.play_with_message(sound_type, message, FeedbackPriority.HIGH)
+                    self.logger.debug(f"[{execution_id}] Completion feedback provided via feedback module")
                 except Exception as e:
-                    self.logger.warning(f"[{execution_id}] Enhanced completion feedback failed, falling back to basic: {e}")
-                    # Fallback to basic completion feedback
-                    try:
-                        feedback_module.play_with_message(sound_type, message)
-                        self.logger.debug(f"[{execution_id}] Basic completion feedback provided via feedback module")
-                    except Exception as fallback_error:
-                        self.logger.warning(f"[{execution_id}] Basic completion feedback also failed: {fallback_error}")
+                    self.logger.warning(f"[{execution_id}] Feedback module failed: {e}")
+                    # Try audio module as fallback
+                    audio_module = self._get_module_safely('audio_module')
+                    if audio_module:
+                        try:
+                            audio_module.text_to_speech(message)
+                            self.logger.debug(f"[{execution_id}] Completion feedback provided via audio module fallback")
+                        except Exception as audio_error:
+                            self.logger.warning(f"[{execution_id}] Audio module fallback also failed: {audio_error}")
             
             # Fallback to audio module
             else:
