@@ -191,9 +191,78 @@ class QuestionAnsweringHandler(BaseHandler):
         """
         self.logger.debug("Attempting browser content extraction")
         
-        # Placeholder implementation - will be implemented in later tasks
-        self.logger.debug("Browser content extraction not yet implemented")
-        return None
+        try:
+            # Initialize BrowserAccessibilityHandler if not already done
+            if not self._browser_handler:
+                from modules.browser_accessibility import BrowserAccessibilityHandler
+                self._browser_handler = BrowserAccessibilityHandler()
+                self.logger.debug("BrowserAccessibilityHandler initialized")
+            
+            # Get current application info
+            app_info = self._detect_active_application()
+            if not app_info:
+                self.logger.warning("Could not detect active application for browser content extraction")
+                return None
+            
+            # Verify it's a browser application
+            from modules.application_detector import ApplicationType
+            if app_info.app_type != ApplicationType.WEB_BROWSER:
+                self.logger.warning(f"Active application {app_info.name} is not a browser")
+                return None
+            
+            # Set up timeout for extraction (2 second limit as per requirements)
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Browser content extraction timed out")
+            
+            # Store old handler to restore later
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(2)  # 2 second timeout
+            
+            try:
+                self.logger.info(f"Extracting content from {app_info.name} ({app_info.browser_type.value if app_info.browser_type else 'unknown browser'})")
+                
+                # Extract text content using browser-specific method
+                content = self._browser_handler.get_page_text_content(app_info)
+                
+                # Cancel timeout
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+                
+                if not content:
+                    self.logger.warning("Browser content extraction returned empty content")
+                    return None
+                
+                # Validate content is substantial (>50 characters as per requirements)
+                if len(content.strip()) <= 50:
+                    self.logger.warning(f"Extracted content too short ({len(content.strip())} characters), likely not substantial page content")
+                    return None
+                
+                # Additional content validation - check for meaningful content
+                if not self._validate_browser_content(content):
+                    self.logger.warning("Extracted content failed validation checks")
+                    return None
+                
+                self.logger.info(f"Successfully extracted {len(content)} characters of browser content")
+                return content
+                
+            except TimeoutError:
+                # Cancel timeout and restore handler
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+                self.logger.warning("Browser content extraction timed out after 2 seconds")
+                return None
+            except Exception as e:
+                # Cancel timeout and restore handler
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+                self.logger.error(f"Error during browser content extraction: {e}")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error in browser content extraction setup: {e}")
+            return None
     
     def _extract_pdf_content(self) -> Optional[str]:
         """
@@ -333,6 +402,72 @@ class QuestionAnsweringHandler(BaseHandler):
         except Exception as e:
             self.logger.error(f"Error determining extraction method: {e}")
             return None
+    
+    def _validate_browser_content(self, content: str) -> bool:
+        """
+        Validate that extracted browser content is meaningful and substantial.
+        
+        This method performs quality checks on extracted content to ensure
+        it represents actual page content rather than browser UI elements
+        or error messages.
+        
+        Args:
+            content: Extracted text content to validate
+            
+        Returns:
+            True if content passes validation, False otherwise
+        """
+        if not content or not content.strip():
+            return False
+        
+        content_lower = content.lower().strip()
+        
+        # Check for common error indicators
+        error_indicators = [
+            "page not found",
+            "404 error",
+            "access denied",
+            "connection failed",
+            "server error",
+            "page cannot be displayed",
+            "this site can't be reached",
+            "no internet connection"
+        ]
+        
+        for indicator in error_indicators:
+            if indicator in content_lower:
+                self.logger.debug(f"Content contains error indicator: {indicator}")
+                return False
+        
+        # Check for browser UI noise (should be minimal in actual page content)
+        ui_noise_indicators = [
+            "bookmark this page",
+            "add to favorites",
+            "print this page",
+            "share this page",
+            "back to top",
+            "skip to main content"
+        ]
+        
+        ui_noise_count = sum(1 for indicator in ui_noise_indicators if indicator in content_lower)
+        if ui_noise_count > 2:  # Too much UI noise
+            self.logger.debug(f"Content contains too much UI noise ({ui_noise_count} indicators)")
+            return False
+        
+        # Check for reasonable word count (substantial content should have multiple words)
+        word_count = len(content.split())
+        if word_count < 10:  # Less than 10 words is likely not substantial content
+            self.logger.debug(f"Content has too few words ({word_count})")
+            return False
+        
+        # Check for reasonable character-to-word ratio (detect excessive punctuation/symbols)
+        char_to_word_ratio = len(content) / word_count if word_count > 0 else 0
+        if char_to_word_ratio > 50:  # Likely contains too much non-text content
+            self.logger.debug(f"Content has poor character-to-word ratio ({char_to_word_ratio:.1f})")
+            return False
+        
+        self.logger.debug(f"Content validation passed: {word_count} words, {len(content)} characters")
+        return True
     
     def get_performance_stats(self) -> Dict[str, Any]:
         """

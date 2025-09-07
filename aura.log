@@ -35526,3 +35526,546 @@ Because they make up everything! 😄...
 2025-09-08 01:56:19,802 - __main__ - INFO - Step 2: Running cleanup handlers...
 2025-09-08 01:56:19,802 - __main__ - INFO - Running 5 cleanup handlers...
 2025-09-08 01:56:19,805 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
+2025-09-08 03:11:07,774 - __main__ - INFO - AURA Application initialized - Version 1.0.0
+2025-09-08 03:11:07,774 - __main__ - INFO - Starting AURA application...
+2025-09-08 03:11:07,774 - __main__ - INFO - Step 1: Validating configuration...
+2025-09-08 03:11:15,809 - config - INFO - Available models in LM Studio: ['google/gemma-3-4b', 'text-embedding-nomic-embed-text-v1.5', 'smolvlm-500m-instruct', 'smolvlm2-2.2b-instruct', 'phi-3-vision-128k-instruct', 'microsoft/phi-4-mini-reasoning', 'qwen2.5-coder-7b-instruct-mlx', 'google/gemma-3-1b', 'phi-2', 'qwen/qwen3-4b', 'qwen3-8b-mlx', 'qwen2-7b-instruct']
+2025-09-08 03:11:15,810 - config - INFO - Selected vision model: google/gemma-3-4b
+2025-09-08 03:11:15,810 - __main__ - INFO - Step 2: Running startup checks...
+2025-09-08 03:11:15,810 - __main__ - INFO - Running 5 startup checks...
+2025-09-08 03:11:19,384 - __main__ - INFO - ✅ All 5 startup checks passed
+2025-09-08 03:11:19,385 - __main__ - INFO - Step 3: Initializing core modules...
+2025-09-08 03:11:19,385 - modules.audio - INFO - Loading Whisper model...
+2025-09-08 03:11:21,325 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-08 03:11:21,326 - modules.audio - INFO - Initializing TTS engine...
+2025-09-08 03:11:21,790 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-08 03:11:21,791 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-08 03:11:21,854 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-08 03:11:21,854 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-08 03:11:21,854 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-08 03:11:21,854 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-08 03:11:21,854 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-08 03:11:23,693 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-08 03:11:23,693 - modules.feedback - INFO - Loading sound files...
+2025-09-08 03:11:23,696 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-08 03:11:23,697 - modules.feedback - INFO - Feedback processing loop started
+2025-09-08 03:11:23,697 - modules.feedback - INFO - Feedback processing thread started
+2025-09-08 03:11:23,697 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-08 03:11:23,697 - orchestrator - INFO - Initializing AURA modules...
+2025-09-08 03:11:23,697 - orchestrator - INFO - Initializing Vision Module...
+2025-09-08 03:11:23,702 - modules.vision - INFO - VisionModule initialized
+2025-09-08 03:11:23,702 - orchestrator - INFO - Vision Module initialized successfully
+2025-09-08 03:11:23,702 - orchestrator - INFO - Initializing Reasoning Module...
+2025-09-08 03:11:23,729 - modules.reasoning - INFO - Initialized Ollama client for cloud API
+2025-09-08 03:11:23,729 - modules.reasoning - INFO - ReasoningModule initialized with model: gpt-oss:120b
+2025-09-08 03:11:23,729 - orchestrator - INFO - Reasoning Module initialized successfully
+2025-09-08 03:11:23,729 - orchestrator - INFO - Initializing Automation Module...
+2025-09-08 03:11:24,062 - modules.automation - INFO - AutomationModule initialized. Screen size: 2560x1600
+2025-09-08 03:11:24,063 - modules.automation - INFO - Retry settings: max_retries=3, retry_delay=0.5s
+2025-09-08 03:11:24,063 - modules.automation - INFO - macOS detected - using cliclick as PRIMARY automation method
+2025-09-08 03:11:24,063 - modules.automation - INFO - AppleScript available as fallback only
+2025-09-08 03:11:24,063 - orchestrator - INFO - Automation Module initialized successfully
+2025-09-08 03:11:24,063 - orchestrator - INFO - Initializing Audio Module...
+2025-09-08 03:11:24,063 - modules.audio - INFO - Loading Whisper model...
+2025-09-08 03:11:25,885 - modules.audio - INFO - Whisper model loaded successfully
+2025-09-08 03:11:25,885 - modules.audio - INFO - Initializing TTS engine...
+2025-09-08 03:11:26,057 - modules.audio - INFO - Using macOS built-in 'say' command for TTS
+2025-09-08 03:11:26,057 - modules.audio - INFO - Initializing Porcupine wake word detection...
+2025-09-08 03:11:26,061 - modules.audio - INFO - Porcupine initialized successfully with wake word: 'computer'
+2025-09-08 03:11:26,061 - modules.audio - INFO - Expected sample rate: 16000 Hz
+2025-09-08 03:11:26,061 - modules.audio - INFO - Expected frame length: 512 samples
+2025-09-08 03:11:26,061 - modules.audio - INFO - AudioModule initialized successfully
+2025-09-08 03:11:26,061 - orchestrator - INFO - Audio Module initialized successfully
+2025-09-08 03:11:26,061 - orchestrator - INFO - Initializing Feedback Module...
+2025-09-08 03:11:26,061 - modules.feedback - INFO - Initializing pygame mixer for sound effects...
+2025-09-08 03:11:26,061 - modules.feedback - INFO - Pygame mixer initialized successfully
+2025-09-08 03:11:26,061 - modules.feedback - INFO - Loading sound files...
+2025-09-08 03:11:26,062 - modules.feedback - INFO - Loaded 3 sound files
+2025-09-08 03:11:26,062 - modules.feedback - INFO - Feedback processing loop started
+2025-09-08 03:11:26,062 - modules.feedback - INFO - Feedback processing thread started
+2025-09-08 03:11:26,063 - modules.feedback - INFO - FeedbackModule initialized successfully with hybrid config: {'enabled': True, 'fast_path_enabled': True, 'slow_path_enabled': True, 'fallback_enabled': True, 'volume_adjustment': 0.6, 'messages_enabled': True}
+2025-09-08 03:11:26,063 - orchestrator - INFO - Feedback Module initialized successfully
+2025-09-08 03:11:26,063 - orchestrator - INFO - Initializing Accessibility Module...
+2025-09-08 03:11:26,079 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-08 03:11:26,113 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-08 03:11:26,113 - modules.accessibility - INFO - Permission validation: ✅ Accessibility permissions granted (FULL)
+2025-09-08 03:11:26,113 - modules.permission_validator - INFO - Started permission monitoring thread
+2025-09-08 03:11:26,113 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-08 03:11:26,113 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-08 03:11:26,113 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-08 03:11:26,114 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-08 03:11:26,114 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-08 03:11:26,114 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-08 03:11:26,114 - modules.accessibility - INFO - Debugging tools initialized successfully
+2025-09-08 03:11:26,115 - modules.accessibility - WARNING - Cannot access focused application - accessibility permissions may be limited
+2025-09-08 03:11:26,115 - modules.accessibility - INFO - AccessibilityModule initialized successfully
+2025-09-08 03:11:26,115 - modules.accessibility.operations - INFO - AccessibilityModule initialized successfully
+2025-09-08 03:11:26,115 - orchestrator - INFO - Accessibility Module initialized successfully
+2025-09-08 03:11:26,115 - orchestrator - INFO - Initializing Browser Accessibility Handler...
+2025-09-08 03:11:26,115 - modules.browser_accessibility - INFO - BrowserAccessibilityHandler initialized
+2025-09-08 03:11:26,115 - orchestrator - INFO - Browser Accessibility Handler initialized successfully
+2025-09-08 03:11:26,115 - orchestrator - INFO - Initializing PDF Handler...
+2025-09-08 03:11:26,208 - modules.pdf_handler - INFO - PDFHandler initialized (pdftotext available: True)
+2025-09-08 03:11:26,208 - orchestrator - INFO - PDF Handler initialized successfully
+2025-09-08 03:11:26,208 - orchestrator - INFO - Initializing debugging and diagnostic tools...
+2025-09-08 03:11:26,208 - modules.permission_validator - INFO - PermissionValidator initialized
+2025-09-08 03:11:26,208 - modules.accessibility_debugger - WARNING - Accessibility functions not available - debugging capabilities limited
+2025-09-08 03:11:26,208 - modules.performance - INFO - Performance monitor initialized with 1000 max metrics
+2025-09-08 03:11:26,209 - modules.diagnostic_tools - INFO - Accessibility health checker initialized
+2025-09-08 03:11:26,209 - modules.error_recovery - INFO - ErrorRecoveryManager initialized
+2025-09-08 03:11:26,209 - orchestrator - INFO - Debugging tools initialized successfully
+2025-09-08 03:11:26,209 - orchestrator - INFO - Successfully initialized modules: vision, reasoning, automation, audio, feedback, accessibility, browser_accessibility, pdf_handler
+2025-09-08 03:11:26,209 - orchestrator - INFO - All modules initialized successfully
+2025-09-08 03:11:26,209 - orchestrator - INFO - System health monitoring initialized
+2025-09-08 03:11:26,218 - GUIHandler - INFO - GUIHandler initialized
+2025-09-08 03:11:26,218 - ConversationHandler - INFO - ConversationHandler initialized
+2025-09-08 03:11:26,218 - DeferredActionHandler - INFO - DeferredActionHandler initialized
+2025-09-08 03:11:26,218 - orchestrator - INFO - Command handlers initialized successfully
+2025-09-08 03:11:26,218 - orchestrator - INFO - Orchestrator initialized successfully
+2025-09-08 03:11:26,218 - __main__ - INFO - Step 4: Verifying module initialization...
+2025-09-08 03:11:26,218 - __main__ - INFO - All modules verified successfully
+2025-09-08 03:11:26,218 - __main__ - INFO - Step 5: Starting health monitoring...
+2025-09-08 03:11:26,218 - __main__ - INFO - Health monitoring started
+2025-09-08 03:11:26,218 - __main__ - INFO - Step 6: Startup completed successfully
+2025-09-08 03:11:26,219 - __main__ - INFO - AURA application startup completed in 18.44s
+2025-09-08 03:11:26,219 - modules.audio - INFO - Converting text to speech: 'AURA is ready. Say 'computer' to activate....'
+2025-09-08 03:11:26,219 - __main__ - INFO - Starting main application loop...
+2025-09-08 03:11:26,220 - __main__ - INFO - Wake word monitoring started
+2025-09-08 03:11:26,220 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:11:29,216 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-08 03:11:31,326 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:11:31,461 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:11:36,528 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:11:36,663 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:11:41,739 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:11:41,871 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:11:45,901 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-08 03:11:45,902 - modules.audio - INFO - Providing wake word confirmation
+2025-09-08 03:11:46,037 - __main__ - INFO - Wake word detected (#1)
+2025-09-08 03:11:46,037 - __main__ - INFO - Processing voice command...
+2025-09-08 03:11:46,038 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-08 03:11:46,038 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-08 03:11:46,038 - modules.audio - INFO - Attempting audio recording with silence detection...
+2025-09-08 03:11:46,038 - modules.audio - INFO - Recording with adaptive silence detection:
+2025-09-08 03:11:46,038 - modules.audio - INFO -   Chunk size: 1600 samples (0.1s)
+2025-09-08 03:11:46,038 - modules.audio - INFO -   Required silence: 10 chunks (1.0s)
+2025-09-08 03:11:46,038 - modules.audio - INFO -   Minimum recording: 5 chunks (0.5s)
+2025-09-08 03:11:46,038 - modules.audio - INFO -   Base silence threshold: 0.05
+2025-09-08 03:11:46,038 - modules.audio - INFO -   Measuring baseline for 5 chunks...
+2025-09-08 03:11:46,621 - modules.audio - INFO - Baseline measurement complete:
+2025-09-08 03:11:46,622 - modules.audio - INFO -   Baseline average: 0.1597
+2025-09-08 03:11:46,622 - modules.audio - INFO -   Baseline max: 0.2427
+2025-09-08 03:11:46,622 - modules.audio - INFO -   Adaptive threshold: 0.1500
+2025-09-08 03:11:46,722 - modules.audio - INFO - Chunk 6: Silent (RMS: 0.1119 < 0.1500), silence: 1/10
+2025-09-08 03:11:46,822 - modules.audio - INFO - Chunk 7: Sound (RMS: 0.2264 >= 0.1500), reset silence count
+2025-09-08 03:11:46,924 - modules.audio - INFO - Chunk 8: Silent (RMS: 0.1302 < 0.1500), silence: 1/10
+2025-09-08 03:11:47,023 - modules.audio - INFO - Chunk 9: Silent (RMS: 0.1426 < 0.1500), silence: 2/10
+2025-09-08 03:11:47,122 - modules.audio - INFO - Chunk 10: Silent (RMS: 0.0589 < 0.1500), silence: 3/10
+2025-09-08 03:11:47,223 - modules.audio - INFO - Chunk 11: Silent (RMS: 0.1151 < 0.1500), silence: 4/10
+2025-09-08 03:11:47,324 - modules.audio - INFO - Chunk 12: Silent (RMS: 0.1041 < 0.1500), silence: 5/10
+2025-09-08 03:11:47,422 - modules.audio - INFO - Chunk 13: Silent (RMS: 0.1358 < 0.1500), silence: 6/10
+2025-09-08 03:11:47,521 - modules.audio - INFO - Chunk 14: Sound (RMS: 0.1753 >= 0.1500), reset silence count
+2025-09-08 03:11:47,621 - modules.audio - INFO - Chunk 15: Sound (RMS: 0.1529 >= 0.1500), reset silence count
+2025-09-08 03:11:47,726 - modules.audio - INFO - Chunk 16: Silent (RMS: 0.1205 < 0.1500), silence: 1/10
+2025-09-08 03:11:47,824 - modules.audio - INFO - Chunk 17: Sound (RMS: 0.1910 >= 0.1500), reset silence count
+2025-09-08 03:11:47,924 - modules.audio - INFO - Chunk 18: Sound (RMS: 0.1533 >= 0.1500), reset silence count
+2025-09-08 03:11:48,024 - modules.audio - INFO - Chunk 19: Sound (RMS: 0.2077 >= 0.1500), reset silence count
+2025-09-08 03:11:48,121 - modules.audio - INFO - Chunk 20: Sound (RMS: 0.1981 >= 0.1500), reset silence count
+2025-09-08 03:11:48,225 - modules.audio - INFO - Chunk 21: Sound (RMS: 0.1773 >= 0.1500), reset silence count
+2025-09-08 03:11:48,325 - modules.audio - INFO - Chunk 22: Sound (RMS: 0.2086 >= 0.1500), reset silence count
+2025-09-08 03:11:48,423 - modules.audio - INFO - Chunk 23: Sound (RMS: 0.1769 >= 0.1500), reset silence count
+2025-09-08 03:11:48,525 - modules.audio - INFO - Chunk 24: Sound (RMS: 0.2051 >= 0.1500), reset silence count
+2025-09-08 03:11:48,624 - modules.audio - INFO - Chunk 25: Silent (RMS: 0.1279 < 0.1500), silence: 1/10
+2025-09-08 03:11:48,723 - modules.audio - INFO - Chunk 26: Sound (RMS: 0.1620 >= 0.1500), reset silence count
+2025-09-08 03:11:48,822 - modules.audio - INFO - Chunk 27: Sound (RMS: 0.1923 >= 0.1500), reset silence count
+2025-09-08 03:11:48,922 - modules.audio - INFO - Chunk 28: Sound (RMS: 0.2409 >= 0.1500), reset silence count
+2025-09-08 03:11:49,020 - modules.audio - INFO - Chunk 29: Silent (RMS: 0.1300 < 0.1500), silence: 1/10
+2025-09-08 03:11:49,125 - modules.audio - INFO - Chunk 30: Silent (RMS: 0.0910 < 0.1500), silence: 2/10
+2025-09-08 03:11:49,222 - modules.audio - INFO - Chunk 31: Sound (RMS: 0.1679 >= 0.1500), reset silence count
+2025-09-08 03:11:49,320 - modules.audio - INFO - Chunk 32: Sound (RMS: 0.2440 >= 0.1500), reset silence count
+2025-09-08 03:11:49,426 - modules.audio - INFO - Chunk 33: Sound (RMS: 0.2015 >= 0.1500), reset silence count
+2025-09-08 03:11:49,519 - modules.audio - INFO - Chunk 34: Silent (RMS: 0.1293 < 0.1500), silence: 1/10
+2025-09-08 03:11:49,625 - modules.audio - INFO - Chunk 35: Silent (RMS: 0.1154 < 0.1500), silence: 2/10
+2025-09-08 03:11:49,723 - modules.audio - INFO - Chunk 36: Sound (RMS: 0.2320 >= 0.1500), reset silence count
+2025-09-08 03:11:49,823 - modules.audio - INFO - Chunk 37: Sound (RMS: 0.2079 >= 0.1500), reset silence count
+2025-09-08 03:11:49,923 - modules.audio - INFO - Chunk 38: Sound (RMS: 0.2432 >= 0.1500), reset silence count
+2025-09-08 03:11:50,022 - modules.audio - INFO - Chunk 39: Silent (RMS: 0.1454 < 0.1500), silence: 1/10
+2025-09-08 03:11:50,121 - modules.audio - INFO - Chunk 40: Silent (RMS: 0.1217 < 0.1500), silence: 2/10
+2025-09-08 03:11:50,222 - modules.audio - INFO - Chunk 41: Sound (RMS: 0.1912 >= 0.1500), reset silence count
+2025-09-08 03:11:50,321 - modules.audio - INFO - Chunk 42: Silent (RMS: 0.1213 < 0.1500), silence: 1/10
+2025-09-08 03:11:50,423 - modules.audio - INFO - Chunk 43: Sound (RMS: 0.1728 >= 0.1500), reset silence count
+2025-09-08 03:11:50,525 - modules.audio - INFO - Chunk 44: Silent (RMS: 0.1387 < 0.1500), silence: 1/10
+2025-09-08 03:11:50,624 - modules.audio - INFO - Chunk 45: Sound (RMS: 0.1511 >= 0.1500), reset silence count
+2025-09-08 03:11:50,721 - modules.audio - INFO - Chunk 46: Sound (RMS: 0.2062 >= 0.1500), reset silence count
+2025-09-08 03:11:50,820 - modules.audio - INFO - Chunk 47: Sound (RMS: 0.1811 >= 0.1500), reset silence count
+2025-09-08 03:11:50,920 - modules.audio - INFO - Chunk 48: Sound (RMS: 0.2508 >= 0.1500), reset silence count
+2025-09-08 03:11:51,024 - modules.audio - INFO - Chunk 49: Sound (RMS: 0.2477 >= 0.1500), reset silence count
+2025-09-08 03:11:51,123 - modules.audio - INFO - Chunk 50: Sound (RMS: 0.2509 >= 0.1500), reset silence count
+2025-09-08 03:11:51,225 - modules.audio - INFO - Chunk 51: Sound (RMS: 0.2400 >= 0.1500), reset silence count
+2025-09-08 03:11:51,322 - modules.audio - INFO - Chunk 52: Sound (RMS: 0.1514 >= 0.1500), reset silence count
+2025-09-08 03:11:51,425 - modules.audio - INFO - Chunk 53: Silent (RMS: 0.1428 < 0.1500), silence: 1/10
+2025-09-08 03:11:51,525 - modules.audio - INFO - Chunk 54: Sound (RMS: 0.1695 >= 0.1500), reset silence count
+2025-09-08 03:11:51,622 - modules.audio - INFO - Chunk 55: Silent (RMS: 0.1044 < 0.1500), silence: 1/10
+2025-09-08 03:11:51,725 - modules.audio - INFO - Chunk 56: Sound (RMS: 0.1860 >= 0.1500), reset silence count
+2025-09-08 03:11:51,825 - modules.audio - INFO - Chunk 57: Sound (RMS: 0.1632 >= 0.1500), reset silence count
+2025-09-08 03:11:51,925 - modules.audio - INFO - Chunk 58: Sound (RMS: 0.1514 >= 0.1500), reset silence count
+2025-09-08 03:11:52,025 - modules.audio - INFO - Chunk 59: Sound (RMS: 0.1589 >= 0.1500), reset silence count
+2025-09-08 03:11:52,122 - modules.audio - INFO - Chunk 60: Sound (RMS: 0.3211 >= 0.1500), reset silence count
+2025-09-08 03:11:52,221 - modules.audio - INFO - Chunk 61: Sound (RMS: 0.1815 >= 0.1500), reset silence count
+2025-09-08 03:11:52,321 - modules.audio - INFO - Chunk 62: Silent (RMS: 0.1401 < 0.1500), silence: 1/10
+2025-09-08 03:11:52,424 - modules.audio - INFO - Chunk 63: Silent (RMS: 0.1436 < 0.1500), silence: 2/10
+2025-09-08 03:11:52,523 - modules.audio - INFO - Chunk 64: Silent (RMS: 0.1349 < 0.1500), silence: 3/10
+2025-09-08 03:11:52,620 - modules.audio - INFO - Chunk 65: Silent (RMS: 0.1262 < 0.1500), silence: 4/10
+2025-09-08 03:11:52,721 - modules.audio - INFO - Chunk 66: Silent (RMS: 0.1433 < 0.1500), silence: 5/10
+2025-09-08 03:11:52,821 - modules.audio - INFO - Chunk 67: Silent (RMS: 0.1278 < 0.1500), silence: 6/10
+2025-09-08 03:11:52,925 - modules.audio - INFO - Chunk 68: Sound (RMS: 0.2056 >= 0.1500), reset silence count
+2025-09-08 03:11:53,021 - modules.audio - INFO - Chunk 69: Sound (RMS: 0.1826 >= 0.1500), reset silence count
+2025-09-08 03:11:53,125 - modules.audio - INFO - Chunk 70: Silent (RMS: 0.1281 < 0.1500), silence: 1/10
+2025-09-08 03:11:53,224 - modules.audio - INFO - Chunk 71: Silent (RMS: 0.1105 < 0.1500), silence: 2/10
+2025-09-08 03:11:53,323 - modules.audio - INFO - Chunk 72: Silent (RMS: 0.1148 < 0.1500), silence: 3/10
+2025-09-08 03:11:53,421 - modules.audio - INFO - Chunk 73: Silent (RMS: 0.1158 < 0.1500), silence: 4/10
+2025-09-08 03:11:53,521 - modules.audio - INFO - Chunk 74: Silent (RMS: 0.0806 < 0.1500), silence: 5/10
+2025-09-08 03:11:53,621 - modules.audio - INFO - Chunk 75: Silent (RMS: 0.1441 < 0.1500), silence: 6/10
+2025-09-08 03:11:53,720 - modules.audio - INFO - Chunk 76: Sound (RMS: 0.1667 >= 0.1500), reset silence count
+2025-09-08 03:11:53,825 - modules.audio - INFO - Chunk 77: Silent (RMS: 0.1071 < 0.1500), silence: 1/10
+2025-09-08 03:11:53,926 - modules.audio - INFO - Chunk 78: Sound (RMS: 0.1568 >= 0.1500), reset silence count
+2025-09-08 03:11:54,025 - modules.audio - INFO - Chunk 79: Silent (RMS: 0.1383 < 0.1500), silence: 1/10
+2025-09-08 03:11:54,123 - modules.audio - INFO - Chunk 80: Sound (RMS: 0.1722 >= 0.1500), reset silence count
+2025-09-08 03:11:54,284 - modules.audio - INFO - Adaptive silence detection recording completed:
+2025-09-08 03:11:54,285 - modules.audio - INFO -   Duration: 8.00s (saved 0.00s)
+2025-09-08 03:11:54,285 - modules.audio - INFO -   Samples: 128000
+2025-09-08 03:11:54,285 - modules.audio - INFO -   RMS volume: 0.1699
+2025-09-08 03:11:54,285 - modules.audio - INFO -   Max volume: 1.2092
+2025-09-08 03:11:54,285 - modules.audio - INFO -   Speech detected: True
+2025-09-08 03:11:54,285 - modules.audio - INFO -   Final threshold used: 0.1500
+2025-09-08 03:11:54,286 - modules.audio - INFO - Good audio level detected (RMS: 0.1699)
+2025-09-08 03:11:54,287 - modules.audio - INFO - Successfully processed 128000 audio samples
+2025-09-08 03:11:54,360 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmphbclsbo4.wav
+2025-09-08 03:11:54,360 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-08 03:11:54,360 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-08 03:11:54,360 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-08 03:11:54,360 - modules.audio - INFO -   Channels: 1
+2025-09-08 03:11:54,361 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-08 03:11:54,361 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-08 03:11:54,361 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmphbclsbo4.wav
+2025-09-08 03:11:54,362 - modules.audio - INFO - Running Whisper transcription...
+2025-09-08 03:11:56,490 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-08 03:11:56,490 - modules.audio - INFO - Whisper transcription completed
+2025-09-08 03:11:56,490 - modules.audio - INFO - Whisper result details:
+2025-09-08 03:11:56,490 - modules.audio - INFO -   Text: 'Write me a python code for a lmtransformer.'
+2025-09-08 03:11:56,490 - modules.audio - INFO -   Language: en
+2025-09-08 03:11:56,490 - modules.audio - INFO -   Segments: 1
+2025-09-08 03:11:56,490 - modules.audio - INFO -     Segment 1: 'Write me a python code for a lmtransformer.' (0.00-8.00s, prob: -0.679)
+2025-09-08 03:11:56,490 - modules.audio - INFO - Transcription result: 'Write me a python code for a lmtransformer.'
+2025-09-08 03:11:56,490 - __main__ - INFO - Command received: 'Write me a python code for a lmtransformer.'
+2025-09-08 03:11:56,490 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-08 03:11:56,490 - orchestrator - INFO - Starting command execution [cmd_1757281316490]: 'Write me a python code for a lmtransformer.'
+2025-09-08 03:11:56,490 - orchestrator - INFO - [cmd_1757281316490] Step 1: Intent recognition and routing
+2025-09-08 03:11:58,390 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-08 03:11:58,392 - orchestrator - INFO - Intent recognized: deferred_action (confidence: 0.98, time: 1.90s)
+2025-09-08 03:11:58,392 - orchestrator - INFO - [cmd_1757281316490] Intent recognized: deferred_action (confidence: 0.98)
+2025-09-08 03:11:58,392 - orchestrator - INFO - [cmd_1757281316490] Routing to DeferredActionHandler for intent 'deferred_action'
+2025-09-08 03:11:58,392 - DeferredActionHandler - INFO - [cmd_1757281316490] Starting DeferredActionHandler execution
+2025-09-08 03:11:58,392 - DeferredActionHandler - INFO - [cmd_1757281316490] Starting deferred action workflow
+2025-09-08 03:11:58,392 - DeferredActionHandler - INFO - [cmd_1757281316490] Content request: Write me a python code for a lmtransformer., Type: code
+2025-09-08 03:12:07,054 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-08 03:12:07,173 - DeferredActionHandler - INFO - [cmd_1757281316490] Generated 3426 characters of code content
+2025-09-08 03:12:07,177 - utils.mouse_listener - INFO - Starting global mouse listener
+2025-09-08 03:12:07,283 - utils.mouse_listener - INFO - Global mouse listener started successfully
+2025-09-08 03:12:07,283 - DeferredActionHandler - INFO - [cmd_1757281316490] Mouse listener started successfully
+2025-09-08 03:12:07,284 - modules.audio - INFO - Converting text to speech: 'Code generated successfully. Click where you want ...'
+2025-09-08 03:12:07,284 - DeferredActionHandler - INFO - Waiting for user action: Content generated. Click where you want it placed.
+2025-09-08 03:12:07,310 - DeferredActionHandler - INFO - [cmd_1757281316490] DeferredActionHandler execution completed
+2025-09-08 03:12:07,311 - DeferredActionHandler - INFO - [cmd_1757281316490] Status: waiting_for_user_action, Time: 8.918s
+2025-09-08 03:12:07,311 - orchestrator - INFO - Releasing execution lock early for deferred action: cmd_1757281316490
+2025-09-08 03:12:07,311 - __main__ - WARNING - Command execution had issues: []
+2025-09-08 03:12:07,311 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:12:10,599 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-08 03:12:10,625 - utils.mouse_listener - INFO - Mouse click detected at (510.87109375, 285.16015625) with left button
+2025-09-08 03:12:10,625 - DeferredActionHandler - INFO - [cmd_1757281316490] Deferred action triggered by user click
+2025-09-08 03:12:10,626 - DeferredActionHandler - INFO - [cmd_1757281316490] Executing deferred action at coordinates: (510.87109375, 285.16015625)
+2025-09-08 03:12:10,626 - DeferredActionHandler - INFO - [cmd_1757281316490] Executing type action with 3427 characters
+2025-09-08 03:12:10,626 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-08 03:12:10,626 - modules.automation - INFO - Executing action: click (attempt 1/4)
+2025-09-08 03:12:10,746 - modules.automation - INFO - cliclick SLOW PATH: Click succeeded at (510, 285) on 'unknown' in 0.120s
+2025-09-08 03:12:10,747 - modules.automation - INFO - Successfully executed action: click
+2025-09-08 03:12:10,952 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-08 03:12:10,952 - modules.automation - INFO - Executing action: type (attempt 1/4)
+2025-09-08 03:12:12,426 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:12:12,559 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:12:17,619 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:12:17,755 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:12:22,827 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:12:22,963 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:12:26,120 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-08 03:12:28,033 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:12:28,164 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:12:33,215 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:12:33,347 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:12:38,401 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:12:38,537 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:12:43,594 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:12:43,726 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:12:48,781 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:12:48,917 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:12:53,976 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:12:54,111 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:12:59,169 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:12:59,302 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:04,354 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:04,484 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:09,536 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:09,673 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:14,731 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:14,865 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:19,925 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:20,061 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:25,118 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:25,254 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:26,131 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-08 03:13:30,310 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:30,446 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:35,501 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:35,637 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:40,703 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:40,832 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:45,887 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:46,019 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:51,072 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:51,203 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:13:56,259 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:13:56,395 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:01,451 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:01,585 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:06,638 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:06,771 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:11,842 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:11,976 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:17,034 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:17,170 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:22,223 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:22,357 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:26,133 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-08 03:14:27,412 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:27,541 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:32,596 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:32,732 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:37,835 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:37,964 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:43,064 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:43,196 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:48,255 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:48,388 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:53,446 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:53,581 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:14:58,634 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:14:58,764 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:15:00,012 - __main__ - INFO - AURA Status Report - Uptime: 232.2s, Wake words: 1 (15.5/hr), Commands: 1 (15.5/hr), Errors: 0, Threads: 13 (Wake: Running, Health: Stopped), Memory: 2634.1MB, CPU: 22.9%, Cache: 0.0% hit rate, Health: fair
+2025-09-08 03:15:03,818 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:15:03,954 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:15:09,016 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:15:09,149 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:15:14,201 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:15:14,336 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:15:19,401 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:15:19,538 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:15:24,596 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:15:24,731 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:15:26,142 - modules.permission_validator - INFO - Permission check completed: ✅ Accessibility permissions granted (FULL)
+2025-09-08 03:15:29,789 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:15:29,920 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:15:34,467 - modules.automation - INFO - cliclick SLOW PATH: Typing succeeded on 'unknown' in 203.515s: 'import math
+import torch
+impor...'
+2025-09-08 03:15:34,468 - modules.automation - INFO - Successfully executed action: type
+2025-09-08 03:15:34,468 - DeferredActionHandler - INFO - [cmd_1757281316490] Successfully typed 3427 characters
+2025-09-08 03:15:34,468 - DeferredActionHandler - INFO - [cmd_1757281316490] Deferred action completed successfully
+2025-09-08 03:15:34,468 - utils.mouse_listener - INFO - Stopping global mouse listener
+2025-09-08 03:15:34,574 - modules.audio - INFO - Converting text to speech: 'Content placed successfully....'
+2025-09-08 03:15:34,980 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:15:35,116 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:15:36,405 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-08 03:15:36,475 - utils.mouse_listener - WARNING - Mouse listener thread did not stop gracefully
+2025-09-08 03:15:36,475 - utils.mouse_listener - INFO - Mouse listener stopped after 209.30 seconds
+2025-09-08 03:15:36,475 - utils.mouse_listener - INFO - Global mouse listener stopped successfully
+2025-09-08 03:15:40,172 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:15:40,308 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:15:45,387 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:15:45,524 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:15:50,269 - modules.audio - INFO - Wake word 'computer' detected!
+2025-09-08 03:15:50,270 - modules.audio - INFO - Providing wake word confirmation
+2025-09-08 03:15:50,406 - __main__ - INFO - Wake word detected (#2)
+2025-09-08 03:15:50,407 - __main__ - INFO - Processing voice command...
+2025-09-08 03:15:50,407 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-08 03:15:50,407 - modules.audio - INFO - Starting speech recording for 8.0 seconds...
+2025-09-08 03:15:50,407 - modules.audio - INFO - Attempting audio recording with silence detection...
+2025-09-08 03:15:50,407 - modules.audio - INFO - Recording with adaptive silence detection:
+2025-09-08 03:15:50,407 - modules.audio - INFO -   Chunk size: 1600 samples (0.1s)
+2025-09-08 03:15:50,407 - modules.audio - INFO -   Required silence: 10 chunks (1.0s)
+2025-09-08 03:15:50,407 - modules.audio - INFO -   Minimum recording: 5 chunks (0.5s)
+2025-09-08 03:15:50,407 - modules.audio - INFO -   Base silence threshold: 0.05
+2025-09-08 03:15:50,407 - modules.audio - INFO -   Measuring baseline for 5 chunks...
+2025-09-08 03:15:50,988 - modules.audio - INFO - Baseline measurement complete:
+2025-09-08 03:15:50,988 - modules.audio - INFO -   Baseline average: 0.2401
+2025-09-08 03:15:50,988 - modules.audio - INFO -   Baseline max: 0.4357
+2025-09-08 03:15:50,988 - modules.audio - INFO -   Adaptive threshold: 0.1500
+2025-09-08 03:15:51,088 - modules.audio - INFO - Chunk 6: Sound (RMS: 0.2954 >= 0.1500), reset silence count
+2025-09-08 03:15:51,190 - modules.audio - INFO - Chunk 7: Sound (RMS: 0.2648 >= 0.1500), reset silence count
+2025-09-08 03:15:51,290 - modules.audio - INFO - Chunk 8: Sound (RMS: 0.2041 >= 0.1500), reset silence count
+2025-09-08 03:15:51,390 - modules.audio - INFO - Chunk 9: Sound (RMS: 0.1912 >= 0.1500), reset silence count
+2025-09-08 03:15:51,490 - modules.audio - INFO - Chunk 10: Sound (RMS: 0.2351 >= 0.1500), reset silence count
+2025-09-08 03:15:51,591 - modules.audio - INFO - Chunk 11: Sound (RMS: 0.1640 >= 0.1500), reset silence count
+2025-09-08 03:15:51,690 - modules.audio - INFO - Chunk 12: Silent (RMS: 0.1443 < 0.1500), silence: 1/10
+2025-09-08 03:15:51,789 - modules.audio - INFO - Chunk 13: Sound (RMS: 0.4394 >= 0.1500), reset silence count
+2025-09-08 03:15:51,893 - modules.audio - INFO - Chunk 14: Sound (RMS: 0.3286 >= 0.1500), reset silence count
+2025-09-08 03:15:51,992 - modules.audio - INFO - Chunk 15: Sound (RMS: 0.2787 >= 0.1500), reset silence count
+2025-09-08 03:15:52,090 - modules.audio - INFO - Chunk 16: Sound (RMS: 0.4033 >= 0.1500), reset silence count
+2025-09-08 03:15:52,190 - modules.audio - INFO - Chunk 17: Sound (RMS: 0.2253 >= 0.1500), reset silence count
+2025-09-08 03:15:52,290 - modules.audio - INFO - Chunk 18: Sound (RMS: 0.2092 >= 0.1500), reset silence count
+2025-09-08 03:15:52,393 - modules.audio - INFO - Chunk 19: Sound (RMS: 0.2364 >= 0.1500), reset silence count
+2025-09-08 03:15:52,492 - modules.audio - INFO - Chunk 20: Sound (RMS: 0.2037 >= 0.1500), reset silence count
+2025-09-08 03:15:52,589 - modules.audio - INFO - Chunk 21: Sound (RMS: 0.2871 >= 0.1500), reset silence count
+2025-09-08 03:15:52,688 - modules.audio - INFO - Chunk 22: Sound (RMS: 0.3632 >= 0.1500), reset silence count
+2025-09-08 03:15:52,793 - modules.audio - INFO - Chunk 23: Sound (RMS: 0.2577 >= 0.1500), reset silence count
+2025-09-08 03:15:52,893 - modules.audio - INFO - Chunk 24: Sound (RMS: 0.2162 >= 0.1500), reset silence count
+2025-09-08 03:15:52,993 - modules.audio - INFO - Chunk 25: Sound (RMS: 0.1810 >= 0.1500), reset silence count
+2025-09-08 03:15:53,092 - modules.audio - INFO - Chunk 26: Sound (RMS: 0.2469 >= 0.1500), reset silence count
+2025-09-08 03:15:53,188 - modules.audio - INFO - Chunk 27: Silent (RMS: 0.1308 < 0.1500), silence: 1/10
+2025-09-08 03:15:53,293 - modules.audio - INFO - Chunk 28: Sound (RMS: 0.2409 >= 0.1500), reset silence count
+2025-09-08 03:15:53,392 - modules.audio - INFO - Chunk 29: Sound (RMS: 0.3410 >= 0.1500), reset silence count
+2025-09-08 03:15:53,490 - modules.audio - INFO - Chunk 30: Sound (RMS: 0.3902 >= 0.1500), reset silence count
+2025-09-08 03:15:53,590 - modules.audio - INFO - Chunk 31: Sound (RMS: 0.3372 >= 0.1500), reset silence count
+2025-09-08 03:15:53,688 - modules.audio - INFO - Chunk 32: Sound (RMS: 0.2728 >= 0.1500), reset silence count
+2025-09-08 03:15:53,790 - modules.audio - INFO - Chunk 33: Sound (RMS: 0.2125 >= 0.1500), reset silence count
+2025-09-08 03:15:53,894 - modules.audio - INFO - Chunk 34: Sound (RMS: 0.2003 >= 0.1500), reset silence count
+2025-09-08 03:15:53,991 - modules.audio - INFO - Chunk 35: Silent (RMS: 0.1304 < 0.1500), silence: 1/10
+2025-09-08 03:15:54,091 - modules.audio - INFO - Chunk 36: Sound (RMS: 0.2616 >= 0.1500), reset silence count
+2025-09-08 03:15:54,190 - modules.audio - INFO - Chunk 37: Sound (RMS: 0.3289 >= 0.1500), reset silence count
+2025-09-08 03:15:54,293 - modules.audio - INFO - Chunk 38: Sound (RMS: 0.3125 >= 0.1500), reset silence count
+2025-09-08 03:15:54,391 - modules.audio - INFO - Chunk 39: Sound (RMS: 0.3192 >= 0.1500), reset silence count
+2025-09-08 03:15:54,488 - modules.audio - INFO - Chunk 40: Sound (RMS: 0.3863 >= 0.1500), reset silence count
+2025-09-08 03:15:54,593 - modules.audio - INFO - Chunk 41: Sound (RMS: 0.2794 >= 0.1500), reset silence count
+2025-09-08 03:15:54,693 - modules.audio - INFO - Chunk 42: Sound (RMS: 0.2447 >= 0.1500), reset silence count
+2025-09-08 03:15:54,791 - modules.audio - INFO - Chunk 43: Silent (RMS: 0.1456 < 0.1500), silence: 1/10
+2025-09-08 03:15:54,889 - modules.audio - INFO - Chunk 44: Silent (RMS: 0.1191 < 0.1500), silence: 2/10
+2025-09-08 03:15:54,988 - modules.audio - INFO - Chunk 45: Silent (RMS: 0.0787 < 0.1500), silence: 3/10
+2025-09-08 03:15:55,091 - modules.audio - INFO - Chunk 46: Sound (RMS: 0.2706 >= 0.1500), reset silence count
+2025-09-08 03:15:55,189 - modules.audio - INFO - Chunk 47: Sound (RMS: 0.3370 >= 0.1500), reset silence count
+2025-09-08 03:15:55,294 - modules.audio - INFO - Chunk 48: Silent (RMS: 0.1166 < 0.1500), silence: 1/10
+2025-09-08 03:15:55,390 - modules.audio - INFO - Chunk 49: Sound (RMS: 0.2824 >= 0.1500), reset silence count
+2025-09-08 03:15:55,488 - modules.audio - INFO - Chunk 50: Sound (RMS: 0.3473 >= 0.1500), reset silence count
+2025-09-08 03:15:55,592 - modules.audio - INFO - Chunk 51: Sound (RMS: 0.3692 >= 0.1500), reset silence count
+2025-09-08 03:15:55,691 - modules.audio - INFO - Chunk 52: Sound (RMS: 0.2509 >= 0.1500), reset silence count
+2025-09-08 03:15:55,791 - modules.audio - INFO - Chunk 53: Sound (RMS: 0.2594 >= 0.1500), reset silence count
+2025-09-08 03:15:55,888 - modules.audio - INFO - Chunk 54: Sound (RMS: 0.2753 >= 0.1500), reset silence count
+2025-09-08 03:15:55,992 - modules.audio - INFO - Chunk 55: Sound (RMS: 0.3175 >= 0.1500), reset silence count
+2025-09-08 03:15:56,090 - modules.audio - INFO - Chunk 56: Silent (RMS: 0.1339 < 0.1500), silence: 1/10
+2025-09-08 03:15:56,194 - modules.audio - INFO - Chunk 57: Sound (RMS: 0.1534 >= 0.1500), reset silence count
+2025-09-08 03:15:56,291 - modules.audio - INFO - Chunk 58: Sound (RMS: 0.4254 >= 0.1500), reset silence count
+2025-09-08 03:15:56,391 - modules.audio - INFO - Chunk 59: Sound (RMS: 0.3186 >= 0.1500), reset silence count
+2025-09-08 03:15:56,490 - modules.audio - INFO - Chunk 60: Sound (RMS: 0.4422 >= 0.1500), reset silence count
+2025-09-08 03:15:56,588 - modules.audio - INFO - Chunk 61: Sound (RMS: 0.1541 >= 0.1500), reset silence count
+2025-09-08 03:15:56,693 - modules.audio - INFO - Chunk 62: Sound (RMS: 0.1812 >= 0.1500), reset silence count
+2025-09-08 03:15:56,791 - modules.audio - INFO - Chunk 63: Sound (RMS: 0.1752 >= 0.1500), reset silence count
+2025-09-08 03:15:56,890 - modules.audio - INFO - Chunk 64: Sound (RMS: 0.2131 >= 0.1500), reset silence count
+2025-09-08 03:15:56,988 - modules.audio - INFO - Chunk 65: Sound (RMS: 0.3349 >= 0.1500), reset silence count
+2025-09-08 03:15:57,093 - modules.audio - INFO - Chunk 66: Sound (RMS: 0.3700 >= 0.1500), reset silence count
+2025-09-08 03:15:57,190 - modules.audio - INFO - Chunk 67: Sound (RMS: 0.3305 >= 0.1500), reset silence count
+2025-09-08 03:15:57,288 - modules.audio - INFO - Chunk 68: Sound (RMS: 0.2408 >= 0.1500), reset silence count
+2025-09-08 03:15:57,394 - modules.audio - INFO - Chunk 69: Sound (RMS: 0.2074 >= 0.1500), reset silence count
+2025-09-08 03:15:57,492 - modules.audio - INFO - Chunk 70: Sound (RMS: 0.2801 >= 0.1500), reset silence count
+2025-09-08 03:15:57,592 - modules.audio - INFO - Chunk 71: Sound (RMS: 0.3856 >= 0.1500), reset silence count
+2025-09-08 03:15:57,688 - modules.audio - INFO - Chunk 72: Sound (RMS: 0.2479 >= 0.1500), reset silence count
+2025-09-08 03:15:57,793 - modules.audio - INFO - Chunk 73: Sound (RMS: 0.4651 >= 0.1500), reset silence count
+2025-09-08 03:15:57,893 - modules.audio - INFO - Chunk 74: Sound (RMS: 0.3318 >= 0.1500), reset silence count
+2025-09-08 03:15:57,991 - modules.audio - INFO - Chunk 75: Silent (RMS: 0.1393 < 0.1500), silence: 1/10
+2025-09-08 03:15:58,093 - modules.audio - INFO - Chunk 76: Sound (RMS: 0.1971 >= 0.1500), reset silence count
+2025-09-08 03:15:58,191 - modules.audio - INFO - Chunk 77: Sound (RMS: 0.2360 >= 0.1500), reset silence count
+2025-09-08 03:15:58,290 - modules.audio - INFO - Chunk 78: Sound (RMS: 0.3216 >= 0.1500), reset silence count
+2025-09-08 03:15:58,388 - modules.audio - INFO - Chunk 79: Sound (RMS: 0.2455 >= 0.1500), reset silence count
+2025-09-08 03:15:58,493 - modules.audio - INFO - Chunk 80: Sound (RMS: 0.2067 >= 0.1500), reset silence count
+2025-09-08 03:15:58,632 - modules.audio - INFO - Adaptive silence detection recording completed:
+2025-09-08 03:15:58,633 - modules.audio - INFO -   Duration: 8.00s (saved 0.00s)
+2025-09-08 03:15:58,633 - modules.audio - INFO -   Samples: 128000
+2025-09-08 03:15:58,633 - modules.audio - INFO -   RMS volume: 0.2752
+2025-09-08 03:15:58,633 - modules.audio - INFO -   Max volume: 1.8224
+2025-09-08 03:15:58,633 - modules.audio - INFO -   Speech detected: True
+2025-09-08 03:15:58,633 - modules.audio - INFO -   Final threshold used: 0.1500
+2025-09-08 03:15:58,634 - modules.audio - INFO - Good audio level detected (RMS: 0.2752)
+2025-09-08 03:15:58,635 - modules.audio - INFO - Successfully processed 128000 audio samples
+2025-09-08 03:15:58,706 - modules.audio - INFO - Created audio file for Whisper: /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp2onyt45o.wav
+2025-09-08 03:15:58,706 - modules.audio - INFO -   File size: 256044 bytes
+2025-09-08 03:15:58,706 - modules.audio - INFO -   Duration: 8000ms (8.00s)
+2025-09-08 03:15:58,706 - modules.audio - INFO -   Sample rate: 16000Hz
+2025-09-08 03:15:58,706 - modules.audio - INFO -   Channels: 1
+2025-09-08 03:15:58,708 - modules.audio - INFO - Debug audio saved to: debug_audio.wav
+2025-09-08 03:15:58,708 - modules.audio - INFO - Transcribing audio with Whisper...
+2025-09-08 03:15:58,709 - modules.audio - INFO - Starting Whisper transcription of /var/folders/5m/bgsbph_n0rl1y699gmlv858m0000gn/T/tmp2onyt45o.wav
+2025-09-08 03:15:58,709 - modules.audio - INFO - Running Whisper transcription...
+2025-09-08 03:16:00,057 - modules.audio - INFO - Whisper transcription with minimal parameters completed
+2025-09-08 03:16:00,057 - modules.audio - INFO - Whisper transcription completed
+2025-09-08 03:16:00,057 - modules.audio - INFO - Whisper result details:
+2025-09-08 03:16:00,057 - modules.audio - INFO -   Text: 'Write me a JavaScript code for sorting an array.'
+2025-09-08 03:16:00,057 - modules.audio - INFO -   Language: en
+2025-09-08 03:16:00,057 - modules.audio - INFO -   Segments: 1
+2025-09-08 03:16:00,057 - modules.audio - INFO -     Segment 1: 'Write me a JavaScript code for sorting an array.' (0.00-6.00s, prob: -0.444)
+2025-09-08 03:16:00,058 - modules.audio - INFO - Transcription result: 'Write me a JavaScript code for sorting an array.'
+2025-09-08 03:16:00,058 - __main__ - INFO - Command received: 'Write me a JavaScript code for sorting an array.'
+2025-09-08 03:16:00,059 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-08 03:16:00,059 - orchestrator - INFO - Starting command execution [cmd_1757281560059]: 'Write me a JavaScript code for sorting an array.'
+2025-09-08 03:16:00,059 - orchestrator - INFO - [cmd_1757281560059] Step 1: Intent recognition and routing
+2025-09-08 03:16:01,963 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-08 03:16:01,966 - orchestrator - INFO - Intent recognized: deferred_action (confidence: 0.99, time: 1.91s)
+2025-09-08 03:16:01,966 - orchestrator - INFO - [cmd_1757281560059] Intent recognized: deferred_action (confidence: 0.99)
+2025-09-08 03:16:01,966 - orchestrator - INFO - [cmd_1757281560059] Routing to DeferredActionHandler for intent 'deferred_action'
+2025-09-08 03:16:01,966 - DeferredActionHandler - INFO - [cmd_1757281560059] Starting DeferredActionHandler execution
+2025-09-08 03:16:01,966 - DeferredActionHandler - INFO - [cmd_1757281560059] Starting deferred action workflow
+2025-09-08 03:16:01,966 - DeferredActionHandler - INFO - [cmd_1757281560059] Content request: Write me a JavaScript code for sorting an array., Type: code
+2025-09-08 03:16:03,601 - httpx - INFO - HTTP Request: POST https://ollama.com/api/chat "HTTP/1.1 200 OK"
+2025-09-08 03:16:03,603 - DeferredActionHandler - INFO - [cmd_1757281560059] Generated 71 characters of code content
+2025-09-08 03:16:03,603 - utils.mouse_listener - INFO - Starting global mouse listener
+2025-09-08 03:16:03,709 - utils.mouse_listener - INFO - Global mouse listener started successfully
+2025-09-08 03:16:03,710 - DeferredActionHandler - INFO - [cmd_1757281560059] Mouse listener started successfully
+2025-09-08 03:16:03,711 - modules.audio - INFO - Converting text to speech: 'Code generated successfully. Click where you want ...'
+2025-09-08 03:16:03,711 - DeferredActionHandler - INFO - Waiting for user action: Content generated. Click where you want it placed.
+2025-09-08 03:16:03,712 - DeferredActionHandler - INFO - [cmd_1757281560059] DeferredActionHandler execution completed
+2025-09-08 03:16:03,712 - DeferredActionHandler - INFO - [cmd_1757281560059] Status: waiting_for_user_action, Time: 1.745s
+2025-09-08 03:16:03,712 - orchestrator - INFO - Releasing execution lock early for deferred action: cmd_1757281560059
+2025-09-08 03:16:03,712 - __main__ - WARNING - Command execution had issues: []
+2025-09-08 03:16:03,712 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:16:07,008 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-08 03:16:07,410 - utils.mouse_listener - INFO - Mouse click detected at (397.47265625, 302.2578125) with left button
+2025-09-08 03:16:07,410 - DeferredActionHandler - INFO - [cmd_1757281560059] Deferred action triggered by user click
+2025-09-08 03:16:07,410 - DeferredActionHandler - INFO - [cmd_1757281560059] Executing deferred action at coordinates: (397.47265625, 302.2578125)
+2025-09-08 03:16:07,411 - DeferredActionHandler - INFO - [cmd_1757281560059] Executing type action with 72 characters
+2025-09-08 03:16:07,412 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-08 03:16:07,412 - modules.automation - INFO - Executing action: click (attempt 1/4)
+2025-09-08 03:16:07,544 - modules.automation - INFO - cliclick SLOW PATH: Click succeeded at (397, 302) on 'unknown' in 0.132s
+2025-09-08 03:16:07,544 - modules.automation - INFO - Successfully executed action: click
+2025-09-08 03:16:07,749 - modules.error_handler - INFO - ErrorHandler initialized
+2025-09-08 03:16:07,750 - modules.automation - INFO - Executing action: type (attempt 1/4)
+2025-09-08 03:16:08,851 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:16:08,981 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:16:12,105 - modules.automation - INFO - cliclick SLOW PATH: Typing succeeded on 'unknown' in 4.355s: 'function sortArray(arr) {
+  re...'
+2025-09-08 03:16:12,105 - modules.automation - INFO - Successfully executed action: type
+2025-09-08 03:16:12,105 - DeferredActionHandler - INFO - [cmd_1757281560059] Successfully typed 72 characters
+2025-09-08 03:16:12,105 - DeferredActionHandler - INFO - [cmd_1757281560059] Deferred action completed successfully
+2025-09-08 03:16:12,105 - utils.mouse_listener - INFO - Stopping global mouse listener
+2025-09-08 03:16:12,206 - modules.audio - INFO - Converting text to speech: 'Content placed successfully....'
+2025-09-08 03:16:14,001 - modules.audio - INFO - Text-to-speech completed successfully
+2025-09-08 03:16:14,028 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:16:14,111 - utils.mouse_listener - WARNING - Mouse listener thread did not stop gracefully
+2025-09-08 03:16:14,111 - utils.mouse_listener - INFO - Mouse listener stopped after 10.51 seconds
+2025-09-08 03:16:14,111 - utils.mouse_listener - INFO - Global mouse listener stopped successfully
+2025-09-08 03:16:14,165 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:16:19,276 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:16:19,412 - modules.audio - INFO - Listening for wake word 'computer'...
+2025-09-08 03:16:22,683 - __main__ - INFO - Received signal 2, initiating graceful shutdown...
+2025-09-08 03:16:22,683 - __main__ - INFO - Initiating AURA shutdown...
+2025-09-08 03:16:22,683 - __main__ - INFO - Step 1: Stopping monitoring threads...
+2025-09-08 03:16:24,475 - modules.audio - INFO - Wake word detection timeout reached
+2025-09-08 03:16:24,610 - __main__ - INFO - Wake word monitoring stopped
+2025-09-08 03:16:24,610 - __main__ - INFO - Step 2: Running cleanup handlers...
+2025-09-08 03:16:24,611 - __main__ - INFO - Running 5 cleanup handlers...
+2025-09-08 03:16:24,612 - __main__ - ERROR - Error cleaning up audio resources: 'str' object has no attribute 'stop'
