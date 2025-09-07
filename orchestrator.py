@@ -4559,11 +4559,23 @@ class Orchestrator:
                 # Handle different action types
                 action_type = action.get("action")
                 
-                if action_type in ["click", "double_click", "type", "scroll"]:
+                if action_type in ["click", "double_click", "type"]:
                     # GUI automation actions
                     self.automation_module.execute_action(action)
                     action_result["status"] = "success"
                     execution_results["successful_actions"] += 1
+                    
+                elif action_type == "scroll":
+                    # Enhanced scroll handling with context awareness
+                    scroll_success = self._execute_enhanced_scroll(action, execution_id)
+                    if scroll_success:
+                        action_result["status"] = "success"
+                        execution_results["successful_actions"] += 1
+                    else:
+                        action_result["status"] = "failed"
+                        action_result["error"] = "Enhanced scroll execution failed"
+                        execution_results["failed_actions"] += 1
+                        execution_results["errors"].append("Enhanced scroll execution failed")
                     
                 elif action_type == "speak":
                     # TTS feedback action
@@ -6819,4 +6831,354 @@ Focus on being helpful while being honest about what information is actually vis
             
         except Exception as e:
             logger.debug(f"Error determining if command is GUI command: {e}")
+            return False
+    
+    def _execute_enhanced_scroll(self, action: Dict[str, Any], execution_id: str) -> bool:
+        """
+        Execute enhanced scroll command with context awareness and focusing.
+        
+        This method implements the enhanced scroll reliability required by
+        Task 0.9 of the system stabilization plan.
+        
+        Args:
+            action: Scroll action dictionary
+            execution_id: Unique execution identifier
+            
+        Returns:
+            True if scroll was successful, False otherwise
+        """
+        try:
+            logger.debug(f"[{execution_id}] Starting enhanced scroll execution")
+            
+            # Extract scroll parameters
+            direction = action.get("direction", "up")
+            amount = action.get("amount", 100)
+            
+            # Step 1: Detect scroll context and identify scrollable areas
+            scroll_context = self._detect_scroll_context(execution_id)
+            
+            # Step 2: Focus primary scrollable area if found
+            if scroll_context.get("scrollable_areas"):
+                focus_success = self._focus_primary_scrollable_area(
+                    scroll_context["scrollable_areas"], 
+                    execution_id
+                )
+                if focus_success:
+                    logger.info(f"[{execution_id}] Successfully focused primary scrollable area")
+                else:
+                    logger.warning(f"[{execution_id}] Failed to focus scrollable area, using fallback")
+            else:
+                logger.info(f"[{execution_id}] No specific scrollable areas found, using current behavior")
+            
+            # Step 3: Execute scroll with enhanced error handling
+            scroll_success = self._execute_scroll_with_fallback(action, execution_id)
+            
+            if scroll_success:
+                logger.info(f"[{execution_id}] Enhanced scroll completed successfully")
+                return True
+            else:
+                logger.error(f"[{execution_id}] Enhanced scroll failed")
+                return False
+                
+        except Exception as e:
+            logger.error(f"[{execution_id}] Enhanced scroll execution failed: {e}")
+            return False
+    
+    def _detect_scroll_context(self, execution_id: str) -> Dict[str, Any]:
+        """
+        Detect scroll context and identify scrollable areas.
+        
+        Args:
+            execution_id: Unique execution identifier
+            
+        Returns:
+            Dictionary containing scroll context information
+        """
+        try:
+            logger.debug(f"[{execution_id}] Detecting scroll context")
+            
+            scroll_context = {
+                "scrollable_areas": [],
+                "active_application": None,
+                "detection_method": "none",
+                "confidence": 0.0
+            }
+            
+            # Get active application information
+            if hasattr(self, 'application_detector') and self.application_detector:
+                try:
+                    app_info = self.application_detector.get_active_application_info()
+                    if app_info:
+                        scroll_context["active_application"] = app_info.to_dict()
+                        logger.debug(f"[{execution_id}] Active application: {app_info.name}")
+                except Exception as e:
+                    logger.debug(f"[{execution_id}] Failed to get application info: {e}")
+            
+            # Try to detect scrollable areas using accessibility API
+            if self.accessibility_module and self.module_availability.get('accessibility', False):
+                try:
+                    scrollable_areas = self._find_scrollable_areas_accessibility(execution_id)
+                    if scrollable_areas:
+                        scroll_context["scrollable_areas"] = scrollable_areas
+                        scroll_context["detection_method"] = "accessibility"
+                        scroll_context["confidence"] = 0.8
+                        logger.debug(f"[{execution_id}] Found {len(scrollable_areas)} scrollable areas via accessibility")
+                except Exception as e:
+                    logger.debug(f"[{execution_id}] Accessibility-based detection failed: {e}")
+            
+            # Fallback: Try to detect scrollable areas using vision
+            if not scroll_context["scrollable_areas"] and self.vision_module and self.module_availability.get('vision', False):
+                try:
+                    scrollable_areas = self._find_scrollable_areas_vision(execution_id)
+                    if scrollable_areas:
+                        scroll_context["scrollable_areas"] = scrollable_areas
+                        scroll_context["detection_method"] = "vision"
+                        scroll_context["confidence"] = 0.6
+                        logger.debug(f"[{execution_id}] Found {len(scrollable_areas)} scrollable areas via vision")
+                except Exception as e:
+                    logger.debug(f"[{execution_id}] Vision-based detection failed: {e}")
+            
+            return scroll_context
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Error detecting scroll context: {e}")
+            return {
+                "scrollable_areas": [],
+                "active_application": None,
+                "detection_method": "error",
+                "confidence": 0.0
+            }
+    
+    def _find_scrollable_areas_accessibility(self, execution_id: str) -> List[Dict[str, Any]]:
+        """
+        Find scrollable areas using accessibility API.
+        
+        Args:
+            execution_id: Unique execution identifier
+            
+        Returns:
+            List of scrollable area information
+        """
+        try:
+            scrollable_areas = []
+            
+            # Common scrollable roles in accessibility API
+            scrollable_roles = [
+                "AXScrollArea", "AXTable", "AXOutline", "AXList", 
+                "AXWebArea", "AXTextArea", "AXGroup"
+            ]
+            
+            # Try to find elements with scrollable roles
+            for role in scrollable_roles:
+                try:
+                    elements = self.accessibility_module.find_elements_by_role(role)
+                    for element in elements[:3]:  # Limit to first 3 for performance
+                        if self._is_element_scrollable(element):
+                            area_info = {
+                                "role": role,
+                                "coordinates": element.get("coordinates", [0, 0]),
+                                "size": element.get("size", [100, 100]),
+                                "title": element.get("title", ""),
+                                "confidence": 0.8
+                            }
+                            scrollable_areas.append(area_info)
+                            logger.debug(f"[{execution_id}] Found scrollable {role}: {area_info['title']}")
+                except Exception as e:
+                    logger.debug(f"[{execution_id}] Error finding {role} elements: {e}")
+                    continue
+            
+            return scrollable_areas
+            
+        except Exception as e:
+            logger.debug(f"[{execution_id}] Error in accessibility-based scrollable area detection: {e}")
+            return []
+    
+    def _find_scrollable_areas_vision(self, execution_id: str) -> List[Dict[str, Any]]:
+        """
+        Find scrollable areas using vision analysis.
+        
+        Args:
+            execution_id: Unique execution identifier
+            
+        Returns:
+            List of scrollable area information
+        """
+        try:
+            scrollable_areas = []
+            
+            # Use vision module to analyze screen for scrollable content
+            screen_analysis = self.vision_module.describe_screen(analysis_type="detailed")
+            
+            if screen_analysis and "elements" in screen_analysis:
+                for element in screen_analysis["elements"]:
+                    # Look for elements that might be scrollable
+                    element_text = element.get("text", "").lower()
+                    element_type = element.get("type", "").lower()
+                    
+                    # Check for scrollable indicators
+                    scrollable_indicators = [
+                        "scroll", "list", "table", "content", "text area",
+                        "document", "page", "feed", "timeline"
+                    ]
+                    
+                    if any(indicator in element_text or indicator in element_type 
+                           for indicator in scrollable_indicators):
+                        area_info = {
+                            "type": element_type,
+                            "coordinates": element.get("coordinates", [0, 0]),
+                            "size": element.get("size", [100, 100]),
+                            "text": element.get("text", ""),
+                            "confidence": 0.6
+                        }
+                        scrollable_areas.append(area_info)
+                        logger.debug(f"[{execution_id}] Found potential scrollable area via vision: {element_text[:50]}")
+            
+            return scrollable_areas
+            
+        except Exception as e:
+            logger.debug(f"[{execution_id}] Error in vision-based scrollable area detection: {e}")
+            return []
+    
+    def _is_element_scrollable(self, element: Dict[str, Any]) -> bool:
+        """
+        Check if an accessibility element is scrollable.
+        
+        Args:
+            element: Element information from accessibility API
+            
+        Returns:
+            True if element appears to be scrollable
+        """
+        try:
+            # Check for scrollable attributes
+            if element.get("scrollable", False):
+                return True
+            
+            # Check for scroll-related properties
+            properties = element.get("properties", {})
+            if properties.get("AXHorizontalScrollBar") or properties.get("AXVerticalScrollBar"):
+                return True
+            
+            # Check size - large elements are more likely to be scrollable
+            size = element.get("size", [0, 0])
+            if len(size) >= 2 and size[0] > 200 and size[1] > 200:
+                return True
+            
+            return False
+            
+        except Exception:
+            return False
+    
+    def _focus_primary_scrollable_area(self, scrollable_areas: List[Dict[str, Any]], execution_id: str) -> bool:
+        """
+        Focus the primary scrollable area before scrolling.
+        
+        Args:
+            scrollable_areas: List of detected scrollable areas
+            execution_id: Unique execution identifier
+            
+        Returns:
+            True if successfully focused a scrollable area
+        """
+        try:
+            if not scrollable_areas:
+                return False
+            
+            # Sort by confidence and size to find the best candidate
+            sorted_areas = sorted(
+                scrollable_areas, 
+                key=lambda x: (x.get("confidence", 0), 
+                              x.get("size", [0, 0])[0] * x.get("size", [0, 0])[1]),
+                reverse=True
+            )
+            
+            primary_area = sorted_areas[0]
+            logger.debug(f"[{execution_id}] Attempting to focus primary scrollable area")
+            
+            # Click on the center of the scrollable area to focus it
+            coordinates = primary_area.get("coordinates", [0, 0])
+            size = primary_area.get("size", [100, 100])
+            
+            if len(coordinates) >= 2 and len(size) >= 2:
+                # Calculate center point
+                center_x = coordinates[0] + size[0] // 2
+                center_y = coordinates[1] + size[1] // 2
+                
+                # Create a click action to focus the area
+                focus_action = {
+                    "action": "click",
+                    "coordinates": [center_x, center_y]
+                }
+                
+                # Execute the focus click
+                self.automation_module.execute_action(focus_action)
+                logger.info(f"[{execution_id}] Focused scrollable area at ({center_x}, {center_y})")
+                
+                # Small delay to ensure focus is established
+                time.sleep(0.2)
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.warning(f"[{execution_id}] Error focusing primary scrollable area: {e}")
+            return False
+    
+    def _execute_scroll_with_fallback(self, action: Dict[str, Any], execution_id: str) -> bool:
+        """
+        Execute scroll with comprehensive fallback mechanisms.
+        
+        Args:
+            action: Scroll action dictionary
+            execution_id: Unique execution identifier
+            
+        Returns:
+            True if scroll was successful
+        """
+        try:
+            # Try primary scroll execution
+            try:
+                self.automation_module.execute_action(action)
+                logger.debug(f"[{execution_id}] Primary scroll execution successful")
+                return True
+            except Exception as primary_error:
+                logger.warning(f"[{execution_id}] Primary scroll failed: {primary_error}")
+            
+            # Fallback 1: Try with different scroll amounts
+            original_amount = action.get("amount", 100)
+            fallback_amounts = [original_amount // 2, original_amount * 2, 50, 200]
+            
+            for amount in fallback_amounts:
+                try:
+                    fallback_action = action.copy()
+                    fallback_action["amount"] = amount
+                    self.automation_module.execute_action(fallback_action)
+                    logger.info(f"[{execution_id}] Fallback scroll successful with amount {amount}")
+                    return True
+                except Exception as fallback_error:
+                    logger.debug(f"[{execution_id}] Fallback amount {amount} failed: {fallback_error}")
+                    continue
+            
+            # Fallback 2: Try alternative scroll directions if original failed
+            direction = action.get("direction", "up")
+            if direction in ["up", "down"]:
+                alternative_directions = ["down", "up"]
+                alt_direction = alternative_directions[0] if direction == "up" else alternative_directions[1]
+                
+                try:
+                    alt_action = action.copy()
+                    alt_action["direction"] = alt_direction
+                    alt_action["amount"] = original_amount // 2  # Smaller amount for alternative direction
+                    self.automation_module.execute_action(alt_action)
+                    logger.info(f"[{execution_id}] Alternative direction scroll successful: {alt_direction}")
+                    return True
+                except Exception as alt_error:
+                    logger.debug(f"[{execution_id}] Alternative direction failed: {alt_error}")
+            
+            # All fallbacks failed
+            logger.error(f"[{execution_id}] All scroll fallback methods failed")
+            return False
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Error in scroll fallback execution: {e}")
             return False

@@ -7,6 +7,7 @@ for different types of applications (web browsers, native apps, system applicati
 
 import logging
 import time
+import subprocess
 from typing import Dict, Any, Optional, List, Tuple, Set
 from dataclasses import dataclass, field
 from enum import Enum
@@ -700,3 +701,577 @@ class ApplicationDetector:
             'strategy_cache_size': len(self._strategy_cache),
             'cached_applications': list(self._app_cache.keys())
         }
+    
+    def get_active_application_info(self) -> Optional[ApplicationInfo]:
+        """
+        Get information about the currently active/focused application.
+        
+        This method implements robust application detection with comprehensive
+        error handling and AppleScript fallback mechanisms.
+        
+        Returns:
+            ApplicationInfo for the active application, or None if detection fails
+        """
+        try:
+            self.logger.debug("Attempting to get active application info")
+            
+            # Try primary method using AppKit
+            app_info = self._get_active_app_primary()
+            if app_info:
+                self.logger.debug(f"Primary method succeeded: {app_info.name}")
+                return app_info
+            
+            # Fallback to AppleScript method
+            self.logger.info("Primary method failed, trying AppleScript fallback")
+            app_info = self._get_active_app_applescript_fallback()
+            if app_info:
+                self.logger.info(f"AppleScript fallback succeeded: {app_info.name}")
+                return app_info
+            
+            # Final fallback - try to get any running application
+            self.logger.warning("AppleScript fallback failed, trying final fallback")
+            app_info = self._get_active_app_final_fallback()
+            if app_info:
+                self.logger.warning(f"Final fallback succeeded: {app_info.name}")
+                return app_info
+            
+            self.logger.error("All application detection methods failed")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error getting active application info: {e}")
+            return None
+    
+    def _get_active_app_primary(self) -> Optional[ApplicationInfo]:
+        """
+        Primary method to get active application using AppKit.
+        
+        Returns:
+            ApplicationInfo if successful, None otherwise
+        """
+        if not APPKIT_AVAILABLE:
+            self.logger.debug("AppKit not available for primary detection")
+            return None
+        
+        try:
+            workspace = NSWorkspace.sharedWorkspace()
+            active_app = workspace.frontmostApplication()
+            
+            if not active_app:
+                self.logger.debug("No frontmost application found")
+                return None
+            
+            app_name = active_app.localizedName()
+            bundle_id = active_app.bundleIdentifier()
+            process_id = active_app.processIdentifier()
+            
+            if not app_name:
+                self.logger.debug("Active application has no name")
+                return None
+            
+            # Create ApplicationInfo
+            app_info = ApplicationInfo(
+                name=app_name,
+                bundle_id=bundle_id or "unknown",
+                process_id=process_id,
+                app_type=ApplicationType.UNKNOWN,  # Will be determined later
+                version=self._get_app_version(active_app),
+                accessibility_enabled=True,
+                detection_confidence=0.95
+            )
+            
+            # Detect application type
+            app_type, browser_type, confidence = self._classify_application(app_info)
+            app_info.app_type = app_type
+            app_info.browser_type = browser_type
+            app_info.detection_confidence = confidence
+            
+            return app_info
+            
+        except Exception as e:
+            self.logger.debug(f"Primary detection method failed: {e}")
+            return None
+    
+    def _get_active_app_applescript_fallback(self) -> Optional[ApplicationInfo]:
+        """
+        AppleScript fallback method for application detection.
+        
+        Uses System Events to identify the focused application when
+        primary methods fail.
+        
+        Returns:
+            ApplicationInfo if successful, None otherwise
+        """
+        try:
+            # AppleScript to get frontmost application
+            script = '''
+            tell application "System Events"
+                set frontApp to first process whose frontmost is true
+                set appName to name of frontApp
+                set appPID to unix id of frontApp
+                try
+                    set appBundle to bundle identifier of frontApp
+                on error
+                    set appBundle to "unknown"
+                end try
+                return appName & "|" & appPID & "|" & appBundle
+            end tell
+            '''
+            
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode != 0:
+                self.logger.debug(f"AppleScript failed with return code {result.returncode}: {result.stderr}")
+                return None
+            
+            # Parse the result
+            parts = result.stdout.strip().split('|')
+            if len(parts) < 3:
+                self.logger.debug(f"AppleScript returned unexpected format: {result.stdout}")
+                return None
+            
+            app_name = parts[0]
+            try:
+                process_id = int(parts[1])
+            except ValueError:
+                process_id = 0
+            bundle_id = parts[2] if parts[2] != "unknown" else "unknown"
+            
+            if not app_name:
+                self.logger.debug("AppleScript returned empty application name")
+                return None
+            
+            # Create ApplicationInfo
+            app_info = ApplicationInfo(
+                name=app_name,
+                bundle_id=bundle_id,
+                process_id=process_id,
+                app_type=ApplicationType.UNKNOWN,
+                detection_confidence=0.85  # Lower confidence for fallback method
+            )
+            
+            # Detect application type
+            app_type, browser_type, confidence = self._classify_application(app_info)
+            app_info.app_type = app_type
+            app_info.browser_type = browser_type
+            app_info.detection_confidence = min(confidence, 0.85)  # Cap confidence for fallback
+            
+            return app_info
+            
+        except subprocess.TimeoutExpired:
+            self.logger.debug("AppleScript fallback timed out")
+            return None
+        except Exception as e:
+            self.logger.debug(f"AppleScript fallback failed: {e}")
+            return None
+    
+    def _get_active_app_final_fallback(self) -> Optional[ApplicationInfo]:
+        """
+        Final fallback method - try to get any reasonable application.
+        
+        This method attempts to find a suitable application when all other
+        methods fail, prioritizing common applications.
+        
+        Returns:
+            ApplicationInfo if any application found, None otherwise
+        """
+        try:
+            # Try to get any running application, preferring common ones
+            preferred_apps = [
+                "Safari", "Google Chrome", "Firefox", "Microsoft Edge",
+                "Finder", "Terminal", "TextEdit", "System Preferences"
+            ]
+            
+            if APPKIT_AVAILABLE:
+                workspace = NSWorkspace.sharedWorkspace()
+                running_apps = workspace.runningApplications()
+                
+                # First, try preferred applications
+                for app in running_apps:
+                    app_name = app.localizedName()
+                    if app_name in preferred_apps:
+                        app_info = ApplicationInfo(
+                            name=app_name,
+                            bundle_id=app.bundleIdentifier() or "unknown",
+                            process_id=app.processIdentifier(),
+                            app_type=ApplicationType.UNKNOWN,
+                            detection_confidence=0.5  # Low confidence for final fallback
+                        )
+                        
+                        # Detect application type
+                        app_type, browser_type, confidence = self._classify_application(app_info)
+                        app_info.app_type = app_type
+                        app_info.browser_type = browser_type
+                        app_info.detection_confidence = min(confidence, 0.5)
+                        
+                        self.logger.debug(f"Final fallback found preferred app: {app_name}")
+                        return app_info
+                
+                # If no preferred apps, try any user application
+                for app in running_apps:
+                    if app.activationPolicy() == 0:  # Regular application
+                        app_name = app.localizedName()
+                        if app_name and not app_name.startswith("com."):
+                            app_info = ApplicationInfo(
+                                name=app_name,
+                                bundle_id=app.bundleIdentifier() or "unknown",
+                                process_id=app.processIdentifier(),
+                                app_type=ApplicationType.UNKNOWN,
+                                detection_confidence=0.3
+                            )
+                            
+                            # Detect application type
+                            app_type, browser_type, confidence = self._classify_application(app_info)
+                            app_info.app_type = app_type
+                            app_info.browser_type = browser_type
+                            app_info.detection_confidence = min(confidence, 0.3)
+                            
+                            self.logger.debug(f"Final fallback found any app: {app_name}")
+                            return app_info
+            
+            # If AppKit is not available, try AppleScript as final attempt
+            try:
+                script = 'tell application "System Events" to get name of first process whose frontmost is true'
+                result = subprocess.run(
+                    ["osascript", "-e", script],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                
+                if result.returncode == 0:
+                    app_name = result.stdout.strip()
+                    if app_name:
+                        app_info = ApplicationInfo(
+                            name=app_name,
+                            bundle_id="unknown",
+                            process_id=0,
+                            app_type=ApplicationType.UNKNOWN,
+                            detection_confidence=0.2
+                        )
+                        
+                        # Basic classification
+                        app_type, browser_type, confidence = self._classify_application(app_info)
+                        app_info.app_type = app_type
+                        app_info.browser_type = browser_type
+                        app_info.detection_confidence = min(confidence, 0.2)
+                        
+                        self.logger.debug(f"Final AppleScript fallback found: {app_name}")
+                        return app_info
+            except:
+                pass
+            
+            return None
+            
+        except Exception as e:
+            self.logger.debug(f"Final fallback failed: {e}")
+            return None
+    
+    def _ensure_application_focus(self) -> Dict[str, Any]:
+        """
+        Ensure we can identify the focused application with comprehensive fallback.
+        
+        This method implements the robust application detection strategy
+        required by the system stabilization plan.
+        
+        Returns:
+            Dictionary with success status and application information
+        """
+        try:
+            self.logger.debug("Ensuring application focus detection")
+            
+            # Try to get active application info
+            app_info = self.get_active_application_info()
+            
+            if app_info and app_info.name and app_info.name != "unknown":
+                return {
+                    "success": True,
+                    "app_info": app_info.to_dict(),
+                    "method": "primary_detection",
+                    "confidence": app_info.detection_confidence,
+                    "message": f"Successfully detected application: {app_info.name}"
+                }
+            
+            # If primary detection failed, try enhanced AppleScript
+            self.logger.info("Primary detection failed, trying enhanced AppleScript")
+            enhanced_result = self._enhanced_applescript_detection()
+            
+            if enhanced_result["success"]:
+                return enhanced_result
+            
+            # Final attempt with system process detection
+            self.logger.warning("Enhanced AppleScript failed, trying system process detection")
+            process_result = self._system_process_detection()
+            
+            if process_result["success"]:
+                return process_result
+            
+            # All methods failed
+            return {
+                "success": False,
+                "error": "Could not identify focused application using any method",
+                "methods_tried": ["primary_detection", "enhanced_applescript", "system_process"],
+                "message": "All application detection methods failed"
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in _ensure_application_focus: {e}")
+            return {
+                "success": False,
+                "error": f"Application focus detection failed: {str(e)}",
+                "message": "Exception occurred during application detection"
+            }
+    
+    def _enhanced_applescript_detection(self) -> Dict[str, Any]:
+        """
+        Enhanced AppleScript detection with multiple fallback strategies.
+        
+        Returns:
+            Dictionary with detection results
+        """
+        try:
+            # Try multiple AppleScript approaches
+            scripts = [
+                # Method 1: System Events frontmost process
+                '''
+                tell application "System Events"
+                    set frontApp to first process whose frontmost is true
+                    set appName to name of frontApp
+                    try
+                        set appBundle to bundle identifier of frontApp
+                    on error
+                        set appBundle to "unknown"
+                    end try
+                    try
+                        set appPID to unix id of frontApp
+                    on error
+                        set appPID to 0
+                    end try
+                    return appName & "|" & appBundle & "|" & appPID
+                end tell
+                ''',
+                
+                # Method 2: NSWorkspace current application
+                '''
+                tell application "System Events"
+                    set frontApp to name of first process whose frontmost is true
+                    return frontApp
+                end tell
+                ''',
+                
+                # Method 3: Get active window title and infer application
+                '''
+                tell application "System Events"
+                    set frontApp to first process whose frontmost is true
+                    set appName to name of frontApp
+                    try
+                        set windowTitle to title of first window of frontApp
+                        return appName & "|window:" & windowTitle
+                    on error
+                        return appName & "|window:unknown"
+                    end try
+                end tell
+                '''
+            ]
+            
+            for i, script in enumerate(scripts):
+                try:
+                    result = subprocess.run(
+                        ["osascript", "-e", script],
+                        capture_output=True,
+                        text=True,
+                        timeout=8
+                    )
+                    
+                    if result.returncode == 0 and result.stdout.strip():
+                        output = result.stdout.strip()
+                        
+                        # Parse the result based on script type
+                        if i == 0:  # Full info script
+                            parts = output.split('|')
+                            if len(parts) >= 3:
+                                app_name = parts[0]
+                                bundle_id = parts[1] if parts[1] != "unknown" else "unknown"
+                                try:
+                                    process_id = int(parts[2])
+                                except:
+                                    process_id = 0
+                                
+                                app_info = ApplicationInfo(
+                                    name=app_name,
+                                    bundle_id=bundle_id,
+                                    process_id=process_id,
+                                    app_type=ApplicationType.UNKNOWN,
+                                    detection_confidence=0.8
+                                )
+                                
+                                # Classify the application
+                                app_type, browser_type, confidence = self._classify_application(app_info)
+                                app_info.app_type = app_type
+                                app_info.browser_type = browser_type
+                                app_info.detection_confidence = min(confidence, 0.8)
+                                
+                                return {
+                                    "success": True,
+                                    "app_info": app_info.to_dict(),
+                                    "method": f"enhanced_applescript_method_{i+1}",
+                                    "confidence": app_info.detection_confidence,
+                                    "message": f"Enhanced AppleScript detection succeeded: {app_name}"
+                                }
+                        
+                        elif i == 1:  # Simple name script
+                            app_name = output
+                            if app_name:
+                                app_info = ApplicationInfo(
+                                    name=app_name,
+                                    bundle_id="unknown",
+                                    process_id=0,
+                                    app_type=ApplicationType.UNKNOWN,
+                                    detection_confidence=0.7
+                                )
+                                
+                                # Basic classification
+                                app_type, browser_type, confidence = self._classify_application(app_info)
+                                app_info.app_type = app_type
+                                app_info.browser_type = browser_type
+                                app_info.detection_confidence = min(confidence, 0.7)
+                                
+                                return {
+                                    "success": True,
+                                    "app_info": app_info.to_dict(),
+                                    "method": f"enhanced_applescript_method_{i+1}",
+                                    "confidence": app_info.detection_confidence,
+                                    "message": f"Simple AppleScript detection succeeded: {app_name}"
+                                }
+                        
+                        elif i == 2:  # Window title script
+                            parts = output.split('|window:')
+                            if len(parts) >= 2:
+                                app_name = parts[0]
+                                window_title = parts[1]
+                                
+                                app_info = ApplicationInfo(
+                                    name=app_name,
+                                    bundle_id="unknown",
+                                    process_id=0,
+                                    app_type=ApplicationType.UNKNOWN,
+                                    detection_confidence=0.6
+                                )
+                                
+                                # Basic classification
+                                app_type, browser_type, confidence = self._classify_application(app_info)
+                                app_info.app_type = app_type
+                                app_info.browser_type = browser_type
+                                app_info.detection_confidence = min(confidence, 0.6)
+                                
+                                return {
+                                    "success": True,
+                                    "app_info": app_info.to_dict(),
+                                    "method": f"enhanced_applescript_method_{i+1}",
+                                    "confidence": app_info.detection_confidence,
+                                    "window_title": window_title,
+                                    "message": f"Window-based AppleScript detection succeeded: {app_name}"
+                                }
+                
+                except subprocess.TimeoutExpired:
+                    self.logger.debug(f"AppleScript method {i+1} timed out")
+                    continue
+                except Exception as e:
+                    self.logger.debug(f"AppleScript method {i+1} failed: {e}")
+                    continue
+            
+            return {
+                "success": False,
+                "error": "All enhanced AppleScript methods failed",
+                "message": "Enhanced AppleScript detection unsuccessful"
+            }
+            
+        except Exception as e:
+            self.logger.debug(f"Enhanced AppleScript detection failed: {e}")
+            return {
+                "success": False,
+                "error": f"Enhanced AppleScript detection error: {str(e)}",
+                "message": "Exception in enhanced AppleScript detection"
+            }
+    
+    def _system_process_detection(self) -> Dict[str, Any]:
+        """
+        System process detection as final fallback.
+        
+        Uses system commands to detect running processes and infer
+        the most likely active application.
+        
+        Returns:
+            Dictionary with detection results
+        """
+        try:
+            # Try to use ps command to find GUI applications
+            result = subprocess.run(
+                ["ps", "aux"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                lines = result.stdout.split('\n')
+                
+                # Look for common GUI applications in process list
+                gui_apps = []
+                for line in lines:
+                    if any(app in line.lower() for app in [
+                        'safari', 'chrome', 'firefox', 'edge', 'finder', 
+                        'terminal', 'textedit', 'mail', 'messages'
+                    ]):
+                        # Extract process name
+                        parts = line.split()
+                        if len(parts) > 10:
+                            process_name = parts[10].split('/')[-1]
+                            if process_name and not process_name.startswith('-'):
+                                gui_apps.append(process_name)
+                
+                if gui_apps:
+                    # Use the first found GUI application
+                    app_name = gui_apps[0]
+                    
+                    app_info = ApplicationInfo(
+                        name=app_name,
+                        bundle_id="unknown",
+                        process_id=0,
+                        app_type=ApplicationType.UNKNOWN,
+                        detection_confidence=0.4
+                    )
+                    
+                    # Basic classification
+                    app_type, browser_type, confidence = self._classify_application(app_info)
+                    app_info.app_type = app_type
+                    app_info.browser_type = browser_type
+                    app_info.detection_confidence = min(confidence, 0.4)
+                    
+                    return {
+                        "success": True,
+                        "app_info": app_info.to_dict(),
+                        "method": "system_process_detection",
+                        "confidence": app_info.detection_confidence,
+                        "message": f"System process detection found: {app_name}",
+                        "note": "Low confidence - inferred from process list"
+                    }
+            
+            return {
+                "success": False,
+                "error": "No suitable GUI applications found in process list",
+                "message": "System process detection unsuccessful"
+            }
+            
+        except Exception as e:
+            self.logger.debug(f"System process detection failed: {e}")
+            return {
+                "success": False,
+                "error": f"System process detection error: {str(e)}",
+                "message": "Exception in system process detection"
+            }
