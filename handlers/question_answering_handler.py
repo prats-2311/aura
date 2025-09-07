@@ -277,9 +277,79 @@ class QuestionAnsweringHandler(BaseHandler):
         """
         self.logger.debug("Attempting PDF content extraction")
         
-        # Placeholder implementation - will be implemented in later tasks
-        self.logger.debug("PDF content extraction not yet implemented")
-        return None
+        try:
+            # Initialize PDFHandler if not already done
+            if not self._pdf_handler:
+                from modules.pdf_handler import PDFHandler
+                self._pdf_handler = PDFHandler()
+                self.logger.debug("PDFHandler initialized")
+            
+            # Get current application info
+            app_info = self._detect_active_application()
+            if not app_info:
+                self.logger.warning("Could not detect active application for PDF content extraction")
+                return None
+            
+            # Verify it's a PDF reader application
+            from modules.application_detector import ApplicationType
+            if app_info.app_type != ApplicationType.PDF_READER:
+                self.logger.warning(f"Active application {app_info.name} is not a PDF reader")
+                return None
+            
+            # Set up timeout for extraction (2 second limit as per requirements)
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("PDF content extraction timed out")
+            
+            # Store old handler to restore later
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(2)  # 2 second timeout
+            
+            try:
+                self.logger.info(f"Extracting content from PDF reader: {app_info.name}")
+                
+                # Extract text content using PDFHandler
+                content = self._pdf_handler.extract_text_from_open_document(app_info.name)
+                
+                # Cancel timeout
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+                
+                if not content:
+                    self.logger.warning("PDF content extraction returned empty content")
+                    return None
+                
+                # Validate content is substantial (>50 characters as per requirements)
+                if len(content.strip()) <= 50:
+                    self.logger.warning(f"Extracted PDF content too short ({len(content.strip())} characters), likely not substantial document content")
+                    return None
+                
+                # Additional content validation and cleaning
+                cleaned_content = self._validate_and_clean_pdf_content(content)
+                if not cleaned_content:
+                    self.logger.warning("PDF content failed validation checks")
+                    return None
+                
+                self.logger.info(f"Successfully extracted {len(cleaned_content)} characters of PDF content")
+                return cleaned_content
+                
+            except TimeoutError:
+                # Cancel timeout and restore handler
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+                self.logger.warning("PDF content extraction timed out after 2 seconds")
+                return None
+            except Exception as e:
+                # Cancel timeout and restore handler
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+                self.logger.error(f"Error during PDF content extraction: {e}")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error in PDF content extraction setup: {e}")
+            return None
     
     def _fallback_to_vision(self, command: str) -> Dict[str, Any]:
         """
@@ -468,6 +538,114 @@ class QuestionAnsweringHandler(BaseHandler):
         
         self.logger.debug(f"Content validation passed: {word_count} words, {len(content)} characters")
         return True
+    
+    def _validate_and_clean_pdf_content(self, content: str) -> Optional[str]:
+        """
+        Validate and clean extracted PDF content to ensure it's meaningful and substantial.
+        
+        This method performs quality checks and cleaning on extracted PDF content to ensure
+        it represents actual document content rather than extraction artifacts or errors.
+        
+        Args:
+            content: Raw extracted PDF text content
+            
+        Returns:
+            Cleaned and validated content string if valid, None if content fails validation
+        """
+        if not content or not content.strip():
+            self.logger.debug("PDF content is empty or whitespace only")
+            return None
+        
+        # Initial cleaning
+        cleaned_content = content.strip()
+        content_lower = cleaned_content.lower()
+        
+        # Check for PDF extraction error indicators
+        error_indicators = [
+            "could not extract text",
+            "no text found",
+            "extraction failed",
+            "corrupted pdf",
+            "password protected",
+            "encrypted document",
+            "unable to read",
+            "invalid pdf"
+        ]
+        
+        for indicator in error_indicators:
+            if indicator in content_lower:
+                self.logger.debug(f"PDF content contains error indicator: {indicator}")
+                return None
+        
+        # Check for excessive extraction artifacts (common in poorly formatted PDFs)
+        artifact_patterns = [
+            r'^\s*\d+\s*$',  # Lines with only page numbers
+            r'^\s*[^\w\s]{3,}\s*$',  # Lines with only symbols/punctuation
+            r'^\s*\.{3,}\s*$',  # Lines with only dots
+            r'^\s*-{3,}\s*$',  # Lines with only dashes
+        ]
+        
+        import re
+        lines = cleaned_content.split('\n')
+        clean_lines = []
+        artifact_count = 0
+        
+        for line in lines:
+            line_stripped = line.strip()
+            if not line_stripped:
+                clean_lines.append('')  # Preserve empty lines for structure
+                continue
+            
+            # Check if line is likely an artifact
+            is_artifact = False
+            for pattern in artifact_patterns:
+                if re.match(pattern, line_stripped):
+                    is_artifact = True
+                    artifact_count += 1
+                    break
+            
+            if not is_artifact:
+                clean_lines.append(line)
+        
+        # If too many lines are artifacts, the extraction might be poor quality
+        total_non_empty_lines = len([line for line in lines if line.strip()])
+        if total_non_empty_lines > 0 and artifact_count / total_non_empty_lines > 0.3:
+            self.logger.debug(f"PDF content has too many extraction artifacts ({artifact_count}/{total_non_empty_lines})")
+            return None
+        
+        # Rejoin cleaned lines
+        cleaned_content = '\n'.join(clean_lines)
+        
+        # Remove excessive whitespace while preserving structure
+        cleaned_content = re.sub(r'\n{4,}', '\n\n\n', cleaned_content)  # Limit consecutive newlines
+        cleaned_content = re.sub(r'[ \t]{3,}', '  ', cleaned_content)  # Limit consecutive spaces/tabs
+        
+        # Final validation checks
+        word_count = len(cleaned_content.split())
+        if word_count < 10:  # Less than 10 words is likely not substantial content
+            self.logger.debug(f"PDF content has too few words ({word_count})")
+            return None
+        
+        # Check for reasonable character-to-word ratio
+        char_to_word_ratio = len(cleaned_content) / word_count if word_count > 0 else 0
+        if char_to_word_ratio > 100:  # Very high ratio suggests extraction issues
+            self.logger.debug(f"PDF content has poor character-to-word ratio ({char_to_word_ratio:.1f})")
+            return None
+        
+        # Check for minimum meaningful content (should have some alphabetic characters)
+        alphabetic_chars = sum(1 for char in cleaned_content if char.isalpha())
+        if alphabetic_chars < 50:  # Less than 50 alphabetic characters is likely not meaningful
+            self.logger.debug(f"PDF content has too few alphabetic characters ({alphabetic_chars})")
+            return None
+        
+        # Check for reasonable text density (alphabetic chars vs total chars)
+        text_density = alphabetic_chars / len(cleaned_content) if len(cleaned_content) > 0 else 0
+        if text_density < 0.3:  # Less than 30% alphabetic characters suggests poor extraction
+            self.logger.debug(f"PDF content has low text density ({text_density:.2f})")
+            return None
+        
+        self.logger.debug(f"PDF content validation passed: {word_count} words, {len(cleaned_content)} characters, {text_density:.2f} text density")
+        return cleaned_content
     
     def get_performance_stats(self) -> Dict[str, Any]:
         """
