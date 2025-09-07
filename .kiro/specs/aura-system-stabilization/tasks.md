@@ -108,7 +108,7 @@
   - Add fallback to gui_interaction when intent recognition fails
   - _Requirements: 5.3, 5.4, 5.5_
 
-- [ ] 1.1 Refactor command execution flow with intent-based routing
+- [x] 1.1 Refactor command execution flow with intent-based routing
   - Update `_execute_command_internal` to perform intent recognition before processing
   - Implement intent-based routing that delegates to appropriate handler methods
   - Move existing GUI automation logic to `_handle_gui_interaction` method
@@ -118,7 +118,7 @@
 
 ### Task 1.2: Implement Whisper Silence Detection
 
-- [ ] 1.2 Enhance audio input pipeline with silence detection
+- [x] 1.2 Enhance audio input pipeline with silence detection
   - Modify `modules/audio.py` speech_to_text method to record in chunks
   - Implement automatic silence detection to stop recording when user finishes speaking
   - Add configurable silence threshold and detection sensitivity settings

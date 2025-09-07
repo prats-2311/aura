@@ -385,6 +385,13 @@ AUDIO_SAMPLE_RATE = 16000  # Hz, for speech recognition
 AUDIO_CHUNK_SIZE = 1024    # Buffer size for audio processing
 AUDIO_RECORDING_DURATION = 8.0  # Maximum recording duration in seconds
 AUDIO_SILENCE_THRESHOLD = 0.005  # Threshold for silence detection (0.0 to 1.0) - lower = more sensitive
+
+# Silence detection settings
+SILENCE_DETECTION_ENABLED = True  # Enable automatic silence detection
+SILENCE_DETECTION_DURATION = 1.0  # Seconds of silence required to stop recording
+SILENCE_DETECTION_CHUNK_SIZE = 0.1  # Size of audio chunks for real-time analysis (seconds)
+SILENCE_DETECTION_SENSITIVITY = 0.05  # RMS threshold for silence detection (lower = more sensitive)
+MIN_RECORDING_DURATION = 0.5  # Minimum recording duration before silence detection kicks in
 TTS_SPEED = 1.0           # Text-to-speech speed multiplier
 TTS_VOLUME = 0.8          # Text-to-speech volume (0.0 to 1.0)
 
@@ -932,6 +939,19 @@ def validate_config():
     if not 0.0 <= AUDIO_SILENCE_THRESHOLD <= 1.0:
         warnings.append("AUDIO_SILENCE_THRESHOLD must be between 0.0 and 1.0")
     
+    # Check silence detection settings
+    if SILENCE_DETECTION_DURATION < 0.5 or SILENCE_DETECTION_DURATION > 5.0:
+        warnings.append("SILENCE_DETECTION_DURATION should be between 0.5-5.0 seconds")
+    
+    if SILENCE_DETECTION_CHUNK_SIZE < 0.05 or SILENCE_DETECTION_CHUNK_SIZE > 1.0:
+        warnings.append("SILENCE_DETECTION_CHUNK_SIZE should be between 0.05-1.0 seconds")
+    
+    if not 0.0 <= SILENCE_DETECTION_SENSITIVITY <= 1.0:
+        warnings.append("SILENCE_DETECTION_SENSITIVITY must be between 0.0 and 1.0")
+    
+    if MIN_RECORDING_DURATION < 0.1 or MIN_RECORDING_DURATION > 5.0:
+        warnings.append("MIN_RECORDING_DURATION should be between 0.1-5.0 seconds")
+    
     if TTS_VOLUME < 0 or TTS_VOLUME > 1:
         errors.append("TTS_VOLUME must be between 0.0 and 1.0")
     
@@ -1259,6 +1279,11 @@ def get_config_summary():
             'sample_rate': AUDIO_SAMPLE_RATE,
             'recording_duration': AUDIO_RECORDING_DURATION,
             'silence_threshold': AUDIO_SILENCE_THRESHOLD,
+            'silence_detection_enabled': SILENCE_DETECTION_ENABLED,
+            'silence_detection_duration': SILENCE_DETECTION_DURATION,
+            'silence_detection_chunk_size': SILENCE_DETECTION_CHUNK_SIZE,
+            'silence_detection_sensitivity': SILENCE_DETECTION_SENSITIVITY,
+            'min_recording_duration': MIN_RECORDING_DURATION,
             'tts_speed': TTS_SPEED,
             'tts_volume': TTS_VOLUME,
             'hybrid_feedback_enabled': HYBRID_FEEDBACK_ENABLED,

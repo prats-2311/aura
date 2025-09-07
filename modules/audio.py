@@ -32,7 +32,12 @@ from config import (
     TTS_VOLUME,
     AUDIO_API_TIMEOUT,
     PORCUPINE_API_KEY,
-    WAKE_WORD
+    WAKE_WORD,
+    SILENCE_DETECTION_ENABLED,
+    SILENCE_DETECTION_DURATION,
+    SILENCE_DETECTION_CHUNK_SIZE,
+    SILENCE_DETECTION_SENSITIVITY,
+    MIN_RECORDING_DURATION
 )
 from .error_handler import (
     global_error_handler,
@@ -518,17 +523,17 @@ class AudioModule:
     
     def _record_audio(self, duration: float, silence_threshold: float) -> Optional[np.ndarray]:
         """
-        Record audio from the default microphone with improved error handling and debugging.
+        Record audio from the default microphone with silence detection and fallback.
         
         Args:
             duration: Maximum recording duration in seconds
-            silence_threshold: Threshold for detecting silence
+            silence_threshold: Threshold for detecting silence (legacy parameter, now uses SILENCE_DETECTION_SENSITIVITY)
             
         Returns:
             Recorded audio data as numpy array
         """
         try:
-            logger.debug(f"Starting audio recording for {duration}s with silence threshold {silence_threshold}")
+            logger.debug(f"Starting audio recording for max {duration}s with silence detection")
             
             # Check audio device availability
             try:
@@ -538,14 +543,173 @@ class AudioModule:
             except Exception as e:
                 logger.warning(f"Could not query audio devices: {e}")
             
+            # Try silence detection first if enabled
+            if SILENCE_DETECTION_ENABLED:
+                try:
+                    logger.info("Attempting audio recording with silence detection...")
+                    audio_data = self._record_audio_with_silence_detection(duration)
+                    if audio_data is not None:
+                        return audio_data
+                    else:
+                        logger.warning("Silence detection recording failed, falling back to fixed duration")
+                except Exception as e:
+                    logger.warning(f"Silence detection failed: {e}, falling back to fixed duration recording")
+            
+            # Fallback to fixed-duration recording
+            logger.info("Using fixed-duration recording fallback...")
+            return self._record_audio_fixed_duration(duration)
+            
+        except Exception as e:
+            logger.error(f"Audio recording failed: {e}")
+            raise
+
+    def _record_audio_with_silence_detection(self, max_duration: float) -> Optional[np.ndarray]:
+        """
+        Record audio with adaptive silence detection to automatically stop when user finishes speaking.
+        
+        Args:
+            max_duration: Maximum recording duration in seconds
+            
+        Returns:
+            Recorded audio data as numpy array, or None if failed
+        """
+        try:
+            chunk_size = int(SILENCE_DETECTION_CHUNK_SIZE * AUDIO_SAMPLE_RATE)
+            audio_chunks = []
+            silence_chunks = 0
+            required_silence_chunks = int(SILENCE_DETECTION_DURATION / SILENCE_DETECTION_CHUNK_SIZE)
+            min_recording_chunks = int(MIN_RECORDING_DURATION / SILENCE_DETECTION_CHUNK_SIZE)
+            max_chunks = int(max_duration / SILENCE_DETECTION_CHUNK_SIZE)
+            
+            # Adaptive baseline measurement
+            baseline_chunks = min(10, int(0.5 / SILENCE_DETECTION_CHUNK_SIZE))  # 0.5 seconds or 10 chunks max
+            baseline_levels = []
+            
+            logger.info(f"Recording with adaptive silence detection:")
+            logger.info(f"  Chunk size: {chunk_size} samples ({SILENCE_DETECTION_CHUNK_SIZE}s)")
+            logger.info(f"  Required silence: {required_silence_chunks} chunks ({SILENCE_DETECTION_DURATION}s)")
+            logger.info(f"  Minimum recording: {min_recording_chunks} chunks ({MIN_RECORDING_DURATION}s)")
+            logger.info(f"  Base silence threshold: {SILENCE_DETECTION_SENSITIVITY}")
+            logger.info(f"  Measuring baseline for {baseline_chunks} chunks...")
+            
+            # Start recording stream
+            with sd.InputStream(
+                samplerate=AUDIO_SAMPLE_RATE,
+                channels=1,
+                dtype=np.float32,
+                blocksize=chunk_size
+            ) as stream:
+                
+                start_time = time.time()
+                chunk_count = 0
+                adaptive_threshold = SILENCE_DETECTION_SENSITIVITY
+                speech_detected = False
+                
+                while chunk_count < max_chunks:
+                    # Read audio chunk
+                    audio_chunk, overflowed = stream.read(chunk_size)
+                    
+                    if overflowed:
+                        logger.warning("Audio input overflow detected")
+                    
+                    # Flatten the chunk
+                    audio_chunk = audio_chunk.flatten()
+                    audio_chunks.append(audio_chunk)
+                    chunk_count += 1
+                    
+                    # Calculate RMS volume for this chunk
+                    chunk_rms = np.sqrt(np.mean(audio_chunk ** 2))
+                    
+                    # Collect baseline measurements
+                    if chunk_count <= baseline_chunks:
+                        baseline_levels.append(chunk_rms)
+                        if chunk_count == baseline_chunks:
+                            # Calculate adaptive threshold
+                            baseline_avg = np.mean(baseline_levels)
+                            baseline_max = np.max(baseline_levels)
+                            # Set threshold to 2x the baseline average, but at least the configured minimum
+                            adaptive_threshold = max(baseline_avg * 2.0, SILENCE_DETECTION_SENSITIVITY)
+                            # Cap it at a reasonable maximum to avoid being too insensitive
+                            adaptive_threshold = min(adaptive_threshold, 0.15)
+                            
+                            logger.info(f"Baseline measurement complete:")
+                            logger.info(f"  Baseline average: {baseline_avg:.4f}")
+                            logger.info(f"  Baseline max: {baseline_max:.4f}")
+                            logger.info(f"  Adaptive threshold: {adaptive_threshold:.4f}")
+                        continue
+                    
+                    # Check if this chunk is silent using adaptive threshold
+                    is_silent = chunk_rms < adaptive_threshold
+                    
+                    # Track if we've detected speech (helps with very quiet speakers)
+                    if chunk_rms > adaptive_threshold * 1.2:  # 1.2x threshold indicates clear speech
+                        speech_detected = True
+                    
+                    if is_silent:
+                        silence_chunks += 1
+                        logger.info(f"Chunk {chunk_count}: Silent (RMS: {chunk_rms:.4f} < {adaptive_threshold:.4f}), silence: {silence_chunks}/{required_silence_chunks}")
+                    else:
+                        silence_chunks = 0  # Reset silence counter on any sound
+                        logger.info(f"Chunk {chunk_count}: Sound (RMS: {chunk_rms:.4f} >= {adaptive_threshold:.4f}), reset silence count")
+                    
+                    # Check if we should stop recording
+                    # Only stop if we've detected speech at some point (prevents stopping on pure silence)
+                    if (chunk_count >= min_recording_chunks and 
+                        silence_chunks >= required_silence_chunks and 
+                        speech_detected):
+                        elapsed_time = time.time() - start_time
+                        logger.info(f"Speech followed by silence detected after {elapsed_time:.2f}s, stopping recording")
+                        break
+                    
+                    # Log progress every second
+                    if chunk_count % int(1.0 / SILENCE_DETECTION_CHUNK_SIZE) == 0:
+                        elapsed_time = time.time() - start_time
+                        logger.debug(f"Recording progress: {elapsed_time:.1f}s, silence: {silence_chunks}/{required_silence_chunks}, speech_detected: {speech_detected}")
+            
+            # Combine all audio chunks
+            if not audio_chunks:
+                logger.warning("No audio chunks recorded")
+                return None
+            
+            audio_data = np.concatenate(audio_chunks)
+            
+            # Calculate final statistics
+            duration_recorded = len(audio_data) / AUDIO_SAMPLE_RATE
+            volume_rms = np.sqrt(np.mean(audio_data ** 2))
+            volume_max = np.max(np.abs(audio_data))
+            
+            logger.info(f"Adaptive silence detection recording completed:")
+            logger.info(f"  Duration: {duration_recorded:.2f}s (saved {max_duration - duration_recorded:.2f}s)")
+            logger.info(f"  Samples: {len(audio_data)}")
+            logger.info(f"  RMS volume: {volume_rms:.4f}")
+            logger.info(f"  Max volume: {volume_max:.4f}")
+            logger.info(f"  Speech detected: {speech_detected}")
+            logger.info(f"  Final threshold used: {adaptive_threshold:.4f}")
+            
+            # Apply the same post-processing as the fixed duration method
+            return self._process_recorded_audio(audio_data)
+            
+        except Exception as e:
+            logger.error(f"Adaptive silence detection recording failed: {e}")
+            return None
+
+    def _record_audio_fixed_duration(self, duration: float) -> Optional[np.ndarray]:
+        """
+        Record audio for a fixed duration (fallback method).
+        
+        Args:
+            duration: Recording duration in seconds
+            
+        Returns:
+            Recorded audio data as numpy array
+        """
+        try:
             # Calculate number of frames
             frames = int(duration * AUDIO_SAMPLE_RATE)
-            logger.debug(f"Recording {frames} frames at {AUDIO_SAMPLE_RATE}Hz")
+            logger.debug(f"Recording {frames} frames at {AUDIO_SAMPLE_RATE}Hz for {duration}s")
             
-            # Use simple synchronous recording for better reliability
-            logger.info("Starting synchronous audio recording...")
-            
-            # Record audio synchronously (simpler and more reliable)
+            # Record audio synchronously
+            logger.info("Starting fixed-duration audio recording...")
             audio_data = sd.rec(
                 frames,
                 samplerate=AUDIO_SAMPLE_RATE,
@@ -563,16 +727,38 @@ class AudioModule:
                 logger.warning("Recorded audio data is empty")
                 return None
             
-            # Calculate audio statistics for debugging
+            # Calculate statistics
             duration_recorded = len(audio_data) / AUDIO_SAMPLE_RATE
             volume_rms = np.sqrt(np.mean(audio_data ** 2))
             volume_max = np.max(np.abs(audio_data))
             
-            logger.info(f"Audio recording completed:")
+            logger.info(f"Fixed-duration recording completed:")
             logger.info(f"  Duration: {duration_recorded:.2f}s")
             logger.info(f"  Samples: {len(audio_data)}")
             logger.info(f"  RMS volume: {volume_rms:.4f}")
             logger.info(f"  Max volume: {volume_max:.4f}")
+            
+            return self._process_recorded_audio(audio_data)
+            
+        except Exception as e:
+            logger.error(f"Fixed-duration recording failed: {e}")
+            raise
+
+    def _process_recorded_audio(self, audio_data: np.ndarray) -> np.ndarray:
+        """
+        Apply post-processing to recorded audio data.
+        
+        Args:
+            audio_data: Raw audio data as numpy array
+            
+        Returns:
+            Processed audio data
+        """
+        try:
+            # Calculate statistics
+            volume_rms = np.sqrt(np.mean(audio_data ** 2))
+            volume_max = np.max(np.abs(audio_data))
+            duration_recorded = len(audio_data) / AUDIO_SAMPLE_RATE
             
             # Check if audio is too quiet
             if volume_rms < 0.001:
@@ -586,7 +772,7 @@ class AudioModule:
             if duration_recorded < 0.5:
                 logger.warning(f"Recorded audio is very short ({duration_recorded:.2f}s). May not be sufficient for transcription.")
             
-            # Apply gain to boost quiet audio (more aggressive than before)
+            # Apply gain to boost quiet audio
             if volume_max > 0:
                 # Target 30% of max volume, with higher max gain for very quiet audio
                 target_level = 0.3
@@ -604,11 +790,11 @@ class AudioModule:
             # Convert to int16 for better compatibility with Whisper
             audio_data = np.clip(audio_data * 32767, -32767, 32767).astype(np.int16)
             
-            logger.info(f"Successfully recorded and processed {len(audio_data)} audio samples")
+            logger.info(f"Successfully processed {len(audio_data)} audio samples")
             return audio_data
             
         except Exception as e:
-            logger.error(f"Audio recording failed: {e}")
+            logger.error(f"Audio processing failed: {e}")
             raise
     
     def listen_for_wake_word(self, timeout: Optional[float] = None, provide_feedback: bool = True) -> bool:
