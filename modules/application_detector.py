@@ -37,6 +37,7 @@ except ImportError:
 class ApplicationType(Enum):
     """Types of applications with different accessibility characteristics."""
     WEB_BROWSER = "web_browser"
+    PDF_READER = "pdf_reader"
     NATIVE_APP = "native_app"
     SYSTEM_APP = "system_app"
     ELECTRON_APP = "electron_app"
@@ -200,6 +201,21 @@ class ApplicationDetector:
                 'com.microsoft.edgemac': BrowserType.EDGE,
             },
             
+            # PDF readers and document viewers
+            ApplicationType.PDF_READER: [
+                'com.apple.Preview',
+                'com.adobe.Reader',
+                'com.adobe.Acrobat.Pro',
+                'com.readdle.PDFExpert-Mac',
+                'net.sourceforge.skim-app.skim',
+                'com.smileonmymac.PDFpen',
+                'com.smileonmymac.PDFpenPro',
+                'com.goodreader.GoodReader',
+                'com.pdfviewer.PDFViewer',
+                'com.apple.iBooks',
+                'com.culturedcode.ThingsMac'  # Things sometimes opens PDFs
+            ],
+            
             # System applications
             ApplicationType.SYSTEM_APP: [
                 'com.apple.finder',
@@ -236,6 +252,15 @@ class ApplicationDetector:
                 r'.*Safari.*',
                 r'.*Firefox.*',
                 r'.*Edge.*'
+            ],
+            ApplicationType.PDF_READER: [
+                r'.*Preview.*',
+                r'.*Adobe.*',
+                r'.*Acrobat.*',
+                r'.*Reader.*',
+                r'.*PDF.*',
+                r'.*Skim.*',
+                r'.*PDFpen.*'
             ],
             ApplicationType.ELECTRON_APP: [
                 r'.*Electron.*',
@@ -480,6 +505,16 @@ class ApplicationDetector:
         if any(browser in app_name for browser in ['chrome', 'safari', 'firefox', 'edge']):
             browser_type = self._detect_browser_type_from_name(app_name)
             return ApplicationType.WEB_BROWSER, browser_type, 0.85
+        
+        # Check PDF readers
+        pdf_patterns = self.bundle_patterns[ApplicationType.PDF_READER]
+        for pattern in pdf_patterns:
+            if pattern.lower() in bundle_id:
+                return ApplicationType.PDF_READER, None, 0.95
+        
+        # Check for PDF reader patterns in name
+        if any(pdf_app in app_name for pdf_app in ['preview', 'adobe', 'acrobat', 'reader', 'pdf', 'skim']):
+            return ApplicationType.PDF_READER, None, 0.85
         
         # Check system applications
         system_patterns = self.bundle_patterns[ApplicationType.SYSTEM_APP]

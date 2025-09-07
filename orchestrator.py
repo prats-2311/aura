@@ -41,6 +41,11 @@ from modules.performance import (
 from modules.diagnostic_tools import AccessibilityHealthChecker
 from modules.error_recovery import ErrorRecoveryManager
 
+# Import content extraction modules for fast path
+from modules.browser_accessibility import BrowserAccessibilityHandler
+from modules.pdf_handler import PDFHandler
+from modules.application_detector import ApplicationType
+
 # Import enhanced fallback configuration
 from config import (
     ENHANCED_FALLBACK_ENABLED,
@@ -125,6 +130,10 @@ class Orchestrator:
         self.diagnostic_tools = None
         self.error_recovery_manager = None
         self.debug_mode_enabled = False
+        
+        # Content extraction modules for fast path
+        self.browser_accessibility_handler = None
+        self.pdf_handler = None
         
         # Fast path configuration
         self.fast_path_enabled = True
@@ -1107,6 +1116,41 @@ class Orchestrator:
             logger.warning(f"Accessibility Module initialization failed: {error_info.message}")
             # Disable fast path if accessibility module fails
             self.fast_path_enabled = False
+        
+        # Initialize content extraction modules for fast path
+        try:
+            logger.info("Initializing Browser Accessibility Handler...")
+            self.browser_accessibility_handler = BrowserAccessibilityHandler()
+            module_init_status['browser_accessibility'] = True
+            logger.info("Browser Accessibility Handler initialized successfully")
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_initialize_modules",
+                category=ErrorCategory.CONFIGURATION_ERROR,
+                severity=ErrorSeverity.LOW,
+                context={"module": "browser_accessibility"}
+            )
+            initialization_errors.append(f"Browser Accessibility Handler: {error_info.user_message}")
+            logger.warning(f"Browser Accessibility Handler initialization failed: {error_info.message}")
+        
+        try:
+            logger.info("Initializing PDF Handler...")
+            self.pdf_handler = PDFHandler()
+            module_init_status['pdf_handler'] = True
+            logger.info("PDF Handler initialized successfully")
+        except Exception as e:
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="orchestrator",
+                function="_initialize_modules",
+                category=ErrorCategory.CONFIGURATION_ERROR,
+                severity=ErrorSeverity.LOW,
+                context={"module": "pdf_handler"}
+            )
+            initialization_errors.append(f"PDF Handler: {error_info.user_message}")
+            logger.warning(f"PDF Handler initialization failed: {error_info.message}")
         
         # Initialize debugging and diagnostic tools
         self._initialize_debugging_tools()
@@ -4753,7 +4797,10 @@ class Orchestrator:
     
     def answer_question(self, question: str) -> Dict[str, Any]:
         """
-        Answer a question about screen content using information extraction mode.
+        Answer a question about screen content using fast path content extraction with vision fallback.
+        
+        This method implements content type detection (browser vs PDF vs other applications)
+        and uses text-based fast path extraction before falling back to vision-based analysis.
         
         Args:
             question: User's question about screen content
@@ -4776,6 +4823,44 @@ class Orchestrator:
             
             # Provide thinking feedback
             self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
+            
+            # Try fast path content extraction first
+            fast_path_result = self._try_fast_path_content_extraction(execution_id, question)
+            
+            if fast_path_result["success"]:
+                logger.info(f"[{execution_id}] Fast path extraction successful, using text-based analysis")
+                answer = fast_path_result["answer"]
+                method_used = fast_path_result["method"]
+                content_length = fast_path_result.get("content_length", 0)
+                
+                # Provide the answer via TTS and console output
+                print(f"\n🤖 AURA: {answer}\n")
+                logger.info(f"[{execution_id}] AURA Response (via {method_used}): {answer}")
+                self.feedback_module.speak(answer, FeedbackPriority.NORMAL)
+                
+                # Format result with fast path metadata
+                result = {
+                    "execution_id": execution_id,
+                    "question": question,
+                    "answer": answer,
+                    "status": "completed",
+                    "duration": time.time() - start_time,
+                    "success": True,
+                    "metadata": {
+                        "method": method_used,
+                        "content_length": content_length,
+                        "fast_path_used": True,
+                        "vision_fallback_used": False,
+                        "timestamp": start_time,
+                        "extraction_time": fast_path_result.get("extraction_time", 0)
+                    }
+                }
+                
+                logger.info(f"[{execution_id}] Question answered successfully via fast path ({method_used})")
+                return result
+            
+            # Fast path failed, fall back to vision-based analysis
+            logger.info(f"[{execution_id}] Fast path failed ({fast_path_result.get('reason', 'unknown')}), falling back to vision analysis")
             
             # Determine analysis type based on question
             analysis_type = self._determine_analysis_type_for_question(question)
@@ -4820,16 +4905,19 @@ class Orchestrator:
                 "duration": time.time() - start_time,
                 "success": success,
                 "metadata": {
+                    "method": "vision_analysis",
                     "screen_elements_analyzed": len(screen_context.get("elements", [])),
                     "text_blocks_analyzed": len(screen_context.get("text_blocks", [])),
                     "confidence": action_plan.get("metadata", {}).get("confidence", 0.0),
-                    "information_extraction_mode": True,
+                    "fast_path_used": False,
+                    "vision_fallback_used": True,
+                    "fast_path_failure_reason": fast_path_result.get("reason", "unknown"),
                     "timestamp": start_time,
                     "screen_resolution": screen_context.get("metadata", {}).get("screen_resolution", [0, 0])
                 }
             }
             
-            logger.info(f"[{execution_id}] Question answered successfully: {success}")
+            logger.info(f"[{execution_id}] Question answered successfully via vision fallback: {success}")
             return result
             
         except Exception as e:
@@ -4902,6 +4990,201 @@ class Orchestrator:
             self.command_history.append(execution_context.copy())
             
             return self._format_execution_result(execution_context)
+
+    def _try_fast_path_content_extraction(self, execution_id: str, question: str) -> Dict[str, Any]:
+        """
+        Try to extract content using fast path methods (browser/PDF text extraction).
+        
+        Args:
+            execution_id: Unique execution identifier
+            question: User's question
+            
+        Returns:
+            Dictionary with success status, answer, method used, and metadata
+        """
+        try:
+            # Get current application information
+            if not self.accessibility_module:
+                return {
+                    "success": False,
+                    "reason": "Accessibility module not available",
+                    "answer": None,
+                    "method": None
+                }
+            
+            app_info = self.accessibility_module.get_active_application_info()
+            if not app_info:
+                return {
+                    "success": False,
+                    "reason": "Could not detect active application",
+                    "answer": None,
+                    "method": None
+                }
+            
+            logger.info(f"[{execution_id}] Active application: {app_info.name} ({app_info.app_type.value})")
+            
+            # Try browser content extraction
+            if app_info.app_type == ApplicationType.WEB_BROWSER and self.browser_accessibility_handler:
+                return self._try_browser_content_extraction(execution_id, question, app_info)
+            
+            # Try PDF content extraction
+            elif app_info.app_type == ApplicationType.PDF_READER and self.pdf_handler:
+                return self._try_pdf_content_extraction(execution_id, question, app_info)
+            
+            # Application type not supported for fast path
+            return {
+                "success": False,
+                "reason": f"Application type {app_info.app_type.value} not supported for fast path extraction",
+                "answer": None,
+                "method": None
+            }
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Fast path content extraction failed: {e}")
+            return {
+                "success": False,
+                "reason": f"Fast path extraction error: {str(e)}",
+                "answer": None,
+                "method": None
+            }
+    
+    def _try_browser_content_extraction(self, execution_id: str, question: str, app_info) -> Dict[str, Any]:
+        """Try to extract and analyze browser content."""
+        try:
+            extraction_start = time.time()
+            
+            # Extract page text content
+            page_content = self.browser_accessibility_handler.get_page_text_content(app_info)
+            
+            if not page_content or len(page_content.strip()) < 50:
+                return {
+                    "success": False,
+                    "reason": "No substantial content extracted from browser",
+                    "answer": None,
+                    "method": "browser_extraction"
+                }
+            
+            extraction_time = time.time() - extraction_start
+            logger.info(f"[{execution_id}] Extracted {len(page_content)} characters from browser in {extraction_time:.2f}s")
+            
+            # Use reasoning module to answer question based on extracted content
+            reasoning_start = time.time()
+            
+            prompt = f"""Based on the following web page content, please answer this question: "{question}"
+
+Web page content:
+{page_content[:8000]}  # Limit content to avoid token limits
+
+Please provide a direct, helpful answer based on the content above. If the answer cannot be found in the content, say "The information is not available in the current page content."
+"""
+            
+            try:
+                response = self.reasoning_module.process_query(prompt)
+                reasoning_time = time.time() - reasoning_start
+                
+                if response and response.strip():
+                    return {
+                        "success": True,
+                        "answer": response.strip(),
+                        "method": "browser_text_extraction",
+                        "content_length": len(page_content),
+                        "extraction_time": extraction_time,
+                        "reasoning_time": reasoning_time
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "reason": "Reasoning module returned empty response",
+                        "answer": None,
+                        "method": "browser_extraction"
+                    }
+                    
+            except Exception as e:
+                logger.error(f"[{execution_id}] Reasoning failed for browser content: {e}")
+                return {
+                    "success": False,
+                    "reason": f"Reasoning failed: {str(e)}",
+                    "answer": None,
+                    "method": "browser_extraction"
+                }
+                
+        except Exception as e:
+            logger.error(f"[{execution_id}] Browser content extraction failed: {e}")
+            return {
+                "success": False,
+                "reason": f"Browser extraction error: {str(e)}",
+                "answer": None,
+                "method": "browser_extraction"
+            }
+    
+    def _try_pdf_content_extraction(self, execution_id: str, question: str, app_info) -> Dict[str, Any]:
+        """Try to extract and analyze PDF content."""
+        try:
+            extraction_start = time.time()
+            
+            # Extract PDF text content
+            pdf_content = self.pdf_handler.extract_text_from_open_document(app_info.name)
+            
+            if not pdf_content or len(pdf_content.strip()) < 50:
+                return {
+                    "success": False,
+                    "reason": "No substantial content extracted from PDF",
+                    "answer": None,
+                    "method": "pdf_extraction"
+                }
+            
+            extraction_time = time.time() - extraction_start
+            logger.info(f"[{execution_id}] Extracted {len(pdf_content)} characters from PDF in {extraction_time:.2f}s")
+            
+            # Use reasoning module to answer question based on extracted content
+            reasoning_start = time.time()
+            
+            prompt = f"""Based on the following PDF document content, please answer this question: "{question}"
+
+PDF document content:
+{pdf_content[:8000]}  # Limit content to avoid token limits
+
+Please provide a direct, helpful answer based on the content above. If the answer cannot be found in the content, say "The information is not available in the current document."
+"""
+            
+            try:
+                response = self.reasoning_module.process_query(prompt)
+                reasoning_time = time.time() - reasoning_start
+                
+                if response and response.strip():
+                    return {
+                        "success": True,
+                        "answer": response.strip(),
+                        "method": "pdf_text_extraction",
+                        "content_length": len(pdf_content),
+                        "extraction_time": extraction_time,
+                        "reasoning_time": reasoning_time
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "reason": "Reasoning module returned empty response",
+                        "answer": None,
+                        "method": "pdf_extraction"
+                    }
+                    
+            except Exception as e:
+                logger.error(f"[{execution_id}] Reasoning failed for PDF content: {e}")
+                return {
+                    "success": False,
+                    "reason": f"Reasoning failed: {str(e)}",
+                    "answer": None,
+                    "method": "pdf_extraction"
+                }
+                
+        except Exception as e:
+            logger.error(f"[{execution_id}] PDF content extraction failed: {e}")
+            return {
+                "success": False,
+                "reason": f"PDF extraction error: {str(e)}",
+                "answer": None,
+                "method": "pdf_extraction"
+            }
 
     def _determine_analysis_type_for_question(self, question: str) -> str:
         """

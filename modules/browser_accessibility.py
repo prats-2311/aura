@@ -1214,6 +1214,222 @@ class BrowserAccessibilityHandler:
         
         return web_elements
     
+    def get_page_text_content(self, app_info: ApplicationInfo) -> Optional[str]:
+        """
+        Extract all text content from web pages using AppleScript and JavaScript.
+        
+        This method provides a "fast path" for content extraction that's much faster
+        than vision-based analysis. It supports multiple browser applications.
+        
+        Args:
+            app_info: Application information for the browser
+            
+        Returns:
+            Extracted text content as string, or None if extraction fails
+        """
+        if not app_info or app_info.app_type.value != 'web_browser':
+            self.logger.warning(f"Application {app_info.name if app_info else 'None'} is not a web browser")
+            return None
+        
+        try:
+            # Try browser-specific extraction methods
+            if app_info.browser_type == BrowserType.CHROME:
+                return self._extract_chrome_text_content(app_info)
+            elif app_info.browser_type == BrowserType.SAFARI:
+                return self._extract_safari_text_content(app_info)
+            elif app_info.browser_type == BrowserType.FIREFOX:
+                return self._extract_firefox_text_content(app_info)
+            else:
+                # Fallback to generic extraction
+                return self._extract_generic_browser_text_content(app_info)
+                
+        except Exception as e:
+            self.logger.error(f"Error extracting text content from {app_info.name}: {e}")
+            return None
+    
+    def _extract_chrome_text_content(self, app_info: ApplicationInfo) -> Optional[str]:
+        """Extract text content from Chrome using AppleScript and JavaScript."""
+        import subprocess
+        
+        try:
+            # AppleScript to execute JavaScript in Chrome's active tab
+            applescript = '''
+            tell application "Google Chrome"
+                if (count of windows) > 0 then
+                    tell active tab of front window
+                        set pageText to execute javascript "var scripts = document.querySelectorAll('script, style, noscript'); for (var i = 0; i < scripts.length; i++) { scripts[i].remove(); } var textContent = document.body.innerText || document.body.textContent || ''; textContent = textContent.replace(/\\\\s+/g, ' ').trim(); textContent;"
+                        return pageText
+                    end tell
+                else
+                    return ""
+                end if
+            end tell
+            '''
+            
+            result = subprocess.run(
+                ["osascript", "-e", applescript],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0 and result.stdout.strip():
+                content = result.stdout.strip()
+                # Additional cleaning and filtering
+                cleaned_content = self._clean_extracted_content(content)
+                self.logger.info(f"Extracted {len(cleaned_content)} characters from Chrome")
+                return cleaned_content
+            else:
+                self.logger.warning(f"Chrome AppleScript failed: {result.stderr}")
+                return None
+                
+        except subprocess.TimeoutExpired:
+            self.logger.warning("Chrome text extraction timed out")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error extracting Chrome text content: {e}")
+            return None
+    
+    def _extract_safari_text_content(self, app_info: ApplicationInfo) -> Optional[str]:
+        """Extract text content from Safari using AppleScript and JavaScript."""
+        import subprocess
+        
+        try:
+            # AppleScript to execute JavaScript in Safari's active tab
+            applescript = '''
+            tell application "Safari"
+                if (count of windows) > 0 then
+                    tell front document
+                        set pageText to do JavaScript "var scripts = document.querySelectorAll('script, style, noscript'); for (var i = 0; i < scripts.length; i++) { scripts[i].remove(); } var textContent = document.body.innerText || document.body.textContent || ''; textContent = textContent.replace(/\\\\s+/g, ' ').trim(); textContent;"
+                        return pageText
+                    end tell
+                else
+                    return ""
+                end if
+            end tell
+            '''
+            
+            result = subprocess.run(
+                ["osascript", "-e", applescript],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0 and result.stdout.strip():
+                content = result.stdout.strip()
+                # Additional cleaning and filtering
+                cleaned_content = self._clean_extracted_content(content)
+                self.logger.info(f"Extracted {len(cleaned_content)} characters from Safari")
+                return cleaned_content
+            else:
+                self.logger.warning(f"Safari AppleScript failed: {result.stderr}")
+                return None
+                
+        except subprocess.TimeoutExpired:
+            self.logger.warning("Safari text extraction timed out")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error extracting Safari text content: {e}")
+            return None
+    
+    def _extract_firefox_text_content(self, app_info: ApplicationInfo) -> Optional[str]:
+        """Extract text content from Firefox using accessibility API fallback."""
+        # Firefox doesn't support AppleScript JavaScript execution like Chrome/Safari
+        # Fall back to accessibility-based text extraction
+        try:
+            browser_tree = self.extract_browser_tree(app_info)
+            if not browser_tree:
+                return None
+            
+            # Extract text from all elements
+            all_text = []
+            for element in browser_tree.get_all_elements():
+                if element.role in ['AXStaticText', 'AXTextField', 'AXButton', 'AXLink']:
+                    text_content = element.value or element.title or element.description
+                    if text_content and text_content.strip():
+                        all_text.append(text_content.strip())
+            
+            if all_text:
+                content = ' '.join(all_text)
+                cleaned_content = self._clean_extracted_content(content)
+                self.logger.info(f"Extracted {len(cleaned_content)} characters from Firefox via accessibility")
+                return cleaned_content
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting Firefox text content: {e}")
+            return None
+    
+    def _extract_generic_browser_text_content(self, app_info: ApplicationInfo) -> Optional[str]:
+        """Generic text extraction using accessibility API for unknown browsers."""
+        try:
+            browser_tree = self.extract_browser_tree(app_info)
+            if not browser_tree:
+                return None
+            
+            # Extract text from all elements
+            all_text = []
+            for element in browser_tree.get_all_elements():
+                if element.role in ['AXStaticText', 'AXTextField', 'AXButton', 'AXLink']:
+                    text_content = element.value or element.title or element.description
+                    if text_content and text_content.strip():
+                        all_text.append(text_content.strip())
+            
+            if all_text:
+                content = ' '.join(all_text)
+                cleaned_content = self._clean_extracted_content(content)
+                self.logger.info(f"Extracted {len(cleaned_content)} characters from {app_info.name} via accessibility")
+                return cleaned_content
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting generic browser text content: {e}")
+            return None
+    
+    def _clean_extracted_content(self, content: str) -> str:
+        """
+        Clean and filter extracted content for better text extraction quality.
+        
+        Args:
+            content: Raw extracted content
+            
+        Returns:
+            Cleaned content string
+        """
+        if not content:
+            return ""
+        
+        # Remove excessive whitespace
+        cleaned = re.sub(r'\s+', ' ', content)
+        
+        # Remove common web page noise
+        noise_patterns = [
+            r'Skip to main content',
+            r'Skip to content',
+            r'Skip navigation',
+            r'Advertisement',
+            r'Cookie notice',
+            r'Accept cookies',
+            r'Privacy policy',
+            r'Terms of service',
+            r'Sign up for newsletter',
+            r'Subscribe to newsletter'
+        ]
+        
+        for pattern in noise_patterns:
+            cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+        
+        # Remove excessive punctuation
+        cleaned = re.sub(r'[^\w\s\.\,\!\?\;\:\-\(\)]+', ' ', cleaned)
+        
+        # Final whitespace cleanup
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        
+        return cleaned
+
     def clear_cache(self):
         """Clear the browser tree cache."""
         self._tree_cache.clear()
