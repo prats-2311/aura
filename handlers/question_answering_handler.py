@@ -677,7 +677,7 @@ class QuestionAnsweringHandler(BaseHandler):
         # Check for reasonable text density (alphabetic chars vs total chars)
         text_density = alphabetic_chars / len(cleaned_content) if len(cleaned_content) > 0 else 0
         if text_density < 0.3:  # Less than 30% alphabetic characters suggests poor extraction
-            self.logger.debug(f"PDF content has low text density ({text_density:.2f})")
+            self.logger.debug(f"PDF content has poor text density ({text_density:.2f})")
             return None
         
         self.logger.debug(f"PDF content validation passed: {word_count} words, {len(cleaned_content)} characters, {text_density:.2f} text density")
@@ -687,33 +687,20 @@ class QuestionAnsweringHandler(BaseHandler):
         """
         Process and prepare extracted content for summarization.
         
-        This method handles content length management and ensures the content
-        is suitable for summarization by the reasoning module.
+        This method handles content length management to ensure the content
+        is suitable for summarization while staying within the 50KB limit.
         
         Args:
-            content: Raw extracted content
+            content: Raw extracted content to process
             
         Returns:
-            Processed content ready for summarization, or None if processing fails
+            Processed content ready for summarization, None if processing fails
         """
         if not content or not content.strip():
             self.logger.debug("Content is empty or whitespace only")
             return None
         
-        # Limit content to 50KB as per design requirements
-        MAX_CONTENT_SIZE = 50 * 1024  # 50KB
-        
-        if len(content) > MAX_CONTENT_SIZE:
-            self.logger.info(f"Content size ({len(content)} bytes) exceeds limit, truncating to {MAX_CONTENT_SIZE} bytes")
-            # Truncate at word boundary to avoid cutting words in half
-            truncated = content[:MAX_CONTENT_SIZE]
-            last_space = truncated.rfind(' ')
-            if last_space > MAX_CONTENT_SIZE * 0.8:  # Only truncate at word boundary if it's not too far back
-                content = truncated[:last_space] + "... [content truncated]"
-            else:
-                content = truncated + "... [content truncated]"
-        
-        # Basic content cleaning
+        # Clean and normalize content
         processed_content = content.strip()
         
         # Remove excessive whitespace while preserving structure
@@ -721,13 +708,316 @@ class QuestionAnsweringHandler(BaseHandler):
         processed_content = re.sub(r'\n{4,}', '\n\n\n', processed_content)  # Limit consecutive newlines
         processed_content = re.sub(r'[ \t]{3,}', '  ', processed_content)  # Limit consecutive spaces/tabs
         
+        # Check content length and apply 50KB limit as per requirements
+        max_content_size = 50 * 1024  # 50KB limit
+        content_size = len(processed_content.encode('utf-8'))
+        
+        if content_size > max_content_size:
+            self.logger.info(f"Content size ({content_size} bytes) exceeds 50KB limit, truncating...")
+            
+            # Truncate content intelligently - try to break at sentence boundaries
+            target_chars = int(max_content_size * 0.8)  # Leave some buffer for encoding
+            
+            if len(processed_content) > target_chars:
+                # Try to find a good breaking point (sentence end)
+                truncated = processed_content[:target_chars]
+                
+                # Look for sentence endings within the last 500 characters
+                sentence_endings = ['. ', '! ', '? ', '.\n', '!\n', '?\n']
+                best_break = -1
+                
+                for ending in sentence_endings:
+                    last_occurrence = truncated.rfind(ending)
+                    if last_occurrence > target_chars - 500:  # Within last 500 chars
+                        best_break = max(best_break, last_occurrence + len(ending))
+                
+                if best_break > 0:
+                    processed_content = truncated[:best_break].strip()
+                    self.logger.debug(f"Truncated content at sentence boundary: {len(processed_content)} characters")
+                else:
+                    # No good sentence boundary found, truncate at word boundary
+                    words = truncated.split()
+                    processed_content = ' '.join(words[:-1])  # Remove last potentially incomplete word
+                    self.logger.debug(f"Truncated content at word boundary: {len(processed_content)} characters")
+                
+                # Add truncation indicator
+                processed_content += "\n\n[Content truncated for processing...]"
+        
         # Final validation
-        if len(processed_content.split()) < 5:  # Less than 5 words is not worth summarizing
-            self.logger.debug("Processed content has too few words for summarization")
+        if len(processed_content.strip()) < 10:
+            self.logger.debug("Processed content too short after cleaning")
             return None
         
-        self.logger.debug(f"Content processed for summarization: {len(processed_content)} characters, {len(processed_content.split())} words")
+        final_size = len(processed_content.encode('utf-8'))
+        self.logger.info(f"Content processed for summarization: {len(processed_content)} characters ({final_size} bytes)")
+        
         return processed_content
+    
+    def _summarize_content(self, content: str, command: str) -> Optional[str]:
+        """
+        Summarize extracted content using the ReasoningModule.
+        
+        This method sends the extracted text to the ReasoningModule for summarization
+        with timeout handling and fallback to raw text if needed.
+        
+        Args:
+            content: Processed content to summarize
+            command: Original user command for context
+            
+        Returns:
+            Summarized content string if successful, None if failed
+        """
+        if not content or not content.strip():
+            self.logger.debug("No content to summarize")
+            return None
+        
+        try:
+            # Initialize ReasoningModule if not already done
+            if not self._reasoning_module:
+                from modules.reasoning import ReasoningModule
+                self._reasoning_module = ReasoningModule()
+                self.logger.debug("ReasoningModule initialized for summarization")
+            
+            # Prepare summarization prompt
+            summarization_prompt = self._build_summarization_prompt(content, command)
+            
+            # Set up timeout for summarization (3 second limit as per requirements)
+            import signal
+            import threading
+            import queue
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Content summarization timed out")
+            
+            # Use threading approach for timeout to avoid signal issues
+            result_queue = queue.Queue()
+            error_queue = queue.Queue()
+            
+            def summarize_worker():
+                try:
+                    self.logger.debug("Starting content summarization with ReasoningModule")
+                    
+                    # Use the process_query method for conversational-style summarization
+                    summary = self._reasoning_module.process_query(
+                        query=summarization_prompt,
+                        context={"content_length": len(content), "command": command}
+                    )
+                    
+                    result_queue.put(summary)
+                    
+                except Exception as e:
+                    self.logger.error(f"Summarization worker error: {e}")
+                    error_queue.put(e)
+            
+            # Start summarization in thread
+            summarize_thread = threading.Thread(target=summarize_worker, daemon=True)
+            summarize_thread.start()
+            
+            # Wait for result with 3 second timeout
+            summarize_thread.join(timeout=3.0)
+            
+            if summarize_thread.is_alive():
+                self.logger.warning("Content summarization timed out after 3 seconds")
+                return None
+            
+            # Check for errors
+            if not error_queue.empty():
+                summarize_error = error_queue.get()
+                self.logger.error(f"Content summarization failed: {summarize_error}")
+                return None
+            
+            # Get result
+            if result_queue.empty():
+                self.logger.warning("No summarization result received")
+                return None
+            
+            summary = result_queue.get()
+            
+            # Validate and clean summary
+            if not summary or not isinstance(summary, str):
+                self.logger.warning("Invalid summarization result")
+                return None
+            
+            summary = summary.strip()
+            if not summary:
+                self.logger.warning("Empty summarization result")
+                return None
+            
+            # Validate summary length (should be reasonable)
+            if len(summary) > len(content):
+                self.logger.warning("Summary is longer than original content, likely an error")
+                return None
+            
+            if len(summary) < 10:
+                self.logger.warning("Summary is too short, likely incomplete")
+                return None
+            
+            self.logger.info(f"Content summarization successful: {len(summary)} characters")
+            return summary
+            
+        except Exception as e:
+            self.logger.error(f"Error in content summarization: {e}")
+            return None
+    
+    def _build_summarization_prompt(self, content: str, command: str) -> str:
+        """
+        Build a prompt for content summarization based on the user's command.
+        
+        Args:
+            content: The content to summarize
+            command: The original user command for context
+            
+        Returns:
+            Formatted prompt for the reasoning module
+        """
+        # Create a context-aware summarization prompt
+        prompt = f"""Please provide a concise summary of the following content. The user asked: "{command}"
+
+Focus on the key information that would be most relevant to answering their question. Keep the summary clear, informative, and conversational.
+
+Content to summarize:
+{content}
+
+Please provide a summary that I can speak to the user as a direct response to their question."""
+        
+        return prompt
+    
+    def _create_fallback_summary(self, content: str) -> str:
+        """
+        Create a fallback summary when ReasoningModule summarization fails.
+        
+        This method provides a simple fallback by returning a truncated version
+        of the processed content when summarization fails.
+        
+        Args:
+            content: The processed content to create a fallback summary from
+            
+        Returns:
+            Fallback summary string
+        """
+        if not content or not content.strip():
+            return "I found some content on your screen, but I'm having trouble processing it right now."
+        
+        # Create a simple fallback summary by taking the first few sentences
+        sentences = []
+        current_sentence = ""
+        
+        # Simple sentence splitting
+        for char in content:
+            current_sentence += char
+            if char in '.!?':
+                # Check if this looks like a sentence ending
+                if len(current_sentence.strip()) > 10:  # Avoid very short fragments
+                    sentences.append(current_sentence.strip())
+                    current_sentence = ""
+                    
+                    # Stop after we have enough content for a summary
+                    if len(sentences) >= 3 or sum(len(s) for s in sentences) > 300:
+                        break
+        
+        # If we didn't get complete sentences, take first 200 characters
+        if not sentences:
+            fallback_text = content[:200].strip()
+            if len(content) > 200:
+                fallback_text += "..."
+            return f"Here's what I can see on your screen: {fallback_text}"
+        
+        # Join sentences for summary
+        summary = " ".join(sentences)
+        if len(content) > len(summary) + 100:  # If there's significantly more content
+            summary += "..."
+        
+        return f"Here's a summary of what's on your screen: {summary}"
+    
+    def _speak_result(self, result: str) -> None:
+        """
+        Speak the summarized content to the user using AudioModule.
+        
+        This method handles response formatting and uses the AudioModule
+        to deliver the spoken response to the user.
+        
+        Args:
+            result: The summarized content to speak
+        """
+        if not result or not result.strip():
+            self.logger.warning("No result to speak")
+            return
+        
+        try:
+            # Initialize AudioModule if not already done
+            if not self._audio_module:
+                from modules.audio import AudioModule
+                self._audio_module = AudioModule()
+                self.logger.debug("AudioModule initialized for speaking results")
+            
+            # Format the result for speaking
+            formatted_result = self._format_result_for_speech(result)
+            
+            self.logger.info(f"Speaking result to user: '{formatted_result[:100]}...'")
+            
+            # Use the AudioModule's text-to-speech functionality
+            self._audio_module.speak(formatted_result)
+            
+        except Exception as e:
+            self.logger.error(f"Error speaking result to user: {e}")
+            # Don't raise exception here - the result was still processed successfully
+    
+    def _format_result_for_speech(self, result: str) -> str:
+        """
+        Format the result text for optimal speech delivery.
+        
+        This method cleans up the text to make it more suitable for
+        text-to-speech conversion.
+        
+        Args:
+            result: Raw result text to format
+            
+        Returns:
+            Formatted text optimized for speech
+        """
+        if not result:
+            return ""
+        
+        formatted = result.strip()
+        
+        # Clean up common formatting issues for speech
+        import re
+        
+        # Replace multiple spaces with single spaces
+        formatted = re.sub(r'\s+', ' ', formatted)
+        
+        # Remove or replace problematic characters for TTS
+        formatted = formatted.replace('\n', '. ')  # Convert newlines to pauses
+        formatted = formatted.replace('\t', ' ')   # Convert tabs to spaces
+        formatted = formatted.replace('  ', ' ')   # Remove double spaces
+        
+        # Clean up common web/PDF artifacts that don't speak well
+        formatted = re.sub(r'\[.*?\]', '', formatted)  # Remove bracketed content
+        formatted = re.sub(r'\(.*?\)', '', formatted)  # Remove parenthetical content that might be artifacts
+        
+        # Ensure proper sentence endings for natural speech pauses
+        if formatted and not formatted.endswith(('.', '!', '?')):
+            formatted += '.'
+        
+        # Limit length for speech (very long responses can be overwhelming)
+        max_speech_length = 500  # Reasonable limit for spoken response
+        if len(formatted) > max_speech_length:
+            # Try to break at sentence boundary
+            truncated = formatted[:max_speech_length]
+            last_sentence_end = max(
+                truncated.rfind('. '),
+                truncated.rfind('! '),
+                truncated.rfind('? ')
+            )
+            
+            if last_sentence_end > max_speech_length - 100:  # If we found a good break point
+                formatted = truncated[:last_sentence_end + 1]
+            else:
+                # Break at word boundary
+                words = truncated.split()
+                formatted = ' '.join(words[:-1]) + '.'
+        
+
     
     def _summarize_content(self, content: str, command: str) -> Optional[str]:
         """
@@ -752,51 +1042,80 @@ class QuestionAnsweringHandler(BaseHandler):
             
             # Set up timeout for summarization (3 second limit as per requirements)
             import signal
+            import threading
+            import queue
             
             def timeout_handler(signum, frame):
                 raise TimeoutError("Content summarization timed out")
             
-            # Store old handler to restore later
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(3)  # 3 second timeout
+            # Use threading approach for timeout to avoid signal issues
+            result_queue = queue.Queue()
+            error_queue = queue.Queue()
             
-            try:
-                # Create summarization prompt based on the user's command
-                summarization_prompt = self._create_summarization_prompt(content, command)
-                
-                self.logger.debug(f"Sending {len(content)} characters to reasoning module for summarization")
-                
-                # Get summary from reasoning module
-                summary_result = self._reasoning_module.process_text_query(summarization_prompt)
-                
-                # Cancel timeout
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
-                
-                if summary_result and summary_result.get('response'):
-                    summary = summary_result['response'].strip()
-                    if summary and len(summary) > 10:  # Ensure we got a meaningful summary
-                        self.logger.info(f"Successfully generated summary: {len(summary)} characters")
-                        return summary
-                    else:
-                        self.logger.warning("Reasoning module returned empty or very short summary")
-                        return None
-                else:
-                    self.logger.warning("Reasoning module returned no response")
-                    return None
+            def summarize_worker():
+                try:
+                    # Create summarization prompt based on the user's command
+                    summarization_prompt = self._create_summarization_prompt(content, command)
                     
-            except TimeoutError:
-                # Cancel timeout and restore handler
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
+                    self.logger.debug(f"Sending {len(content)} characters to reasoning module for summarization")
+                    
+                    # Get summary from reasoning module using process_query
+                    summary = self._reasoning_module.process_query(
+                        query=summarization_prompt,
+                        context={"content_length": len(content), "command": command}
+                    )
+                    
+                    result_queue.put(summary)
+                    
+                except Exception as e:
+                    self.logger.error(f"Summarization worker error: {e}")
+                    error_queue.put(e)
+            
+            # Start summarization in thread
+            summarize_thread = threading.Thread(target=summarize_worker, daemon=True)
+            summarize_thread.start()
+            
+            # Wait for result with 3 second timeout
+            summarize_thread.join(timeout=3.0)
+            
+            if summarize_thread.is_alive():
                 self.logger.warning("Content summarization timed out after 3 seconds")
                 return None
-            except Exception as e:
-                # Cancel timeout and restore handler
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
-                self.logger.error(f"Error during content summarization: {e}")
+            
+            # Check for errors
+            if not error_queue.empty():
+                summarize_error = error_queue.get()
+                self.logger.error(f"Content summarization failed: {summarize_error}")
                 return None
+            
+            # Get result
+            if result_queue.empty():
+                self.logger.warning("No summarization result received")
+                return None
+            
+            summary = result_queue.get()
+            
+            # Validate and clean summary
+            if not summary or not isinstance(summary, str):
+                self.logger.warning("Invalid summarization result")
+                return None
+            
+            summary = summary.strip()
+            if not summary:
+                self.logger.warning("Empty summarization result")
+                return None
+            
+            # Validate summary length (should be reasonable)
+            if len(summary) > len(content):
+                self.logger.warning("Summary is longer than original content, likely an error")
+                return None
+            
+            if len(summary) < 10:
+                self.logger.warning("Summary is too short, likely incomplete")
+                return None
+            
+            self.logger.info(f"Content summarization successful: {len(summary)} characters")
+            return summary
                 
         except Exception as e:
             self.logger.error(f"Error in summarization setup: {e}")
@@ -989,11 +1308,71 @@ class QuestionAnsweringHandler(BaseHandler):
                 self._audio_module = AudioModule()
                 self.logger.debug("AudioModule initialized for speech output")
             
-            # Speak the content
-            self.logger.debug(f"Speaking result to user: {len(content)} characters")
-            self._audio_module.speak(content)
+            # Format content for speech
+            formatted_content = self._format_result_for_speech(content)
+            
+            # Speak the content using the correct method
+            self.logger.debug(f"Speaking result to user: {len(formatted_content)} characters")
+            self._audio_module.text_to_speech(formatted_content)
             
         except Exception as e:
             self.logger.error(f"Error speaking result to user: {e}")
             # Don't raise the exception - audio failure shouldn't break the handler
             # The result will still be returned in the response
+    
+    def _format_result_for_speech(self, result: str) -> str:
+        """
+        Format the result text for optimal speech delivery.
+        
+        This method cleans up the text to make it more suitable for
+        text-to-speech conversion.
+        
+        Args:
+            result: Raw result text to format
+            
+        Returns:
+            Formatted text optimized for speech
+        """
+        if not result:
+            return ""
+        
+        formatted = result.strip()
+        
+        # Clean up common formatting issues for speech
+        import re
+        
+        # Replace multiple spaces with single spaces
+        formatted = re.sub(r'\s+', ' ', formatted)
+        
+        # Remove or replace problematic characters for TTS
+        formatted = formatted.replace('\n', '. ')  # Convert newlines to pauses
+        formatted = formatted.replace('\t', ' ')   # Convert tabs to spaces
+        formatted = formatted.replace('  ', ' ')   # Remove double spaces
+        
+        # Clean up common web/PDF artifacts that don't speak well
+        formatted = re.sub(r'\[.*?\]', '', formatted)  # Remove bracketed content
+        formatted = re.sub(r'\(.*?\)', '', formatted)  # Remove parenthetical content that might be artifacts
+        
+        # Ensure proper sentence endings for natural speech pauses
+        if formatted and not formatted.endswith(('.', '!', '?')):
+            formatted += '.'
+        
+        # Limit length for speech (very long responses can be overwhelming)
+        max_speech_length = 500  # Reasonable limit for spoken response
+        if len(formatted) > max_speech_length:
+            # Try to break at sentence boundary
+            truncated = formatted[:max_speech_length]
+            last_sentence_end = max(
+                truncated.rfind('. '),
+                truncated.rfind('! '),
+                truncated.rfind('? ')
+            )
+            
+            if last_sentence_end > max_speech_length - 100:  # If we found a good break point
+                formatted = truncated[:last_sentence_end + 1]
+            else:
+                # Break at word boundary
+                words = truncated.split()
+                formatted = ' '.join(words[:-1]) + '.'
+        
+        return formatted.strip()
