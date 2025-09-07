@@ -205,103 +205,463 @@ class DeferredActionHandler(BaseHandler):
     
     def _clean_and_format_content(self, content: str, content_type: str) -> str:
         """
-        Clean and format generated content for typing.
+        Clean and format generated content for typing with comprehensive cleaning and formatting.
         
         Args:
             content: Raw generated content
             content_type: Type of content (code, text, etc.)
             
         Returns:
-            Cleaned and formatted content
+            Cleaned and formatted content ready for typing
         """
         try:
-            # Remove common unwanted prefixes and suffixes
+            # Comprehensive list of unwanted prefixes
             unwanted_prefixes = [
+                # Common explanatory phrases
                 "Here is the code:",
                 "Here's the code:",
-                "Here is the essay:",
-                "Here is the article:",
-                "Here is the text:",
+                "Here is your code:",
+                "Here's your code:",
+                "The code is:",
                 "The following code:",
-                "The following essay:",
-                "The following article:",
+                "Below is the code:",
+                "Here is the requested code:",
+                "Here's the requested code:",
+                "The requested code is:",
+                
+                # Text content prefixes
+                "Here is the text:",
+                "Here's the text:",
+                "Here is your text:",
+                "Here's your text:",
+                "The text is:",
                 "The following text:",
+                "Below is the text:",
+                "Here is the essay:",
+                "Here's the essay:",
+                "Here is the article:",
+                "Here's the article:",
+                "The essay is:",
+                "The article is:",
+                
+                # Markdown code blocks
                 "```python",
                 "```javascript",
+                "```js",
+                "```typescript",
+                "```ts",
                 "```html",
                 "```css",
+                "```java",
+                "```c++",
+                "```cpp",
+                "```c#",
+                "```csharp",
+                "```json",
+                "```yaml",
+                "```yml",
+                "```xml",
+                "```sql",
+                "```bash",
+                "```shell",
                 "```",
+                
+                # Bold/italic markers
                 "**Code:**",
+                "**Text:**",
                 "**Essay:**",
                 "**Article:**",
-                "**Text:**"
+                "*Code:*",
+                "*Text:*",
+                "*Essay:*",
+                "*Article:*",
+                
+                # Other common prefixes
+                "Solution:",
+                "Answer:",
+                "Response:",
+                "Output:",
+                "Result:",
+                "Generated code:",
+                "Generated text:",
+                "Final code:",
+                "Final text:",
+                "Complete code:",
+                "Complete text:"
             ]
             
+            # Comprehensive list of unwanted suffixes
             unwanted_suffixes = [
+                # Markdown code blocks
                 "```",
+                "```python",
+                "```javascript",
+                "```js",
+                "```typescript",
+                "```ts",
+                "```html",
+                "```css",
+                "```java",
+                "```c++",
+                "```cpp",
+                "```c#",
+                "```csharp",
+                "```json",
+                "```yaml",
+                "```yml",
+                "```xml",
+                "```sql",
+                "```bash",
+                "```shell",
+                
+                # End markers
                 "**End of code**",
+                "**End of text**",
                 "**End of essay**",
                 "**End of article**",
-                "**End of text**"
+                "*End of code*",
+                "*End of text*",
+                "*End of essay*",
+                "*End of article*",
+                "--- End ---",
+                "-- End --",
+                "- End -",
+                
+                # Other common suffixes
+                "That's it!",
+                "Done!",
+                "Complete!",
+                "Finished!",
+                "Hope this helps!",
+                "Let me know if you need anything else!",
+                "Feel free to ask if you have questions!"
             ]
             
-            # Clean the content
+            # Start with trimmed content
             cleaned_content = content.strip()
             
-            # Remove unwanted prefixes
-            for prefix in unwanted_prefixes:
-                if cleaned_content.lower().startswith(prefix.lower()):
-                    cleaned_content = cleaned_content[len(prefix):].strip()
-                    break
+            # Remove unwanted prefixes (case-insensitive, multiple passes)
+            changed = True
+            while changed:
+                changed = False
+                for prefix in unwanted_prefixes:
+                    if cleaned_content.lower().startswith(prefix.lower()):
+                        cleaned_content = cleaned_content[len(prefix):].strip()
+                        changed = True
+                        break
             
-            # Remove unwanted suffixes
-            for suffix in unwanted_suffixes:
-                if cleaned_content.lower().endswith(suffix.lower()):
-                    cleaned_content = cleaned_content[:-len(suffix)].strip()
-                    break
+            # Remove unwanted suffixes (case-insensitive, multiple passes)
+            changed = True
+            while changed:
+                changed = False
+                for suffix in unwanted_suffixes:
+                    if cleaned_content.lower().endswith(suffix.lower()):
+                        cleaned_content = cleaned_content[:-len(suffix)].strip()
+                        changed = True
+                        break
             
-            # For code content, ensure proper formatting
+            # Remove duplicate content (common with AI responses)
+            cleaned_content = self._remove_duplicate_content(cleaned_content)
+            
+            # Apply content type-specific formatting
             if content_type == 'code':
-                # Remove any remaining markdown code blocks
-                if cleaned_content.startswith('```') and cleaned_content.endswith('```'):
-                    lines = cleaned_content.split('\n')
-                    if len(lines) > 2:
-                        # Remove first and last lines if they're markdown markers
-                        if lines[0].startswith('```'):
-                            lines = lines[1:]
-                        if lines[-1].strip() == '```':
-                            lines = lines[:-1]
-                        cleaned_content = '\n'.join(lines)
-                
-                # Ensure proper indentation (convert tabs to spaces)
-                cleaned_content = cleaned_content.replace('\t', '    ')
-            
-            # For text content, ensure proper paragraph formatting
+                cleaned_content = self._format_code_content(cleaned_content)
             elif content_type == 'text':
-                # Ensure proper line breaks between paragraphs
-                lines = cleaned_content.split('\n')
-                formatted_lines = []
-                
-                for i, line in enumerate(lines):
-                    line = line.strip()
-                    if line:  # Non-empty line
-                        formatted_lines.append(line)
-                        # Add extra line break after paragraphs (except for the last line)
-                        if i < len(lines) - 1 and lines[i + 1].strip():
-                            # Check if next line starts a new paragraph
-                            next_line = lines[i + 1].strip()
-                            if next_line and not line.endswith('.') and not line.endswith('!') and not line.endswith('?'):
-                                continue  # Same paragraph
-                            elif next_line:
-                                formatted_lines.append('')  # Add paragraph break
-                
-                cleaned_content = '\n'.join(formatted_lines)
+                cleaned_content = self._format_text_content(cleaned_content)
+            else:
+                # Generic content formatting
+                cleaned_content = self._format_generic_content(cleaned_content)
+            
+            # Final cleanup
+            cleaned_content = self._final_content_cleanup(cleaned_content)
             
             return cleaned_content
             
         except Exception as e:
             self.logger.warning(f"Error cleaning generated content: {e}")
             return content  # Return original content if cleaning fails
+    
+    def _remove_duplicate_content(self, content: str) -> str:
+        """
+        Remove duplicate content that sometimes appears in AI responses.
+        
+        Args:
+            content: Content to check for duplicates
+            
+        Returns:
+            Content with duplicates removed
+        """
+        try:
+            lines = content.split('\n')
+            if len(lines) < 2:
+                return content
+            
+            # Check for exact duplicate blocks
+            unique_lines = []
+            seen_blocks = set()
+            
+            # Process in chunks to detect duplicate blocks
+            for i, line in enumerate(lines):
+                # Create a block of 3 lines for comparison
+                if i + 2 < len(lines):
+                    block = '\n'.join(lines[i:i+3])
+                    if block not in seen_blocks:
+                        seen_blocks.add(block)
+                        unique_lines.append(line)
+                    else:
+                        # Skip this line as it's part of a duplicate block
+                        continue
+                else:
+                    unique_lines.append(line)
+            
+            return '\n'.join(unique_lines)
+            
+        except Exception as e:
+            self.logger.warning(f"Error removing duplicate content: {e}")
+            return content
+    
+    def _format_code_content(self, content: str) -> str:
+        """
+        Format code content with proper indentation and structure.
+        
+        Args:
+            content: Raw code content
+            
+        Returns:
+            Properly formatted code
+        """
+        try:
+            # Remove any remaining markdown code blocks
+            if content.startswith('```') and content.endswith('```'):
+                lines = content.split('\n')
+                if len(lines) > 2:
+                    # Remove first and last lines if they're markdown markers
+                    if lines[0].startswith('```'):
+                        lines = lines[1:]
+                    if lines and lines[-1].strip() == '```':
+                        lines = lines[:-1]
+                    content = '\n'.join(lines)
+            
+            # Check for single-line code that needs reformatting
+            if self._is_single_line_code(content):
+                content = self._format_single_line_code(content)
+            
+            # Ensure proper indentation (convert tabs to spaces)
+            content = content.replace('\t', '    ')
+            
+            # Remove excessive blank lines but preserve intentional spacing
+            lines = content.split('\n')
+            formatted_lines = []
+            blank_line_count = 0
+            
+            for line in lines:
+                if line.strip():  # Non-empty line
+                    formatted_lines.append(line)
+                    blank_line_count = 0
+                else:  # Empty line
+                    blank_line_count += 1
+                    if blank_line_count <= 2:  # Allow max 2 consecutive blank lines
+                        formatted_lines.append(line)
+            
+            return '\n'.join(formatted_lines)
+            
+        except Exception as e:
+            self.logger.warning(f"Error formatting code content: {e}")
+            return content
+    
+    def _format_text_content(self, content: str) -> str:
+        """
+        Format text content with proper paragraph structure.
+        
+        Args:
+            content: Raw text content
+            
+        Returns:
+            Properly formatted text
+        """
+        try:
+            # Ensure proper line breaks between paragraphs
+            lines = content.split('\n')
+            formatted_lines = []
+            
+            for i, line in enumerate(lines):
+                line = line.strip()
+                if line:  # Non-empty line
+                    formatted_lines.append(line)
+                    # Add extra line break after paragraphs (except for the last line)
+                    if i < len(lines) - 1:
+                        next_line = lines[i + 1].strip() if i + 1 < len(lines) else ""
+                        if next_line and self._should_add_paragraph_break(line, next_line):
+                            formatted_lines.append('')  # Add paragraph break
+                elif formatted_lines and formatted_lines[-1]:  # Preserve intentional blank lines
+                    formatted_lines.append('')
+            
+            return '\n'.join(formatted_lines)
+            
+        except Exception as e:
+            self.logger.warning(f"Error formatting text content: {e}")
+            return content
+    
+    def _format_generic_content(self, content: str) -> str:
+        """
+        Format generic content with basic cleanup.
+        
+        Args:
+            content: Raw content
+            
+        Returns:
+            Cleaned content
+        """
+        try:
+            # Basic cleanup for unknown content types
+            lines = content.split('\n')
+            formatted_lines = []
+            
+            for line in lines:
+                # Remove excessive whitespace but preserve indentation
+                if line.strip():
+                    formatted_lines.append(line.rstrip())
+                else:
+                    formatted_lines.append('')
+            
+            # Remove excessive blank lines at start and end
+            while formatted_lines and not formatted_lines[0].strip():
+                formatted_lines.pop(0)
+            while formatted_lines and not formatted_lines[-1].strip():
+                formatted_lines.pop()
+            
+            return '\n'.join(formatted_lines)
+            
+        except Exception as e:
+            self.logger.warning(f"Error formatting generic content: {e}")
+            return content
+    
+    def _is_single_line_code(self, content: str) -> bool:
+        """
+        Check if content appears to be single-line code that should be reformatted.
+        
+        Args:
+            content: Content to check
+            
+        Returns:
+            True if content appears to be improperly formatted single-line code
+        """
+        try:
+            # Check if it's a single line with code-like characteristics
+            if '\n' in content:
+                return False
+            
+            # Look for code patterns that suggest it should be multi-line
+            code_indicators = [
+                '{', '}', ';', 'function', 'def ', 'class ', 'if ', 'for ', 'while ',
+                'import ', 'from ', 'return ', 'var ', 'let ', 'const ', '=', '(', ')'
+            ]
+            
+            return any(indicator in content for indicator in code_indicators) and len(content) > 50
+            
+        except Exception:
+            return False
+    
+    def _format_single_line_code(self, content: str) -> str:
+        """
+        Format single-line code into properly structured multi-line code.
+        
+        Args:
+            content: Single-line code content
+            
+        Returns:
+            Properly formatted multi-line code
+        """
+        try:
+            # Basic formatting for common patterns
+            formatted = content
+            
+            # Add line breaks after common delimiters
+            replacements = [
+                ('{', '{\n'),
+                ('}', '\n}'),
+                (';', ';\n'),
+                (' if ', '\nif '),
+                (' for ', '\nfor '),
+                (' while ', '\nwhile '),
+                (' def ', '\ndef '),
+                (' class ', '\nclass '),
+                (' function ', '\nfunction ')
+            ]
+            
+            for old, new in replacements:
+                formatted = formatted.replace(old, new)
+            
+            # Clean up excessive newlines
+            while '\n\n\n' in formatted:
+                formatted = formatted.replace('\n\n\n', '\n\n')
+            
+            return formatted.strip()
+            
+        except Exception as e:
+            self.logger.warning(f"Error formatting single-line code: {e}")
+            return content
+    
+    def _should_add_paragraph_break(self, current_line: str, next_line: str) -> bool:
+        """
+        Determine if a paragraph break should be added between two lines.
+        
+        Args:
+            current_line: Current line of text
+            next_line: Next line of text
+            
+        Returns:
+            True if a paragraph break should be added
+        """
+        try:
+            # Add paragraph break if current line ends with sentence-ending punctuation
+            if current_line.endswith(('.', '!', '?', ':')):
+                return True
+            
+            # Add paragraph break if next line starts with common paragraph starters
+            paragraph_starters = [
+                'However,', 'Therefore,', 'Additionally,', 'Furthermore,', 'Moreover,',
+                'In conclusion,', 'Finally,', 'First,', 'Second,', 'Third,', 'Next,',
+                'Meanwhile,', 'Subsequently,', 'Consequently,', 'Nevertheless,'
+            ]
+            
+            return any(next_line.startswith(starter) for starter in paragraph_starters)
+            
+        except Exception:
+            return False
+    
+    def _final_content_cleanup(self, content: str) -> str:
+        """
+        Perform final cleanup on content before returning.
+        
+        Args:
+            content: Content to clean up
+            
+        Returns:
+            Final cleaned content
+        """
+        try:
+            # Remove excessive whitespace
+            content = content.strip()
+            
+            # Ensure content ends with a single newline if it's multi-line
+            if '\n' in content and not content.endswith('\n'):
+                content += '\n'
+            
+            # Remove any remaining unwanted characters or patterns
+            unwanted_patterns = [
+                '\r\n',  # Windows line endings
+                '\r',    # Old Mac line endings
+            ]
+            
+            for pattern in unwanted_patterns:
+                content = content.replace(pattern, '\n')
+            
+            return content
+            
+        except Exception as e:
+            self.logger.warning(f"Error in final content cleanup: {e}")
+            return content
     
     def _setup_deferred_action_state(self, content: str, content_type: str, execution_id: str) -> None:
         """

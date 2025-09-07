@@ -114,17 +114,35 @@ You are AURA, an AI assistant helping with code generation. The user has request
 User request: {request}
 Context: {context}
 
-Generate clean, well-formatted code that directly addresses the user's request. 
-- Provide ONLY the code without any explanations, comments, or markdown formatting
-- Ensure proper indentation and formatting for the target language
-- Use 4 spaces for indentation in Python, 2 spaces for JavaScript/HTML/CSS
-- Include proper line breaks and structure
-- Make the code ready to be typed directly into an editor
-- Focus on practical, working code
-- Keep it concise but complete
-- Do NOT include any metadata, descriptions, or surrounding text
+Generate clean, well-formatted, editor-ready code that directly addresses the user's request.
 
-Generate the requested code:
+CRITICAL FORMATTING REQUIREMENTS:
+- Provide ONLY the code without any explanations, comments, or markdown formatting
+- Use EXACTLY 4 spaces for indentation in Python
+- Use EXACTLY 2 spaces for indentation in JavaScript, HTML, CSS, JSON, YAML
+- Use EXACTLY 4 spaces for indentation in Java, C#, C++
+- Include proper line breaks between functions, classes, and logical sections
+- Ensure consistent indentation throughout the entire code block
+- Make the code ready to be typed directly into an editor without any modifications
+- Start each line at the correct indentation level (no leading spaces unless part of code structure)
+- End with a single newline character
+
+CONTENT REQUIREMENTS:
+- Focus on practical, working code that compiles/runs correctly
+- Include necessary imports and dependencies at the top
+- Use meaningful variable and function names
+- Keep it concise but complete for the requested functionality
+- Follow language-specific best practices and conventions
+
+FORBIDDEN ELEMENTS:
+- Do NOT include any markdown code blocks (```)
+- Do NOT include any explanatory text before or after the code
+- Do NOT include phrases like "Here is the code:" or "The following code:"
+- Do NOT include any metadata, descriptions, or surrounding text
+- Do NOT include comments unless specifically requested
+- Do NOT include multiple code examples or alternatives
+
+Generate the requested code with perfect formatting:
 """
 
 # Text generation prompt for essays, articles, and other text content
@@ -134,17 +152,31 @@ You are AURA, an AI assistant helping with text generation. The user has request
 User request: {request}
 Context: {context}
 
-Generate clean, well-formatted text that directly addresses the user's request.
-- Provide ONLY the text content without any explanations or metadata
-- Use proper paragraph structure with line breaks between paragraphs
-- Ensure proper grammar, spelling, and punctuation
-- Make the text ready to be typed directly into a document or text field
-- Focus on clear, engaging, and well-structured content
-- Keep it appropriately detailed for the request
-- Do NOT include any titles, headers, metadata, or surrounding explanations
-- Do NOT include phrases like "Here is the essay" or "The following text"
+Generate clean, well-formatted, editor-ready text that directly addresses the user's request.
 
-Generate the requested text:
+CRITICAL FORMATTING REQUIREMENTS:
+- Provide ONLY the text content without any explanations or metadata
+- Use proper paragraph structure with double line breaks between paragraphs
+- Ensure consistent spacing and formatting throughout
+- Make the text ready to be typed directly into a document or text field
+- Start immediately with the requested content (no introductory phrases)
+- End with appropriate punctuation but no extra formatting
+
+CONTENT REQUIREMENTS:
+- Focus on clear, engaging, and well-structured content
+- Use proper grammar, spelling, and punctuation throughout
+- Keep it appropriately detailed and comprehensive for the request
+- Maintain consistent tone and style throughout the text
+- Structure content logically with smooth transitions between ideas
+
+FORBIDDEN ELEMENTS:
+- Do NOT include any titles, headers, metadata, or surrounding explanations
+- Do NOT include phrases like "Here is the essay", "The following text", or "Here's your content"
+- Do NOT include any markdown formatting or special characters
+- Do NOT include multiple versions or alternatives
+- Do NOT include any instructional or meta-commentary text
+
+Generate the requested text with perfect formatting:
 """
 
 # Detailed prompt for comprehensive analysis (when user specifically asks for details)
@@ -299,9 +331,9 @@ LOG_FUZZY_MATCH_SCORES = False
 
 # -- Conversational Enhancement Settings --
 # Deferred action configuration
-DEFERRED_ACTION_TIMEOUT = 300.0  # Maximum wait time for user action (5 minutes)
-DEFERRED_ACTION_MAX_TIMEOUT = 600.0  # Absolute maximum timeout (10 minutes)
-DEFERRED_ACTION_MIN_TIMEOUT = 30.0   # Minimum timeout (30 seconds)
+DEFERRED_ACTION_TIMEOUT = 600.0  # Maximum wait time for user action (10 minutes - increased for complex content)
+DEFERRED_ACTION_MAX_TIMEOUT = 900.0  # Absolute maximum timeout (15 minutes)
+DEFERRED_ACTION_MIN_TIMEOUT = 60.0   # Minimum timeout (1 minute - increased for content review)
 MOUSE_LISTENER_SENSITIVITY = 1.0  # Click detection sensitivity (0.1 - 2.0)
 MOUSE_LISTENER_DOUBLE_CLICK_TIME = 0.5  # Time window for double-click detection
 DEFERRED_ACTION_AUDIO_CUES = True  # Enable audio guidance for deferred actions
@@ -334,7 +366,7 @@ INTENT_CACHE_TTL = 300  # Intent cache time-to-live in seconds
 
 # Content generation settings
 CODE_GENERATION_MAX_LENGTH = 2000  # Maximum length for generated code
-CODE_GENERATION_TIMEOUT = 45.0     # Timeout for code generation
+CODE_GENERATION_TIMEOUT = 120.0    # Timeout for code generation (increased for complex requests)
 TEXT_GENERATION_MAX_LENGTH = 1000  # Maximum length for generated text
 CONTENT_VALIDATION_ENABLED = True  # Enable validation of generated content
 CONTENT_SANITIZATION_ENABLED = True  # Enable sanitization of generated content

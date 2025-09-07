@@ -1,113 +1,234 @@
 #!/usr/bin/env python3
 """
-Test Content Generation Fix
+Test script for Task 0.2: Resolve Deferred Action Content Generation Bugs
 
-This test verifies that the content generation correctly handles dictionary responses.
+This script tests the enhanced content generation prompts and comprehensive
+content cleaning and formatting functionality.
 """
 
 import sys
 import logging
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
-# Setup logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def test_content_generation_response_handling():
-    """Test that content generation handles dictionary responses correctly."""
-    logger.info("Testing content generation response handling...")
+def test_content_cleaning():
+    """Test the enhanced content cleaning functionality."""
+    logger.info("Testing enhanced content cleaning functionality...")
     
     try:
-        # Mock the reasoning module response
-        mock_response = {
-            'message': 'def fibonacci(n):\n    if n <= 1:\n        return n\n    else:\n        return fibonacci(n-1) + fibonacci(n-2)'
-        }
+        # Import the deferred action handler
+        from handlers.deferred_action_handler import DeferredActionHandler
         
-        # Test the content extraction logic directly
-        response = mock_response
+        # Create a mock orchestrator
+        mock_orchestrator = Mock()
         
-        # Extract content using the same logic as in orchestrator
-        if isinstance(response, dict) and 'message' in response:
-            generated_content = response.get('message', '').strip()
-        elif isinstance(response, dict) and 'response' in response:
-            generated_content = response.get('response', '').strip()
-        elif isinstance(response, str):
-            generated_content = response.strip()
-        else:
-            generated_content = str(response).strip()
+        # Create the handler
+        handler = DeferredActionHandler(mock_orchestrator)
         
-        logger.info(f"Extracted content: {len(generated_content)} chars")
-        logger.info(f"Content preview: {generated_content[:100]}...")
+        # Test cases for content cleaning
+        test_cases = [
+            {
+                "name": "Code with markdown blocks",
+                "content": "```python\ndef hello_world():\n    print('Hello, World!')\n```",
+                "content_type": "code",
+                "expected_contains": ["def hello_world():", "print('Hello, World!')"],
+                "expected_not_contains": ["```python", "```"]
+            },
+            {
+                "name": "Code with explanatory prefix",
+                "content": "Here is the code:\ndef calculate_sum(a, b):\n    return a + b",
+                "content_type": "code",
+                "expected_contains": ["def calculate_sum(a, b):", "return a + b"],
+                "expected_not_contains": ["Here is the code:"]
+            },
+            {
+                "name": "Text with unwanted prefix",
+                "content": "Here is the essay:\n\nThis is a sample essay about technology. It discusses various aspects of modern computing.\n\nTechnology has revolutionized our world.",
+                "content_type": "text",
+                "expected_contains": ["This is a sample essay", "Technology has revolutionized"],
+                "expected_not_contains": ["Here is the essay:"]
+            },
+            {
+                "name": "Single line code formatting",
+                "content": "def process_data(data): return [x * 2 for x in data if x > 0]",
+                "content_type": "code",
+                "expected_contains": ["def process_data(data):"],
+                "expected_not_contains": []
+            },
+            {
+                "name": "Multiple unwanted prefixes",
+                "content": "Here's the code:\n```javascript\nfunction greet(name) {\n    console.log('Hello, ' + name);\n}\n```",
+                "content_type": "code",
+                "expected_contains": ["function greet(name)", "console.log"],
+                "expected_not_contains": ["Here's the code:", "```javascript", "```"]
+            }
+        ]
         
-        if generated_content and 'def fibonacci' in generated_content:
-            logger.info("✅ Content extraction successful")
+        # Run test cases
+        passed = 0
+        failed = 0
+        
+        for test_case in test_cases:
+            logger.info(f"\nTesting: {test_case['name']}")
+            logger.info(f"Original content: {repr(test_case['content'])}")
             
-            # Test that newlines are preserved
-            if '\n' in generated_content:
-                logger.info("✅ Newlines preserved in extracted content")
-            else:
-                logger.warning("❌ Newlines missing in extracted content")
+            try:
+                # Clean the content
+                cleaned = handler._clean_and_format_content(
+                    test_case['content'], 
+                    test_case['content_type']
+                )
                 
-            return True
-        else:
-            logger.error("❌ Content extraction failed")
-            return False
-            
+                logger.info(f"Cleaned content: {repr(cleaned)}")
+                
+                # Check expected contains
+                contains_passed = True
+                for expected in test_case['expected_contains']:
+                    if expected not in cleaned:
+                        logger.error(f"Expected '{expected}' not found in cleaned content")
+                        contains_passed = False
+                
+                # Check expected not contains
+                not_contains_passed = True
+                for not_expected in test_case['expected_not_contains']:
+                    if not_expected in cleaned:
+                        logger.error(f"Unwanted '{not_expected}' found in cleaned content")
+                        not_contains_passed = False
+                
+                if contains_passed and not_contains_passed:
+                    logger.info(f"✅ {test_case['name']} - PASSED")
+                    passed += 1
+                else:
+                    logger.error(f"❌ {test_case['name']} - FAILED")
+                    failed += 1
+                    
+            except Exception as e:
+                logger.error(f"❌ {test_case['name']} - ERROR: {e}")
+                failed += 1
+        
+        logger.info(f"\n=== Content Cleaning Test Results ===")
+        logger.info(f"Passed: {passed}")
+        logger.info(f"Failed: {failed}")
+        logger.info(f"Total: {passed + failed}")
+        
+        return failed == 0
+        
     except Exception as e:
-        logger.error(f"❌ Test failed with exception: {e}")
+        logger.error(f"Error testing content cleaning: {e}")
         return False
 
-def test_alternative_response_formats():
-    """Test different response formats."""
-    logger.info("Testing alternative response formats...")
+def test_prompt_enhancements():
+    """Test that the enhanced prompts are properly configured."""
+    logger.info("Testing enhanced prompt configurations...")
     
-    test_cases = [
-        # OpenAI-style format
-        {'message': 'print("Hello, World!")'},
-        # Direct response format
-        {'response': 'print("Hello, World!")'},
-        # String format (fallback)
-        'print("Hello, World!")',
-        # Generic dict format
-        {'content': 'print("Hello, World!")', 'other': 'data'}
-    ]
-    
-    for i, response in enumerate(test_cases):
-        logger.info(f"Testing case {i+1}: {type(response)}")
+    try:
+        import config
         
-        # Extract content using the same logic
-        if isinstance(response, dict) and 'message' in response:
-            generated_content = response.get('message', '').strip()
-        elif isinstance(response, dict) and 'response' in response:
-            generated_content = response.get('response', '').strip()
-        elif isinstance(response, str):
-            generated_content = response.strip()
-        else:
-            generated_content = str(response).strip()
+        # Check CODE_GENERATION_PROMPT enhancements
+        code_prompt = config.CODE_GENERATION_PROMPT
         
-        if generated_content and 'Hello' in generated_content:
-            logger.info(f"✅ Case {i+1} successful: {generated_content}")
+        # Check for enhanced formatting requirements
+        enhanced_features = [
+            "CRITICAL FORMATTING REQUIREMENTS",
+            "EXACTLY 4 spaces for indentation in Python",
+            "EXACTLY 2 spaces for indentation in JavaScript",
+            "FORBIDDEN ELEMENTS",
+            "Do NOT include any markdown code blocks",
+            "perfect formatting"
+        ]
+        
+        prompt_passed = True
+        for feature in enhanced_features:
+            if feature not in code_prompt:
+                logger.error(f"Enhanced feature '{feature}' not found in CODE_GENERATION_PROMPT")
+                prompt_passed = False
+        
+        if prompt_passed:
+            logger.info("✅ CODE_GENERATION_PROMPT enhancements - PASSED")
         else:
-            logger.warning(f"❌ Case {i+1} failed: {generated_content}")
-    
-    return True
+            logger.error("❌ CODE_GENERATION_PROMPT enhancements - FAILED")
+        
+        # Check TEXT_GENERATION_PROMPT enhancements
+        text_prompt = config.TEXT_GENERATION_PROMPT
+        
+        text_features = [
+            "CRITICAL FORMATTING REQUIREMENTS",
+            "editor-ready text",
+            "FORBIDDEN ELEMENTS",
+            "perfect formatting"
+        ]
+        
+        text_passed = True
+        for feature in text_features:
+            if feature not in text_prompt:
+                logger.error(f"Enhanced feature '{feature}' not found in TEXT_GENERATION_PROMPT")
+                text_passed = False
+        
+        if text_passed:
+            logger.info("✅ TEXT_GENERATION_PROMPT enhancements - PASSED")
+        else:
+            logger.error("❌ TEXT_GENERATION_PROMPT enhancements - FAILED")
+        
+        # Check timeout configurations
+        timeout_checks = [
+            ("CODE_GENERATION_TIMEOUT", 120.0),
+            ("DEFERRED_ACTION_TIMEOUT", 600.0),
+            ("DEFERRED_ACTION_MAX_TIMEOUT", 900.0),
+            ("DEFERRED_ACTION_MIN_TIMEOUT", 60.0)
+        ]
+        
+        timeout_passed = True
+        for timeout_name, expected_value in timeout_checks:
+            actual_value = getattr(config, timeout_name, None)
+            if actual_value != expected_value:
+                logger.error(f"{timeout_name} expected {expected_value}, got {actual_value}")
+                timeout_passed = False
+            else:
+                logger.info(f"✅ {timeout_name} = {actual_value}")
+        
+        if timeout_passed:
+            logger.info("✅ Timeout configurations - PASSED")
+        else:
+            logger.error("❌ Timeout configurations - FAILED")
+        
+        return prompt_passed and text_passed and timeout_passed
+        
+    except Exception as e:
+        logger.error(f"Error testing prompt enhancements: {e}")
+        return False
 
 def main():
-    """Run content generation tests."""
-    logger.info("🧪 Testing Content Generation Response Handling")
-    logger.info("=" * 50)
+    """Run all tests for Task 0.2."""
+    logger.info("=== Task 0.2: Resolve Deferred Action Content Generation Bugs ===")
+    logger.info("Testing enhanced content generation prompts and comprehensive content cleaning...")
     
-    success1 = test_content_generation_response_handling()
-    success2 = test_alternative_response_formats()
+    # Test prompt enhancements (Task 0.6)
+    prompt_test_passed = test_prompt_enhancements()
     
-    if success1 and success2:
-        logger.info("🎉 All content generation tests passed!")
-        logger.info("The response handling should now work correctly.")
-        return True
+    # Test content cleaning enhancements (Task 0.7)
+    cleaning_test_passed = test_content_cleaning()
+    
+    # Overall results
+    logger.info("\n=== Overall Test Results ===")
+    if prompt_test_passed:
+        logger.info("✅ Task 0.6 (Prompt Enhancements) - PASSED")
     else:
-        logger.error("💥 Some content generation tests failed!")
-        return False
+        logger.error("❌ Task 0.6 (Prompt Enhancements) - FAILED")
+    
+    if cleaning_test_passed:
+        logger.info("✅ Task 0.7 (Content Cleaning) - PASSED")
+    else:
+        logger.error("❌ Task 0.7 (Content Cleaning) - FAILED")
+    
+    if prompt_test_passed and cleaning_test_passed:
+        logger.info("🎉 Task 0.2: Resolve Deferred Action Content Generation Bugs - COMPLETED SUCCESSFULLY")
+        return 0
+    else:
+        logger.error("💥 Task 0.2: Some tests failed - NEEDS ATTENTION")
+        return 1
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    sys.exit(main())

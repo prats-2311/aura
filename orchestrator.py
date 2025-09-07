@@ -2405,6 +2405,9 @@ class Orchestrator:
         """
         Clean generated content to remove unwanted formatting or metadata.
         
+        This method delegates to the enhanced content cleaning logic in the 
+        deferred action handler for consistency and improved functionality.
+        
         Args:
             content: Raw generated content
             content_type: Type of content (code, text, etc.)
@@ -2413,34 +2416,37 @@ class Orchestrator:
             Cleaned content ready for typing
         """
         try:
-            # Remove common unwanted prefixes and suffixes
+            # Use the enhanced content cleaning from the deferred action handler
+            if hasattr(self, 'deferred_action_handler') and self.deferred_action_handler:
+                return self.deferred_action_handler._clean_and_format_content(content, content_type)
+            
+            # Fallback to basic cleaning if handler not available
+            logger.warning("Deferred action handler not available, using basic content cleaning")
+            return self._basic_content_cleaning(content, content_type)
+            
+        except Exception as e:
+            logger.warning(f"Error cleaning generated content: {e}")
+            return content  # Return original content if cleaning fails
+    
+    def _basic_content_cleaning(self, content: str, content_type: str) -> str:
+        """
+        Basic content cleaning as fallback when handler is not available.
+        
+        Args:
+            content: Raw generated content
+            content_type: Type of content (code, text, etc.)
+            
+        Returns:
+            Basic cleaned content
+        """
+        try:
+            # Basic unwanted prefixes and suffixes
             unwanted_prefixes = [
-                "Here is the code:",
-                "Here is the essay:",
-                "Here is the article:",
-                "Here is the text:",
-                "The following code:",
-                "The following essay:",
-                "The following article:",
-                "The following text:",
-                "```python",
-                "```javascript",
-                "```html",
-                "```css",
-                "```",
-                "**Code:**",
-                "**Essay:**",
-                "**Article:**",
-                "**Text:**"
+                "Here is the code:", "Here's the code:", "```python", "```javascript", 
+                "```", "Here is the text:", "Here's the text:"
             ]
             
-            unwanted_suffixes = [
-                "```",
-                "**End of code**",
-                "**End of essay**",
-                "**End of article**",
-                "**End of text**"
-            ]
+            unwanted_suffixes = ["```", "**End of code**", "**End of text**"]
             
             # Clean the content
             cleaned_content = content.strip()
@@ -2457,48 +2463,15 @@ class Orchestrator:
                     cleaned_content = cleaned_content[:-len(suffix)].strip()
                     break
             
-            # For code content, ensure proper formatting
+            # Basic formatting for code
             if content_type == 'code':
-                # Remove any remaining markdown code blocks
-                if cleaned_content.startswith('```') and cleaned_content.endswith('```'):
-                    lines = cleaned_content.split('\n')
-                    if len(lines) > 2:
-                        # Remove first and last lines if they're markdown markers
-                        if lines[0].startswith('```'):
-                            lines = lines[1:]
-                        if lines[-1].strip() == '```':
-                            lines = lines[:-1]
-                        cleaned_content = '\n'.join(lines)
-                
-                # Ensure proper indentation (convert tabs to spaces)
                 cleaned_content = cleaned_content.replace('\t', '    ')
-            
-            # For text content, ensure proper paragraph formatting
-            elif content_type == 'text':
-                # Ensure proper line breaks between paragraphs
-                lines = cleaned_content.split('\n')
-                formatted_lines = []
-                
-                for i, line in enumerate(lines):
-                    line = line.strip()
-                    if line:  # Non-empty line
-                        formatted_lines.append(line)
-                        # Add extra line break after paragraphs (except for the last line)
-                        if i < len(lines) - 1 and lines[i + 1].strip():
-                            # Check if next line starts a new paragraph
-                            next_line = lines[i + 1].strip()
-                            if next_line and not line.endswith('.') and not line.endswith('!') and not line.endswith('?'):
-                                continue  # Same paragraph
-                            elif next_line:
-                                formatted_lines.append('')  # Add paragraph break
-                
-                cleaned_content = '\n'.join(formatted_lines)
             
             return cleaned_content
             
         except Exception as e:
-            logger.warning(f"Error cleaning generated content: {e}")
-            return content  # Return original content if cleaning fails
+            logger.warning(f"Error in basic content cleaning: {e}")
+            return content
     
     def _start_mouse_listener_for_deferred_action(self, execution_id: str) -> None:
         """
