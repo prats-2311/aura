@@ -4147,6 +4147,15 @@ class Orchestrator:
                     "execution_time": handler_result.get("execution_time"),
                     "metadata": handler_result.get("metadata", {})
                 }
+                
+                # Add conversational-specific fields if present
+                if "response" in handler_result:
+                    execution_context["execution_results"]["response"] = handler_result["response"]
+                if "interaction_type" in handler_result:
+                    execution_context["execution_results"]["interaction_type"] = handler_result["interaction_type"]
+                if "conversation_context" in handler_result:
+                    execution_context["execution_results"]["conversation_context"] = handler_result["conversation_context"]
+                    
             else:
                 execution_context["errors"].append(handler_result.get("message", "Handler execution failed"))
                 execution_context["execution_results"] = {
@@ -4698,9 +4707,23 @@ class Orchestrator:
         # Add execution details if available
         if execution_context.get("execution_results"):
             exec_results = execution_context["execution_results"]
-            result["actions_executed"] = exec_results["successful_actions"]
-            result["actions_failed"] = exec_results["failed_actions"]
-            result["total_actions"] = exec_results["total_actions"]
+            # Handle different result formats (GUI actions vs conversational responses)
+            if "successful_actions" in exec_results:
+                result["actions_executed"] = exec_results["successful_actions"]
+                result["actions_failed"] = exec_results["failed_actions"]
+                result["total_actions"] = exec_results["total_actions"]
+            else:
+                # For conversational and other non-action results
+                result["success"] = exec_results.get("success", True)
+                result["message"] = exec_results.get("message", "")
+                if "response" in exec_results:
+                    result["response"] = exec_results["response"]
+                if "interaction_type" in exec_results:
+                    result["interaction_type"] = exec_results["interaction_type"]
+                if "conversation_context" in exec_results:
+                    result["conversation_context"] = exec_results["conversation_context"]
+                if "execution_time" in exec_results:
+                    result["execution_time"] = exec_results["execution_time"]
         
         # Add errors and warnings if any
         if execution_context["errors"]:

@@ -694,6 +694,266 @@ Please analyze the user's command and the current screen state, then provide a d
             if duration < 0:
                 raise Exception("Estimated duration must be non-negative")
     
+    @measure_performance("conversational_query", include_system_metrics=True)
+    @with_error_handling(
+        category=ErrorCategory.API_ERROR,
+        severity=ErrorSeverity.MEDIUM,
+        max_retries=2,
+        retry_delay=1.0,
+        user_message="I'm having trouble generating a response. Please try again.",
+        fallback_return="I'm sorry, I'm having trouble processing your request right now. Please try again later."
+    )
+    def process_query(self, query: str, prompt_template: str = None, context: Dict[str, Any] = None) -> str:
+        """
+        Process a conversational query using the specified prompt template.
+        
+        Args:
+            query (str): The user's conversational query
+            prompt_template (str): The prompt template to use (e.g., 'CONVERSATIONAL_PROMPT')
+            context (Dict[str, Any]): Additional context for the conversation
+            
+        Returns:
+            str: Generated conversational response
+            
+        Raises:
+            Exception: If API communication fails or response is invalid after retries
+        """
+        try:
+            # Input validation
+            if not query or not query.strip():
+                raise ValueError("Query cannot be empty")
+            
+            if len(query) > 2000:
+                raise ValueError("Query too long (maximum 2000 characters)")
+            
+            logger.info(f"Processing conversational query: '{query[:100]}...'")
+            
+            # Get the prompt template from config
+            prompt_template_text = self._get_prompt_template(prompt_template)
+            
+            # Build the conversational prompt
+            try:
+                prompt = self._build_conversational_prompt(query, prompt_template_text, context or {})
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="reasoning",
+                    function="process_query",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"query_length": len(query), "template": prompt_template}
+                )
+                raise Exception(f"Prompt building failed: {error_info.user_message}")
+            
+            # Make API request
+            try:
+                response = self._make_api_request(prompt)
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="reasoning",
+                    function="process_query",
+                    category=ErrorCategory.API_ERROR,
+                    context={"prompt_length": len(prompt)}
+                )
+                # Return fallback response for API errors
+                return self._get_conversational_fallback(str(e))
+            
+            # Extract conversational response
+            try:
+                conversational_response = self._extract_conversational_response(response)
+            except Exception as e:
+                error_info = global_error_handler.handle_error(
+                    error=e,
+                    module="reasoning",
+                    function="process_query",
+                    category=ErrorCategory.PROCESSING_ERROR,
+                    context={"response_type": type(response).__name__}
+                )
+                # Return fallback response for parsing errors
+                return self._get_conversational_fallback(str(e))
+            
+            logger.info(f"Generated conversational response: '{conversational_response[:100]}...'")
+            return conversational_response
+            
+        except Exception as e:
+            # Final fallback - always return a valid response
+            logger.error(f"Failed to process conversational query: {str(e)}")
+            return self._get_conversational_fallback(str(e))
+    
+    def _get_prompt_template(self, template_name: str) -> str:
+        """
+        Get the prompt template from config.
+        
+        Args:
+            template_name (str): Name of the template (e.g., 'CONVERSATIONAL_PROMPT')
+            
+        Returns:
+            str: The prompt template text
+        """
+        try:
+            # Import config to get the template
+            import config
+            
+            if template_name and hasattr(config, template_name):
+                return getattr(config, template_name)
+            else:
+                # Default conversational prompt
+                return """You are AURA, a helpful AI assistant. The user is having a casual conversation with you. 
+Respond in a friendly, natural, and helpful manner. Keep responses concise but warm.
+
+User: {query}
+
+Respond naturally as AURA would, being helpful and conversational. Do not provide JSON responses for conversational interactions."""
+                
+        except Exception as e:
+            logger.warning(f"Failed to get prompt template '{template_name}': {e}")
+            # Return default template
+            return """You are AURA, a helpful AI assistant. Respond to the user's query in a friendly and helpful manner.
+
+User: {query}
+
+Please provide a natural, conversational response."""
+    
+    def _build_conversational_prompt(self, query: str, template: str, context: Dict[str, Any]) -> str:
+        """
+        Build the conversational prompt using the template and context.
+        
+        Args:
+            query (str): User's conversational query
+            template (str): Prompt template
+            context (Dict[str, Any]): Conversation context
+            
+        Returns:
+            str: Complete conversational prompt
+        """
+        try:
+            # Format the template with the query and context
+            formatted_prompt = template.format(
+                query=query,
+                context=context
+            )
+            
+            # Add conversation history if available
+            if context.get('conversation_history'):
+                history_text = self._format_conversation_history(context['conversation_history'])
+                formatted_prompt = f"{formatted_prompt}\n\nRecent conversation:\n{history_text}"
+            
+            return formatted_prompt
+            
+        except Exception as e:
+            logger.warning(f"Failed to build conversational prompt: {e}")
+            # Return simple fallback prompt
+            return f"You are AURA, a helpful AI assistant. Please respond to: {query}"
+    
+    def _format_conversation_history(self, history: list) -> str:
+        """
+        Format conversation history for inclusion in prompts.
+        
+        Args:
+            history (list): List of conversation exchanges
+            
+        Returns:
+            str: Formatted conversation history
+        """
+        try:
+            formatted_lines = []
+            for exchange in history[-3:]:  # Only include last 3 exchanges
+                if isinstance(exchange, dict):
+                    user_query = exchange.get('user_query', '')
+                    aura_response = exchange.get('aura_response', '')
+                    if user_query and aura_response:
+                        formatted_lines.append(f"User: {user_query}")
+                        formatted_lines.append(f"AURA: {aura_response}")
+            
+            return '\n'.join(formatted_lines)
+            
+        except Exception as e:
+            logger.warning(f"Failed to format conversation history: {e}")
+            return ""
+    
+    def _extract_conversational_response(self, api_response: Dict[str, Any]) -> str:
+        """
+        Extract the conversational response from the API response.
+        
+        Args:
+            api_response (dict): Raw API response
+            
+        Returns:
+            str: Extracted conversational response
+            
+        Raises:
+            Exception: If response format is invalid
+        """
+        try:
+            # Extract content from API response
+            if "choices" not in api_response or not api_response["choices"]:
+                raise Exception("Invalid API response: no choices found")
+            
+            content = api_response["choices"][0]["message"]["content"]
+            
+            # Clean up the response
+            content = content.strip()
+            
+            # Remove any JSON formatting if present (shouldn't be for conversational responses)
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.endswith("```"):
+                content = content[:-3]
+            
+            # Remove common prefixes that might be added by the model
+            prefixes_to_remove = [
+                "AURA: ",
+                "Assistant: ",
+                "AI: ",
+                "Response: "
+            ]
+            
+            for prefix in prefixes_to_remove:
+                if content.startswith(prefix):
+                    content = content[len(prefix):].strip()
+                    break
+            
+            # Validate response length
+            if len(content) > 1000:
+                content = content[:1000] + "..."
+                logger.warning("Conversational response truncated due to length")
+            
+            if not content:
+                raise Exception("Empty conversational response")
+            
+            return content
+            
+        except KeyError as e:
+            raise Exception(f"Invalid API response structure: missing {str(e)}")
+        except Exception as e:
+            raise Exception(f"Failed to extract conversational response: {str(e)}")
+    
+    def _get_conversational_fallback(self, error_message: str) -> str:
+        """
+        Generate a fallback conversational response when processing fails.
+        
+        Args:
+            error_message (str): The error that occurred
+            
+        Returns:
+            str: Fallback conversational response
+        """
+        logger.warning(f"Using conversational fallback due to error: {error_message}")
+        
+        # Determine appropriate fallback message based on error type
+        if "timeout" in error_message.lower() or "timed out" in error_message.lower():
+            return "I'm taking a bit longer than usual to process that. Could you try asking again?"
+        elif "connection" in error_message.lower() or "connect" in error_message.lower():
+            return "I'm having trouble with my connection right now. Please try again in a moment."
+        elif "parse" in error_message.lower() or "json" in error_message.lower():
+            return "I'm having trouble understanding that request. Could you rephrase it for me?"
+        elif "invalid" in error_message.lower():
+            return "Something doesn't seem right with that request. Could you try asking differently?"
+        elif "empty" in error_message.lower():
+            return "I didn't catch what you said. Could you repeat that?"
+        else:
+            return "I'm having a bit of trouble right now. Please try again, and I'll do my best to help!"
+
     def _get_fallback_response(self, error_message: str) -> Dict[str, Any]:
         """
         Generate a fallback response when reasoning fails.
