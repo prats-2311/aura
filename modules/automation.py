@@ -648,6 +648,7 @@ class AutomationModule:
     def _cliclick_type(self, text: str, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:
         """
         Execute typing using cliclick on macOS with fast path optimization.
+        Enhanced to handle newlines and special characters properly.
         
         Args:
             text: Text to type
@@ -660,30 +661,58 @@ class AutomationModule:
         try:
             start_time = time.time()
             
-            # cliclick uses 't:' for typing
-            # TIMEOUT REMOVED: Allow typing to complete without artificial time limits
-            result = subprocess.run(
-                ['cliclick', f't:{text}'],
-                capture_output=True,
-                text=True
-            )
+            # Validate input text
+            if not self._validate_text_input(text):
+                logger.error("cliclick typing: Invalid text input")
+                return False
+            
+            # Preprocess text for cliclick to handle newlines and special characters
+            formatted_text = self._format_text_for_typing(text, 'cliclick')
+            
+            # Log formatting details for debugging
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.debug(f"cliclick {path_type} PATH: Original text length: {len(text)}, lines: {text.count(chr(10)) + 1}")
+            logger.debug(f"cliclick {path_type} PATH: Formatted text length: {len(formatted_text)}")
+            
+            # Choose typing method based on content
+            if '\n' in text:
+                # Multi-line text - use line-by-line approach for better formatting preservation
+                logger.debug(f"cliclick {path_type} PATH: Using multiline typing for {text.count(chr(10)) + 1} lines")
+                success = self._cliclick_type_multiline(formatted_text, fast_path, element_info)
+            else:
+                # Single line - use standard cliclick typing with increased timeout
+                timeout = 5 if fast_path else 10  # Increased from 3/5 to 5/10
+                logger.debug(f"cliclick {path_type} PATH: Using single-line typing with {timeout}s timeout")
+                
+                result = subprocess.run(
+                    ['cliclick', f't:{formatted_text}'],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout
+                )
+                success = result.returncode == 0
+                if not success:
+                    logger.warning(f"cliclick {path_type} PATH: Single-line typing failed: {result.stderr}")
             
             execution_time = time.time() - start_time
             
-            if result.returncode == 0:
-                path_type = "FAST" if fast_path else "SLOW"
-                text_preview = text[:30] + "..." if len(text) > 30 else text
+            if success:
+                text_preview = text[:50] + "..." if len(text) > 50 else text
+                text_preview = text_preview.replace('\n', '\\n')  # Show newlines in log
                 element_desc = element_info.get('title', 'unknown') if element_info else 'unknown'
                 logger.info(f"cliclick {path_type} PATH: Typing succeeded on '{element_desc}' in {execution_time:.3f}s: '{text_preview}'")
                 
-                # Log performance metrics
+                # Log performance metrics with formatting details
                 perf_record = {
                     'timestamp': time.time(),
                     'execution_time': execution_time,
                     'path_type': 'fast' if fast_path else 'slow',
                     'success': True,
                     'action': 'type',
-                    'text_length': len(text)
+                    'text_length': len(text),
+                    'newlines_count': text.count('\n'),
+                    'formatting_preserved': True,
+                    'method': 'multiline' if '\n' in text else 'single_line'
                 }
                 if element_info:
                     perf_record.update({
@@ -698,8 +727,25 @@ class AutomationModule:
                 
                 return True
             else:
-                path_type = "FAST" if fast_path else "SLOW"
-                logger.warning(f"cliclick {path_type} PATH: Typing failed: {result.stderr}")
+                logger.warning(f"cliclick {path_type} PATH: Typing failed - formatting may not be preserved")
+                
+                # Log failed performance
+                perf_record = {
+                    'timestamp': time.time(),
+                    'execution_time': execution_time,
+                    'path_type': 'fast' if fast_path else 'slow',
+                    'success': False,
+                    'action': 'type',
+                    'text_length': len(text),
+                    'newlines_count': text.count('\n'),
+                    'formatting_preserved': False,
+                    'method': 'multiline' if '\n' in text else 'single_line'
+                }
+                
+                if not hasattr(self, 'performance_history'):
+                    self.performance_history = []
+                self.performance_history.append(perf_record)
+                
                 return False
                 
         except subprocess.TimeoutExpired:
@@ -711,6 +757,147 @@ class AutomationModule:
             execution_time = time.time() - start_time if 'start_time' in locals() else 0.0
             path_type = "FAST" if fast_path else "SLOW"
             logger.error(f"cliclick {path_type} PATH: Typing failed with exception: {e}")
+            return False
+    
+    def _format_text_for_typing(self, text: str, method: str) -> str:
+        """
+        Preprocess text for typing based on the method being used.
+        Enhanced to properly handle newlines and special characters for cliclick.
+        
+        Args:
+            text: Original text to format
+            method: Typing method ('cliclick' or 'applescript')
+            
+        Returns:
+            str: Formatted text ready for the specified typing method
+        """
+        if method == 'cliclick':
+            # For cliclick, we need to handle special characters that might interfere
+            # with command parsing, but preserve newlines for multi-line handling
+            formatted = text
+            
+            # Escape backslashes first to prevent double-escaping
+            formatted = formatted.replace('\\', '\\\\')
+            
+            # Escape characters that could interfere with cliclick command parsing
+            # Note: We don't escape newlines here as they're handled separately in multiline method
+            # Be more conservative with escaping - only escape truly problematic characters
+            formatted = formatted.replace('"', '\\"')
+            formatted = formatted.replace("'", "\\'")
+            formatted = formatted.replace('`', '\\`')
+            formatted = formatted.replace('$', '\\$')
+            
+            # Only escape shell operators that actually cause issues with cliclick
+            # Parentheses, brackets, and braces are generally safe in cliclick text
+            formatted = formatted.replace('&', '\\&')
+            formatted = formatted.replace('|', '\\|')
+            formatted = formatted.replace(';', '\\;')
+            # Remove problematic escaping of parentheses and brackets
+            # These don't need escaping in cliclick and cause corruption
+            # formatted = formatted.replace('(', '\\(')  # REMOVED - causes corruption
+            # formatted = formatted.replace(')', '\\)')  # REMOVED - causes corruption
+            # formatted = formatted.replace('[', '\\[')  # REMOVED - not needed
+            # formatted = formatted.replace(']', '\\]')  # REMOVED - not needed
+            # formatted = formatted.replace('{', '\\{')  # REMOVED - not needed
+            # formatted = formatted.replace('}', '\\}')  # REMOVED - not needed
+            # formatted = formatted.replace('<', '\\<')  # REMOVED - not needed
+            # formatted = formatted.replace('>', '\\>')  # REMOVED - not needed
+            
+            return formatted
+            
+        elif method == 'applescript':
+            # For AppleScript, escape characters that interfere with AppleScript strings
+            formatted = text
+            
+            # Escape backslashes first
+            formatted = formatted.replace('\\', '\\\\')
+            
+            # Escape double quotes for AppleScript string literals
+            formatted = formatted.replace('"', '\\"')
+            
+            # Handle carriage returns
+            formatted = formatted.replace('\r', '\\r')
+            
+            return formatted
+        
+        else:
+            # Unknown method, return text as-is
+            logger.warning(f"Unknown typing method '{method}', returning unformatted text")
+            return text
+    
+    def _cliclick_type_multiline(self, text: str, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Handle multi-line text typing with cliclick using key sequences.
+        Enhanced to preserve indentation and handle empty lines properly.
+        
+        Args:
+            text: Formatted text to type (already processed by _format_text_for_typing)
+            fast_path: Whether this is a fast path execution
+            element_info: Optional element information for optimization
+            
+        Returns:
+            bool: True if typing succeeded, False otherwise
+        """
+        try:
+            lines = text.split('\n')
+            path_type = "FAST" if fast_path else "SLOW"
+            
+            logger.debug(f"cliclick {path_type} PATH: Typing {len(lines)} lines with preserved formatting")
+            
+            # Increase timeout for better reliability - the main issue is timeout being too short
+            base_timeout = 5 if fast_path else 10  # Increased from 3/5 to 5/10
+            line_timeout = max(2, min(base_timeout, len(text) // 50))  # More generous timeout scaling
+            
+            for i, line in enumerate(lines):
+                # Type the line content (including empty lines for proper spacing)
+                if line.strip():  # Non-empty line
+                    # Use cliclick to type the line with increased timeout
+                    result = subprocess.run(
+                        ['cliclick', f't:{line}'],
+                        capture_output=True,
+                        text=True,
+                        timeout=line_timeout
+                    )
+                    
+                    if result.returncode != 0:
+                        logger.warning(f"cliclick {path_type} PATH: Failed to type line {i+1}: {result.stderr}")
+                        return False
+                        
+                    # Slightly longer delay for better reliability
+                    if not fast_path:
+                        time.sleep(0.02)  # Increased from 0.01 to 0.02
+                        
+                else:  # Empty line - just preserve the spacing
+                    logger.debug(f"cliclick {path_type} PATH: Preserving empty line {i+1}")
+                
+                # Add newline after each line except the last one
+                if i < len(lines) - 1:
+                    # Use cliclick to press Return key with increased timeout
+                    result = subprocess.run(
+                        ['cliclick', 'kp:return'],
+                        capture_output=True,
+                        text=True,
+                        timeout=3  # Increased from 2 to 3
+                    )
+                    
+                    if result.returncode != 0:
+                        logger.warning(f"cliclick {path_type} PATH: Failed to press Return after line {i+1}: {result.stderr}")
+                        return False
+                    
+                    # Slightly longer delay for proper line processing
+                    if not fast_path:
+                        time.sleep(0.02)  # Increased from 0.01 to 0.02
+            
+            logger.debug(f"cliclick {path_type} PATH: Successfully typed {len(lines)} lines with preserved formatting")
+            return True
+            
+        except subprocess.TimeoutExpired:
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.error(f"cliclick {path_type} PATH: Multi-line typing timed out - consider using AppleScript for very long content")
+            return False
+        except Exception as e:
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.error(f"cliclick {path_type} PATH: Multi-line typing failed with exception: {e}")
             return False
     
     def _cliclick_scroll(self, direction: str, amount: int, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:
@@ -1008,31 +1195,40 @@ class AutomationModule:
             return False
     
     def _macos_type(self, text: str) -> bool:
-        """Execute typing using AppleScript on macOS."""
+        """
+        Execute typing using AppleScript on macOS.
+        Enhanced to handle special characters and prevent corruption.
+        """
         try:
+            # Format text specifically for AppleScript (different from cliclick formatting)
+            formatted_text = self._format_text_for_typing(text, 'applescript')
+            
             # For AppleScript, we need to handle newlines differently
             # Split text by newlines and type each line separately with return key presses
-            lines = text.split('\n')
+            lines = formatted_text.split('\n')
+            
+            logger.debug(f"AppleScript typing {len(lines)} lines with preserved formatting")
             
             for i, line in enumerate(lines):
                 if line:  # Only type non-empty lines
                     # INDENTATION DEBUG: Check line indentation before processing
                     leading_spaces = len(line) - len(line.lstrip())
                     if leading_spaces > 0:
-                        logger.debug(f"AppleScript typing line {i+1} with {leading_spaces} leading spaces: '{line}'")
+                        logger.debug(f"AppleScript typing line {i+1} with {leading_spaces} leading spaces: '{line[:50]}...'")
                     
-                    # Escape special characters for AppleScript (but not newlines)
-                    escaped_line = line.replace('\\', '\\\\').replace('"', '\\"').replace('\r', '\\r')
+                    # Additional AppleScript-specific escaping for the keystroke command
+                    # Note: text is already formatted by _format_text_for_typing
+                    applescript_line = line.replace('"', '\\"')  # Escape quotes for AppleScript string
                     
                     # INDENTATION DEBUG: Verify spaces preserved after escaping
-                    escaped_spaces = len(escaped_line) - len(escaped_line.lstrip())
+                    escaped_spaces = len(applescript_line) - len(applescript_line.lstrip())
                     if leading_spaces != escaped_spaces:
-                        logger.error(f"INDENTATION LOST during escaping! Original: {leading_spaces} spaces, Escaped: {escaped_spaces} spaces")
+                        logger.error(f"INDENTATION LOST during AppleScript escaping! Original: {leading_spaces} spaces, Escaped: {escaped_spaces} spaces")
                     
-                    # Type the line
+                    # Type the line using AppleScript keystroke
                     applescript = f'''
                     tell application "System Events"
-                        keystroke "{escaped_line}"
+                        keystroke "{applescript_line}"
                     end tell
                     '''
                     
@@ -1040,13 +1236,16 @@ class AutomationModule:
                         ['osascript', '-e', applescript],
                         capture_output=True,
                         text=True,
-                        timeout=10,
+                        timeout=15,  # Increased timeout for reliability
                         check=False
                     )
                     
                     if result.returncode != 0:
-                        logger.warning(f"AppleScript typing failed for line {i}: {result.stderr}")
+                        logger.warning(f"AppleScript typing failed for line {i+1}: {result.stderr}")
                         return False
+                    
+                    # Small delay for character processing
+                    time.sleep(0.01)
                 
                 # Add newline (return key) after each line except the last one
                 if i < len(lines) - 1:
@@ -1065,17 +1264,20 @@ class AutomationModule:
                     )
                     
                     if result.returncode != 0:
-                        logger.warning(f"AppleScript return key failed after line {i}: {result.stderr}")
+                        logger.warning(f"AppleScript return key failed after line {i+1}: {result.stderr}")
                         return False
+                    
+                    # Small delay for line processing
+                    time.sleep(0.01)
             
-            logger.debug(f"macOS typing executed successfully: {len(text)} characters, {len(lines)} lines")
+            logger.debug(f"AppleScript typing executed successfully: {len(text)} characters, {len(lines)} lines")
             return True
             
         except subprocess.TimeoutExpired:
-            logger.error(f"macOS typing timed out")
+            logger.error(f"AppleScript typing timed out")
             return False
         except Exception as e:
-            logger.error(f"macOS typing failed with exception: {e}")
+            logger.error(f"AppleScript typing failed with exception: {e}")
             return False
     
     def _macos_scroll(self, direction: str, amount: int) -> bool:
