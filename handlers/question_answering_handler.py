@@ -1050,13 +1050,17 @@ Provide a clear, concise answer that directly addresses the user's question."""
                 self._application_detector = ApplicationDetector()
                 self.logger.debug("ApplicationDetector initialized")
             
-            # Get active application info
+            # Get active application info (always fresh, no caching)
             app_info = self._application_detector.get_active_application_info()
             
             if app_info:
                 self.logger.info(f"Detected active application: {app_info.name} ({app_info.app_type.value})")
-                if app_info.browser_type:
+                if hasattr(app_info, 'bundle_id') and app_info.bundle_id:
+                    self.logger.debug(f"Bundle ID: {app_info.bundle_id}")
+                if hasattr(app_info, 'browser_type') and app_info.browser_type:
                     self.logger.debug(f"Browser type: {app_info.browser_type.value}")
+                if hasattr(app_info, 'pid') and app_info.pid:
+                    self.logger.debug(f"Process ID: {app_info.pid}")
                 return app_info
             else:
                 self.logger.warning("Could not detect active application")
@@ -1395,8 +1399,45 @@ Provide a clear, concise answer that directly addresses the user's question."""
                 self._reasoning_module = ReasoningModule()
                 self.logger.debug("ReasoningModule initialized for summarization")
             
-            # Prepare summarization prompt
-            summarization_prompt = self._build_summarization_prompt(content, command)
+            # Truncate content for reasoning module (2000 char limit)
+            # Reserve space for prompt text (~400 chars), so limit content to ~1200 chars
+            max_content_for_reasoning = 1200
+            truncated_content = content
+            
+            self.logger.info(f"Content length before truncation: {len(content)} characters")
+            
+            if len(content) > max_content_for_reasoning:
+                self.logger.info(f"Content ({len(content)} chars) exceeds reasoning module limit, truncating to {max_content_for_reasoning} chars")
+                
+                # Try to truncate at sentence boundary
+                truncated = content[:max_content_for_reasoning]
+                sentence_endings = ['. ', '! ', '? ', '.\n', '!\n', '?\n']
+                best_break = -1
+                
+                for ending in sentence_endings:
+                    last_occurrence = truncated.rfind(ending)
+                    if last_occurrence > max_content_for_reasoning - 300:  # Within last 300 chars
+                        best_break = max(best_break, last_occurrence + len(ending))
+                
+                if best_break > 0:
+                    truncated_content = truncated[:best_break].strip()
+                    self.logger.debug(f"Truncated content at sentence boundary: {len(truncated_content)} characters")
+                else:
+                    # No good sentence boundary found, truncate at word boundary
+                    words = truncated.split()
+                    truncated_content = ' '.join(words[:-1])  # Remove last potentially incomplete word
+                    self.logger.debug(f"Truncated content at word boundary: {len(truncated_content)} characters")
+                
+                # Add truncation indicator
+                truncated_content += "... [content truncated]"
+            
+            self.logger.info(f"Content length after truncation: {len(truncated_content)} characters")
+            
+            # Prepare summarization prompt with truncated content
+            summarization_prompt = self._build_summarization_prompt(truncated_content, command)
+            
+            # Log prompt length for debugging
+            self.logger.debug(f"Summarization prompt length: {len(summarization_prompt)} characters")
             
             # Set up timeout for summarization (3 second limit as per requirements)
             import threading
@@ -1630,189 +1671,8 @@ Please provide a summary that I can speak to the user as a direct response to th
                 # Break at word boundary
                 words = truncated.split()
                 formatted = ' '.join(words[:-1]) + '.'
-        
 
-    
-    def _summarize_content(self, content: str, command: str) -> Optional[str]:
-        """
-        Summarize extracted content using the reasoning module.
-        
-        This method sends the extracted and processed content to the reasoning
-        module for summarization, with timeout handling and error recovery.
-        
-        Args:
-            content: Processed content to summarize
-            command: Original user command for context
-            
-        Returns:
-            Summarized content if successful, None if failed
-        """
-        try:
-            # Initialize ReasoningModule if not already done
-            if not self._reasoning_module:
-                from modules.reasoning import ReasoningModule
-                self._reasoning_module = ReasoningModule()
-                self.logger.debug("ReasoningModule initialized for summarization")
-            
-            # Set up timeout for summarization (3 second limit as per requirements)
-            import threading
-            import queue
-            
-            
-            # Use threading approach for timeout to avoid signal issues
-            result_queue = queue.Queue()
-            error_queue = queue.Queue()
-            
-            def summarize_worker():
-                try:
-                    # Create summarization prompt based on the user's command
-                    summarization_prompt = self._create_summarization_prompt(content, command)
-                    
-                    self.logger.debug(f"Sending {len(content)} characters to reasoning module for summarization")
-                    
-                    # Get summary from reasoning module using process_query
-                    summary = self._reasoning_module.process_query(
-                        query=summarization_prompt,
-                        context={"content_length": len(content), "command": command}
-                    )
-                    
-                    result_queue.put(summary)
-                    
-                except Exception as e:
-                    self.logger.error(f"Summarization worker error: {e}")
-                    error_queue.put(e)
-            
-            # Start summarization in thread
-            summarize_thread = threading.Thread(target=summarize_worker, daemon=True)
-            summarize_thread.start()
-            
-            # Wait for result with 3 second timeout
-            summarize_thread.join(timeout=3.0)
-            
-            if summarize_thread.is_alive():
-                self.logger.warning("Content summarization timed out after 3 seconds")
-                return None
-            
-            # Check for errors
-            if not error_queue.empty():
-                summarize_error = error_queue.get()
-                self.logger.error(f"Content summarization failed: {summarize_error}")
-                return None
-            
-            # Get result
-            if result_queue.empty():
-                self.logger.warning("No summarization result received")
-                return None
-            
-            summary = result_queue.get()
-            
-            # Validate and clean summary
-            if not summary or not isinstance(summary, str):
-                self.logger.warning("Invalid summarization result")
-                return None
-            
-            summary = summary.strip()
-            if not summary:
-                self.logger.warning("Empty summarization result")
-                return None
-            
-            # Validate summary length (should be reasonable)
-            if len(summary) > len(content):
-                self.logger.warning("Summary is longer than original content, likely an error")
-                return None
-            
-            if len(summary) < 10:
-                self.logger.warning("Summary is too short, likely incomplete")
-                return None
-            
-            self.logger.info(f"Content summarization successful: {len(summary)} characters")
-            return summary
-                
-        except Exception as e:
-            self.logger.error(f"Error in summarization setup: {e}")
-            return None
-    
-    def _create_summarization_prompt(self, content: str, command: str) -> str:
-        """
-        Create an appropriate summarization prompt based on the user's command.
-        
-        Args:
-            content: Content to summarize
-            command: Original user command
-            
-        Returns:
-            Formatted prompt for the reasoning module
-        """
-        # Analyze the command to determine the type of summary needed
-        command_lower = command.lower().strip()
-        
-        if any(phrase in command_lower for phrase in ["what's on", "what is on", "describe", "tell me about"]):
-            prompt_type = "general_description"
-        elif any(phrase in command_lower for phrase in ["summarize", "summary", "main points"]):
-            prompt_type = "summary"
-        elif any(phrase in command_lower for phrase in ["key", "important", "highlights"]):
-            prompt_type = "key_points"
-        else:
-            prompt_type = "general_description"
-        
-        # Create appropriate prompt based on type
-        if prompt_type == "summary":
-            prompt = f"Please provide a concise summary of the following content:\n\n{content}"
-        elif prompt_type == "key_points":
-            prompt = f"Please identify the key points and important information from the following content:\n\n{content}"
-        else:  # general_description
-            prompt = f"Please describe what's shown in the following content in a clear and concise way:\n\n{content}"
-        
-        return prompt
-    
-    def _create_fallback_summary(self, content: str) -> str:
-        """
-        Create a fallback summary when the reasoning module fails.
-        
-        This method provides a basic summary by extracting the first few sentences
-        or paragraphs from the content when full summarization fails.
-        
-        Args:
-            content: Content to create fallback summary from
-            
-        Returns:
-            Basic summary of the content
-        """
-        if not content or not content.strip():
-            return "I found some content on your screen, but I'm having trouble processing it right now."
-        
-        # Try to extract first few sentences (up to 200 words)
-        sentences = content.split('.')
-        summary_parts = []
-        word_count = 0
-        
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-            
-            sentence_words = len(sentence.split())
-            if word_count + sentence_words > 200:  # Limit to ~200 words
-                break
-            
-            summary_parts.append(sentence)
-            word_count += sentence_words
-            
-            if len(summary_parts) >= 3:  # Limit to first 3 sentences
-                break
-        
-        if summary_parts:
-            fallback_summary = '. '.join(summary_parts)
-            if not fallback_summary.endswith('.'):
-                fallback_summary += '.'
-            
-            self.logger.debug(f"Created fallback summary: {len(fallback_summary)} characters")
-            return f"Here's what I found on your screen: {fallback_summary}"
-        else:
-            # If we can't extract sentences, just return a generic message with content type
-            content_length = len(content)
-            word_count = len(content.split())
-            return f"I found content on your screen with approximately {word_count} words ({content_length} characters), but I'm having trouble summarizing it right now."
+
     
     def _log_fast_path_performance(self, app_info: 'ApplicationInfo', extraction_method: str, 
                                  extraction_time: float, summarization_time: float, 

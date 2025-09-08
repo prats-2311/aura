@@ -781,6 +781,9 @@ class ApplicationDetector:
         """
         Primary method to get active application using AppKit.
         
+        This method intelligently detects the user's intended active application
+        by filtering out development tools and system applications.
+        
         Returns:
             ApplicationInfo if successful, None otherwise
         """
@@ -790,10 +793,98 @@ class ApplicationDetector:
         
         try:
             workspace = NSWorkspace.sharedWorkspace()
-            active_app = workspace.frontmostApplication()
+            
+            # Get frontmost application first
+            frontmost_app = workspace.frontmostApplication()
+            
+            # Define applications to ignore when detecting user's active app
+            ignored_bundle_ids = {
+                'dev.kiro.desktop',  # Kiro IDE
+                'com.apple.Terminal',  # Terminal
+                'com.microsoft.VSCode',  # VS Code
+                'com.apple.dt.Xcode',  # Xcode
+                'com.jetbrains.intellij',  # IntelliJ
+                'com.sublimetext.4',  # Sublime Text
+                'com.github.atom',  # Atom
+                'com.apple.Console',  # Console
+                'com.apple.ActivityMonitor',  # Activity Monitor
+                'com.apple.systempreferences',  # System Preferences
+            }
+            
+            # Check if frontmost app should be ignored
+            if frontmost_app and frontmost_app.bundleIdentifier() not in ignored_bundle_ids:
+                # Frontmost app is a valid user application
+                active_app = frontmost_app
+                self.logger.debug(f"Using frontmost application: {active_app.localizedName()}")
+            else:
+                # Frontmost app is a development tool, find the most recent user application
+                self.logger.debug(f"Frontmost app is development tool ({frontmost_app.localizedName() if frontmost_app else 'None'}), finding user application")
+                
+                running_apps = workspace.runningApplications()
+                user_apps = []
+                
+                for app in running_apps:
+                    if (app.localizedName() and 
+                        not app.isHidden() and 
+                        app.bundleIdentifier() not in ignored_bundle_ids and
+                        not self._is_system_app(app) and
+                        app.activationPolicy() == 0):  # Only regular user applications
+                        user_apps.append(app)
+                
+                # Find the most recently active user application
+                # Priority: 1) Currently active apps, 2) Most recently launched apps
+                active_user_apps = [app for app in user_apps if app.isActive()]
+                
+                if active_user_apps:
+                    # If there are active user apps, pick the one with highest PID (most recent)
+                    active_user_apps.sort(key=lambda app: -app.processIdentifier())
+                    active_app = active_user_apps[0]
+                    self.logger.debug(f"Found active user app: {active_app.localizedName()}")
+                else:
+                    # No active user apps, find the most recently launched one
+                    # But prioritize common user applications over system apps like Music
+                    priority_apps = []
+                    other_apps = []
+                    
+                    for app in user_apps:
+                        bundle_id = app.bundleIdentifier()
+                        if bundle_id and any(bundle_id.startswith(prefix) for prefix in [
+                            'com.google.Chrome',
+                            'com.apple.Safari',
+                            'org.mozilla.firefox',
+                            'com.microsoft.edgemac',
+                            'com.brave.Browser',
+                            'com.apple.Preview',
+                            'com.adobe.Reader',
+                            'com.microsoft.VSCode',
+                            'com.sublimetext',
+                            'com.jetbrains.',
+                        ]):
+                            priority_apps.append(app)
+                        else:
+                            other_apps.append(app)
+                    
+                    # Sort priority apps by PID (most recent first)
+                    priority_apps.sort(key=lambda app: -app.processIdentifier())
+                    other_apps.sort(key=lambda app: -app.processIdentifier())
+                    
+                    # Choose from priority apps first, then others
+                    if priority_apps:
+                        active_app = priority_apps[0]
+                        self.logger.debug(f"Selected priority user app: {active_app.localizedName()}")
+                    elif other_apps:
+                        active_app = other_apps[0]
+                        self.logger.debug(f"Selected other user app: {active_app.localizedName()}")
+                    else:
+                        active_app = frontmost_app
+                
+                if active_app:
+                    self.logger.debug(f"Selected user application: {active_app.localizedName()}")
+                else:
+                    self.logger.debug("No suitable user application found")
             
             if not active_app:
-                self.logger.debug("No frontmost application found")
+                self.logger.debug("No active application found")
                 return None
             
             app_name = active_app.localizedName()
@@ -812,20 +903,71 @@ class ApplicationDetector:
                 app_type=ApplicationType.UNKNOWN,  # Will be determined later
                 version=self._get_app_version(active_app),
                 accessibility_enabled=True,
-                detection_confidence=0.95
+                detection_confidence=0.90 if active_app == frontmost_app else 0.75  # Lower confidence for inferred apps
             )
             
             # Detect application type
             app_type, browser_type, confidence = self._classify_application(app_info)
             app_info.app_type = app_type
             app_info.browser_type = browser_type
-            app_info.detection_confidence = confidence
+            app_info.detection_confidence = min(app_info.detection_confidence, confidence)
             
             return app_info
             
         except Exception as e:
             self.logger.debug(f"Primary detection method failed: {e}")
             return None
+    
+    def _is_system_app(self, app) -> bool:
+        """
+        Check if an application is a system application that should be ignored.
+        
+        Args:
+            app: NSRunningApplication instance
+            
+        Returns:
+            True if the app is a system app, False otherwise
+        """
+        bundle_id = app.bundleIdentifier()
+        if not bundle_id:
+            return True
+        
+        # System app patterns to ignore (but keep user-facing Apple apps like Preview, Safari, etc.)
+        system_patterns = [
+            'com.apple.dock',
+            'com.apple.finder',
+            'com.apple.systemuiserver',
+            'com.apple.controlcenter',
+            'com.apple.notificationcenterui',
+            'com.apple.WindowManager',
+            'com.apple.loginwindow',
+            'com.apple.Spotlight',
+            'com.apple.wifi',
+            'com.apple.universalcontrol',
+            'com.apple.PowerChime',
+            'com.apple.UserNotificationCenter',
+            'com.apple.CoreLocationAgent',
+            'com.apple.chronod',
+            'com.apple.security.',
+            'com.apple.coreservices.',
+            'com.apple.talagent',
+            'com.apple.wallpaper.',
+            'com.apple.ViewBridgeAuxiliary',
+            'com.apple.TextInputMenuAgent',
+            'com.apple.AirPlayUIAgent',
+            'com.apple.PressAndHold',
+        ]
+        
+        # Check if it's a system app pattern
+        for pattern in system_patterns:
+            if bundle_id.startswith(pattern):
+                return True
+        
+        # Check activation policy - background apps should be ignored
+        if app.activationPolicy() != 0:  # 0 = NSApplicationActivationPolicyRegular
+            return True
+        
+        return False
     
     def _get_active_app_applescript_fallback(self) -> Optional[ApplicationInfo]:
         """
