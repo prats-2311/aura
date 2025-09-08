@@ -397,11 +397,11 @@ class Orchestrator:
         """
         command_lower = command.lower().strip()
         
-        # Conversational patterns
+        # Conversational patterns - be more specific to avoid conflicts with question answering
         conversational_patterns = [
             "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
             "how are you", "what's up", "thanks", "thank you", "goodbye", "bye",
-            "tell me about", "what do you think", "can you help", "i need help"
+            "what do you think", "can you help", "i need help", "tell me a joke"
         ]
         
         # Deferred action patterns
@@ -411,24 +411,65 @@ class Orchestrator:
             "compose", "draft"
         ]
         
-        # Question answering patterns
+        # Question answering patterns - enhanced for screen content queries
         question_patterns = [
+            # Basic question words
             "what is", "what does", "how does", "why does", "where is",
             "when is", "who is", "explain", "describe", "summarize",
-            "what's on the screen", "what do you see"
+            # Screen content specific patterns
+            "what's on the screen", "what do you see", "what's on my screen",
+            "describe this page", "describe the screen", "what's displayed",
+            "what's showing", "what's visible", "read this", "read the screen",
+            "read my screen", "analyze the screen", "analyze my screen",
+            # Content analysis patterns
+            "what does this say", "what's this about", "what's the content",
+            "summarize this", "tell me about this", "what are the main points",
+            "what's the title", "what buttons are available", "what options do I have",
+            "what can I click", "what's the main idea", "main idea",
+            # Document specific patterns
+            "what's in this pdf", "what's in this document", "summarize this document",
+            "what's this article about", "read this document", "what does this contain",
+            # UI element queries
+            "what buttons are on", "what options are", "what can I click on",
+            "what options do i have", "what can i click", "options do i have"
         ]
         
-        # Check for conversational intent
-        if any(pattern in command_lower for pattern in conversational_patterns):
+        # Check for question answering intent FIRST (highest priority for content queries)
+        if any(pattern in command_lower for pattern in question_patterns):
+            # Determine more specific action type based on command content
+            action_type = "general_question"
+            content_type = "explanation"
+            
+            # Content summary patterns (check first to prioritize over screen analysis)
+            if any(summary_pattern in command_lower for summary_pattern in 
+                   ["summarize", "main points", "main idea", "about"]):
+                action_type = "content_summary"
+                content_type = "screen_content"
+            # Document query patterns
+            elif any(doc_pattern in command_lower for doc_pattern in 
+                     ["pdf", "document", "article", "file"]):
+                action_type = "document_query"
+                content_type = "document_content"
+            # Screen analysis patterns
+            elif any(screen_pattern in command_lower for screen_pattern in 
+                   ["screen", "see", "displayed", "showing", "visible", "analyze"]):
+                action_type = "screen_analysis"
+                content_type = "screen_content"
+            # UI element query patterns
+            elif any(ui_pattern in command_lower for ui_pattern in 
+                     ["buttons", "options", "click", "available"]):
+                action_type = "general_question"
+                content_type = "explanation"
+            
             return {
-                "intent": "conversational_chat",
-                "confidence": 0.8,
+                "intent": "question_answering",
+                "confidence": 0.8,  # Increased confidence for better pattern matching
                 "parameters": {
-                    "action_type": "general_conversation",
+                    "action_type": action_type,
                     "target": command,
-                    "content_type": "conversation"
+                    "content_type": content_type
                 },
-                "reasoning": "Matched conversational patterns in fallback classification"
+                "reasoning": "Matched question patterns in fallback classification"
             }
         
         # Check for deferred action intent
@@ -444,17 +485,17 @@ class Orchestrator:
                 "reasoning": "Matched content generation patterns in fallback classification"
             }
         
-        # Check for question answering intent
-        if any(pattern in command_lower for pattern in question_patterns):
+        # Check for conversational intent
+        if any(pattern in command_lower for pattern in conversational_patterns):
             return {
-                "intent": "question_answering",
-                "confidence": 0.7,
+                "intent": "conversational_chat",
+                "confidence": 0.8,
                 "parameters": {
-                    "action_type": "general_question",
+                    "action_type": "general_conversation",
                     "target": command,
-                    "content_type": "explanation"
+                    "content_type": "conversation"
                 },
-                "reasoning": "Matched question patterns in fallback classification"
+                "reasoning": "Matched conversational patterns in fallback classification"
             }
         
         # Default to GUI interaction

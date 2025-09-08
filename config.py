@@ -82,16 +82,22 @@ Intent categories:
 - "gui_interaction": Traditional GUI automation commands (click, type, scroll, etc.)
 - "conversational_chat": General conversation, greetings, or casual questions
 - "deferred_action": Requests for content generation that will be placed later (e.g., "write code for X")
-- "question_answering": Specific information requests about the screen or system
+- "question_answering": Information requests about screen content, system status, or content comprehension
+
+Special focus for question_answering intent:
+- Screen content queries: "what's on my screen", "what do you see", "describe this page", "summarize this"
+- Content analysis: "what does this say", "read this to me", "explain this content"
+- Information extraction: "what are the main points", "what's the title", "what buttons are available"
+- Document queries: "what's in this PDF", "summarize this document", "what's this article about"
 
 Return your response in this exact JSON format:
 {{
     "intent": "gui_interaction|conversational_chat|deferred_action|question_answering",
     "confidence": 0.95,
     "parameters": {{
-        "action_type": "click|type|scroll|generate_code|general_question",
+        "action_type": "click|type|scroll|generate_code|general_question|screen_analysis|content_summary|document_query",
         "target": "extracted target or content request",
-        "content_type": "code|text|explanation"
+        "content_type": "code|text|explanation|screen_content|document_content"
     }},
     "reasoning": "Brief explanation of why this intent was chosen"
 }}
