@@ -8,11 +8,34 @@ and PDF text extraction capabilities before falling back to vision-based process
 
 import logging
 import time
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import Dict, Any, Optional, TYPE_CHECKING, List
 from handlers.base_handler import BaseHandler
+from dataclasses import dataclass, field
+from collections import deque, defaultdict
+import threading
 
 if TYPE_CHECKING:
     from modules.application_detector import ApplicationInfo
+
+
+@dataclass
+class QuestionAnsweringMetric:
+    """Performance metric for question answering operations."""
+    timestamp: float = field(default_factory=time.time)
+    command: str = ""
+    app_name: Optional[str] = None
+    app_type: Optional[str] = None
+    extraction_method: Optional[str] = None
+    total_execution_time: float = 0.0
+    extraction_time: float = 0.0
+    summarization_time: float = 0.0
+    content_size: int = 0
+    summary_size: int = 0
+    success: bool = False
+    fast_path_used: bool = False
+    fallback_reason: Optional[str] = None
+    error_message: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class QuestionAnsweringHandler(BaseHandler):
@@ -48,6 +71,28 @@ class QuestionAnsweringHandler(BaseHandler):
         self._reasoning_module = None
         self._audio_module = None
         
+        # Performance monitoring
+        self._performance_metrics = deque(maxlen=500)  # Store last 500 metrics
+        self._metrics_lock = threading.Lock()
+        self._app_performance_stats = defaultdict(lambda: {
+            'attempts': 0,
+            'successes': 0,
+            'total_extraction_time': 0.0,
+            'total_summarization_time': 0.0,
+            'total_response_time': 0.0,
+            'content_sizes': deque(maxlen=50),
+            'fallback_reasons': defaultdict(int),
+            'last_success_time': 0.0
+        })
+        
+        # Health check status
+        self._last_health_check = 0.0
+        self._health_check_interval = 300.0  # 5 minutes
+        self._browser_handler_available = None
+        self._pdf_handler_available = None
+        self._reasoning_module_available = None
+        self._last_performance_log = time.time()
+        
         # Performance tracking
         self._fast_path_attempts = 0
         self._fast_path_successes = 0
@@ -73,6 +118,11 @@ class QuestionAnsweringHandler(BaseHandler):
         """
         # Start execution timing and logging
         start_time = self._log_execution_start(command, context)
+        
+        # Periodically log system performance impact
+        if time.time() - self._last_performance_log > 600:  # Every 10 minutes
+            self.log_system_performance_impact()
+            self._last_performance_log = time.time()
         
         try:
             # Validate the command
@@ -562,6 +612,9 @@ class QuestionAnsweringHandler(BaseHandler):
             # Calculate execution time
             fallback_time = time.time() - fallback_start_time
             
+            # Log fallback performance
+            self._log_fallback_performance(fallback_reason, fallback_time, success, screen_context.get("app_name"))
+            
             # Create result with comprehensive metadata
             result = self._create_success_result(
                 answer,
@@ -583,6 +636,9 @@ class QuestionAnsweringHandler(BaseHandler):
         except Exception as e:
             fallback_time = time.time() - fallback_start_time
             self.logger.error(f"Vision fallback failed after {fallback_time:.2f}s: {e}")
+            
+            # Log fallback performance (failed)
+            self._log_fallback_performance(fallback_reason, fallback_time, False)
             
             # Provide error feedback (matching existing behavior)
             error_message = "I encountered an error while trying to answer your question. Please try again."
@@ -1930,4 +1986,445 @@ Please provide a summary that I can speak to the user as a direct response to th
                 words = truncated.split()
                 formatted = ' '.join(words[:-1]) + '.'
         
-        return formatted.strip()
+        return formatted.strip()   
+ 
+    def _log_fast_path_performance(self, app_info: 'ApplicationInfo', extraction_method: str, 
+                                 extraction_time: float, summarization_time: float, 
+                                 total_time: float, content_size: int, summary_size: int) -> None:
+        """
+        Log detailed performance metrics for fast path execution.
+        
+        Args:
+            app_info: Application information
+            extraction_method: Method used for content extraction
+            extraction_time: Time taken for content extraction
+            summarization_time: Time taken for summarization
+            total_time: Total execution time
+            content_size: Size of extracted content in characters
+            summary_size: Size of summary in characters
+        """
+        try:
+            # Create performance metric
+            metric = QuestionAnsweringMetric(
+                app_name=app_info.name,
+                app_type=app_info.app_type.value if app_info.app_type else "unknown",
+                extraction_method=extraction_method,
+                total_execution_time=total_time,
+                extraction_time=extraction_time,
+                summarization_time=summarization_time,
+                content_size=content_size,
+                summary_size=summary_size,
+                success=True,
+                fast_path_used=True,
+                metadata={
+                    'browser_type': app_info.browser_type.value if hasattr(app_info, 'browser_type') and app_info.browser_type else None,
+                    'meets_5s_target': total_time <= 5.0,
+                    'extraction_efficiency': content_size / extraction_time if extraction_time > 0 else 0,
+                    'summarization_efficiency': summary_size / summarization_time if summarization_time > 0 else 0
+                }
+            )
+            
+            # Store metric
+            with self._metrics_lock:
+                self._performance_metrics.append(metric)
+            
+            # Update application-specific statistics
+            app_stats = self._app_performance_stats[app_info.name]
+            app_stats['attempts'] += 1
+            app_stats['successes'] += 1
+            app_stats['total_extraction_time'] += extraction_time
+            app_stats['total_summarization_time'] += summarization_time
+            app_stats['total_response_time'] += total_time
+            app_stats['content_sizes'].append(content_size)
+            app_stats['last_success_time'] = time.time()
+            
+            # Log performance details
+            self.logger.info(f"Fast path performance - App: {app_info.name}, Method: {extraction_method}, "
+                           f"Total: {total_time:.2f}s, Extract: {extraction_time:.2f}s, "
+                           f"Summarize: {summarization_time:.2f}s, Content: {content_size} chars, "
+                           f"Summary: {summary_size} chars, Target met: {total_time <= 5.0}")
+            
+            # Log efficiency metrics
+            extraction_efficiency = content_size / extraction_time if extraction_time > 0 else 0
+            summarization_efficiency = summary_size / summarization_time if summarization_time > 0 else 0
+            self.logger.debug(f"Efficiency metrics - Extraction: {extraction_efficiency:.0f} chars/s, "
+                            f"Summarization: {summarization_efficiency:.0f} chars/s")
+            
+        except Exception as e:
+            self.logger.error(f"Error logging fast path performance: {e}")
+    
+    def _log_fallback_performance(self, fallback_reason: str, fallback_time: float, 
+                                success: bool, app_name: Optional[str] = None) -> None:
+        """
+        Log performance metrics for fallback to vision processing.
+        
+        Args:
+            fallback_reason: Reason for fallback
+            fallback_time: Time taken for fallback processing
+            success: Whether fallback was successful
+            app_name: Name of the application (if known)
+        """
+        try:
+            # Create performance metric
+            metric = QuestionAnsweringMetric(
+                app_name=app_name or "unknown",
+                extraction_method="vision_fallback",
+                total_execution_time=fallback_time,
+                success=success,
+                fast_path_used=False,
+                fallback_reason=fallback_reason,
+                metadata={
+                    'fallback_triggered': True,
+                    'meets_5s_target': fallback_time <= 5.0,
+                    'fallback_category': self._categorize_fallback_reason(fallback_reason)
+                }
+            )
+            
+            # Store metric
+            with self._metrics_lock:
+                self._performance_metrics.append(metric)
+            
+            # Update application-specific statistics
+            if app_name:
+                app_stats = self._app_performance_stats[app_name]
+                app_stats['attempts'] += 1
+                app_stats['fallback_reasons'][fallback_reason] += 1
+                if success:
+                    app_stats['successes'] += 1
+                    app_stats['total_response_time'] += fallback_time
+            
+            # Log fallback performance
+            self.logger.info(f"Fallback performance - Reason: {fallback_reason}, "
+                           f"Time: {fallback_time:.2f}s, Success: {success}, "
+                           f"App: {app_name or 'unknown'}")
+            
+        except Exception as e:
+            self.logger.error(f"Error logging fallback performance: {e}")
+    
+    def _categorize_fallback_reason(self, reason: str) -> str:
+        """Categorize fallback reasons for analysis."""
+        reason_lower = reason.lower()
+        if "application_detection" in reason_lower:
+            return "detection_failure"
+        elif "unsupported_application" in reason_lower:
+            return "unsupported_app"
+        elif "timeout" in reason_lower:
+            return "timeout"
+        elif "extraction" in reason_lower:
+            return "extraction_failure"
+        elif "validation" in reason_lower:
+            return "content_validation"
+        else:
+            return "other"
+    
+    def get_performance_statistics(self, time_window_minutes: int = 60) -> Dict[str, Any]:
+        """
+        Get comprehensive performance statistics for the specified time window.
+        
+        Args:
+            time_window_minutes: Time window in minutes for statistics
+            
+        Returns:
+            Dictionary containing performance statistics
+        """
+        cutoff_time = time.time() - (time_window_minutes * 60)
+        
+        with self._metrics_lock:
+            # Filter metrics within time window
+            recent_metrics = [m for m in self._performance_metrics if m.timestamp >= cutoff_time]
+            
+            if not recent_metrics:
+                return {
+                    'time_window_minutes': time_window_minutes,
+                    'total_requests': 0,
+                    'fast_path_success_rate': 0.0,
+                    'avg_response_time': 0.0,
+                    'target_compliance_rate': 0.0,
+                    'fallback_rate': 0.0,
+                    'app_performance': {},
+                    'extraction_methods': {},
+                    'fallback_reasons': {},
+                    'health_status': self._get_health_status()
+                }
+            
+            # Calculate overall statistics
+            total_requests = len(recent_metrics)
+            fast_path_requests = [m for m in recent_metrics if m.fast_path_used]
+            successful_fast_path = [m for m in fast_path_requests if m.success]
+            fallback_requests = [m for m in recent_metrics if not m.fast_path_used]
+            target_compliant = [m for m in recent_metrics if m.total_execution_time <= 5.0]
+            
+            fast_path_success_rate = (len(successful_fast_path) / len(fast_path_requests) * 100) if fast_path_requests else 0
+            avg_response_time = sum(m.total_execution_time for m in recent_metrics) / total_requests
+            target_compliance_rate = (len(target_compliant) / total_requests * 100) if total_requests > 0 else 0
+            fallback_rate = (len(fallback_requests) / total_requests * 100) if total_requests > 0 else 0
+            
+            # Extraction method breakdown
+            extraction_methods = defaultdict(lambda: {'count': 0, 'success_count': 0, 'avg_time': 0.0})
+            for metric in recent_metrics:
+                method = metric.extraction_method or 'unknown'
+                extraction_methods[method]['count'] += 1
+                if metric.success:
+                    extraction_methods[method]['success_count'] += 1
+                extraction_methods[method]['avg_time'] = (
+                    (extraction_methods[method]['avg_time'] * (extraction_methods[method]['count'] - 1) + 
+                     metric.total_execution_time) / extraction_methods[method]['count']
+                )
+            
+            # Fallback reason analysis
+            fallback_reasons = defaultdict(int)
+            for metric in fallback_requests:
+                if metric.fallback_reason:
+                    fallback_reasons[metric.fallback_reason] += 1
+            
+            # Application performance breakdown
+            app_performance = {}
+            for app_name, stats in self._app_performance_stats.items():
+                if stats['attempts'] > 0:
+                    app_metrics = [m for m in recent_metrics if m.app_name == app_name]
+                    if app_metrics:
+                        app_fast_path = [m for m in app_metrics if m.fast_path_used and m.success]
+                        app_performance[app_name] = {
+                            'total_attempts': len(app_metrics),
+                            'fast_path_successes': len(app_fast_path),
+                            'success_rate': (len([m for m in app_metrics if m.success]) / len(app_metrics) * 100),
+                            'avg_response_time': sum(m.total_execution_time for m in app_metrics) / len(app_metrics),
+                            'avg_content_size': sum(m.content_size for m in app_metrics if m.content_size > 0) / max(1, len([m for m in app_metrics if m.content_size > 0])),
+                            'last_success_time': stats['last_success_time']
+                        }
+            
+            return {
+                'timestamp': time.time(),
+                'time_window_minutes': time_window_minutes,
+                'total_requests': total_requests,
+                'fast_path_requests': len(fast_path_requests),
+                'fast_path_success_rate': fast_path_success_rate,
+                'avg_response_time': avg_response_time,
+                'target_compliance_rate': target_compliance_rate,
+                'fallback_rate': fallback_rate,
+                'extraction_methods': dict(extraction_methods),
+                'fallback_reasons': dict(fallback_reasons),
+                'app_performance': app_performance,
+                'health_status': self._get_health_status(),
+                'performance_trends': self._analyze_performance_trends(recent_metrics)
+            }
+    
+    def _analyze_performance_trends(self, metrics: list) -> Dict[str, Any]:
+        """Analyze performance trends from metrics."""
+        if len(metrics) < 10:
+            return {'trend': 'insufficient_data', 'confidence': 0.0}
+        
+        # Split metrics into two halves for trend analysis
+        mid_point = len(metrics) // 2
+        older_metrics = metrics[:mid_point]
+        newer_metrics = metrics[mid_point:]
+        
+        older_avg_time = sum(m.total_execution_time for m in older_metrics) / len(older_metrics)
+        newer_avg_time = sum(m.total_execution_time for m in newer_metrics) / len(newer_metrics)
+        
+        older_success_rate = sum(1 for m in older_metrics if m.success) / len(older_metrics) * 100
+        newer_success_rate = sum(1 for m in newer_metrics if m.success) / len(newer_metrics) * 100
+        
+        # Determine trend
+        time_improvement = (older_avg_time - newer_avg_time) / older_avg_time * 100 if older_avg_time > 0 else 0
+        success_improvement = newer_success_rate - older_success_rate
+        
+        if time_improvement > 10 and success_improvement > 5:
+            trend = 'improving'
+        elif time_improvement < -10 or success_improvement < -5:
+            trend = 'degrading'
+        else:
+            trend = 'stable'
+        
+        return {
+            'trend': trend,
+            'time_improvement_percent': time_improvement,
+            'success_rate_change': success_improvement,
+            'confidence': min(len(metrics) / 50.0, 1.0)  # Higher confidence with more data
+        }
+    
+    def _get_health_status(self) -> Dict[str, Any]:
+        """
+        Get health check status for browser and PDF handlers.
+        
+        Returns:
+            Dictionary containing health status information
+        """
+        current_time = time.time()
+        
+        # Perform health check if needed
+        if current_time - self._last_health_check > self._health_check_interval:
+            self._perform_health_check()
+            self._last_health_check = current_time
+        
+        return {
+            'browser_handler_available': self._browser_handler_available,
+            'pdf_handler_available': self._pdf_handler_available,
+            'reasoning_module_available': self._reasoning_module_available,
+            'last_health_check': self._last_health_check,
+            'health_check_interval': self._health_check_interval,
+            'overall_health': self._calculate_overall_health()
+        }
+    
+    def _perform_health_check(self) -> None:
+        """Perform health checks on required modules."""
+        try:
+            # Check browser handler availability
+            try:
+                if not self._browser_handler:
+                    from modules.browser_accessibility import BrowserAccessibilityHandler
+                    self._browser_handler = BrowserAccessibilityHandler()
+                
+                # Test basic functionality
+                self._browser_handler_available = hasattr(self._browser_handler, 'get_page_text_content')
+                self.logger.debug(f"Browser handler health check: {'✅' if self._browser_handler_available else '❌'}")
+                
+            except Exception as e:
+                self._browser_handler_available = False
+                self.logger.warning(f"Browser handler health check failed: {e}")
+            
+            # Check PDF handler availability
+            try:
+                if not self._pdf_handler:
+                    from modules.pdf_handler import PDFHandler
+                    self._pdf_handler = PDFHandler()
+                
+                # Test basic functionality
+                self._pdf_handler_available = hasattr(self._pdf_handler, 'extract_text_from_open_document')
+                self.logger.debug(f"PDF handler health check: {'✅' if self._pdf_handler_available else '❌'}")
+                
+            except Exception as e:
+                self._pdf_handler_available = False
+                self.logger.warning(f"PDF handler health check failed: {e}")
+            
+            # Check reasoning module availability
+            try:
+                if not self._reasoning_module:
+                    from modules.reasoning import ReasoningModule
+                    self._reasoning_module = ReasoningModule()
+                
+                # Test basic functionality
+                self._reasoning_module_available = hasattr(self._reasoning_module, 'process_query')
+                self.logger.debug(f"Reasoning module health check: {'✅' if self._reasoning_module_available else '❌'}")
+                
+            except Exception as e:
+                self._reasoning_module_available = False
+                self.logger.warning(f"Reasoning module health check failed: {e}")
+                
+        except Exception as e:
+            self.logger.error(f"Health check failed: {e}")
+            # Set all to False on general failure
+            self._browser_handler_available = False
+            self._pdf_handler_available = False
+            self._reasoning_module_available = False
+    
+    def _calculate_overall_health(self) -> str:
+        """Calculate overall system health status."""
+        available_count = sum([
+            self._browser_handler_available or False,
+            self._pdf_handler_available or False,
+            self._reasoning_module_available or False
+        ])
+        
+        if available_count == 3:
+            return "excellent"
+        elif available_count == 2:
+            return "good"
+        elif available_count == 1:
+            return "degraded"
+        else:
+            return "critical"
+    
+    def log_system_performance_impact(self) -> None:
+        """Log overall system performance impact of fast path implementation."""
+        try:
+            stats = self.get_performance_statistics(time_window_minutes=60)
+            
+            # Calculate performance impact metrics
+            total_requests = stats.get('total_requests', 0)
+            fast_path_requests = stats.get('fast_path_requests', 0)
+            fast_path_rate = (fast_path_requests / total_requests * 100) if total_requests > 0 else 0
+            avg_response_time = stats.get('avg_response_time', 0.0)
+            target_compliance = stats.get('target_compliance_rate', 0.0)
+            
+            # Estimate time savings (assuming vision fallback takes ~15 seconds on average)
+            estimated_vision_time = 15.0
+            time_saved = fast_path_requests * (estimated_vision_time - avg_response_time) if avg_response_time < estimated_vision_time else 0
+            
+            # Log comprehensive performance impact
+            self.logger.info(f"System Performance Impact Summary:")
+            self.logger.info(f"  Total requests (60min): {total_requests}")
+            self.logger.info(f"  Fast path usage: {fast_path_rate:.1f}%")
+            self.logger.info(f"  Average response time: {avg_response_time:.2f}s")
+            self.logger.info(f"  5-second target compliance: {target_compliance:.1f}%")
+            self.logger.info(f"  Estimated time saved: {time_saved:.1f}s")
+            self.logger.info(f"  System health: {stats['health_status']['overall_health']}")
+            
+            # Log application-specific performance
+            if stats['app_performance']:
+                self.logger.info("  Application Performance:")
+                for app_name, app_stats in stats['app_performance'].items():
+                    self.logger.info(f"    {app_name}: {app_stats['success_rate']:.1f}% success, "
+                                   f"{app_stats['avg_response_time']:.2f}s avg time")
+            
+            # Log fallback analysis
+            if stats['fallback_reasons']:
+                self.logger.info("  Top fallback reasons:")
+                sorted_reasons = sorted(stats['fallback_reasons'].items(), key=lambda x: x[1], reverse=True)
+                for reason, count in sorted_reasons[:3]:
+                    self.logger.info(f"    {reason}: {count} occurrences")
+                    
+        except Exception as e:
+            self.logger.error(f"Error logging system performance impact: {e}")
+    
+    def get_performance_recommendations(self) -> List[str]:
+        """
+        Get performance improvement recommendations based on current metrics.
+        
+        Returns:
+            List of recommendation strings
+        """
+        recommendations = []
+        
+        try:
+            stats = self.get_performance_statistics(time_window_minutes=60)
+            
+            # Check success rate
+            if stats['fast_path_success_rate'] < 70:
+                recommendations.append("Fast path success rate is low - consider updating application detection strategies")
+            
+            # Check response time
+            if stats['avg_response_time'] > 3.0:
+                recommendations.append("Average response time is high - consider optimizing content extraction or summarization")
+            
+            # Check target compliance
+            if stats['target_compliance_rate'] < 80:
+                recommendations.append("5-second target compliance is low - review timeout settings and processing efficiency")
+            
+            # Check fallback rate
+            if stats['fallback_rate'] > 50:
+                recommendations.append("High fallback rate detected - investigate application compatibility issues")
+            
+            # Check health status
+            health = stats['health_status']['overall_health']
+            if health in ['degraded', 'critical']:
+                recommendations.append(f"System health is {health} - run diagnostics and check module availability")
+            
+            # Application-specific recommendations
+            for app_name, app_stats in stats['app_performance'].items():
+                if app_stats['success_rate'] < 50:
+                    recommendations.append(f"Low success rate for {app_name} - develop app-specific optimization")
+            
+            # Trend-based recommendations
+            trends = stats.get('performance_trends', {})
+            if trends.get('trend') == 'degrading':
+                recommendations.append("Performance is degrading over time - investigate recent system changes")
+            
+            if not recommendations:
+                recommendations.append("Performance is within acceptable parameters - no immediate action needed")
+                
+        except Exception as e:
+            self.logger.error(f"Error generating performance recommendations: {e}")
+            recommendations.append("Unable to generate recommendations due to analysis error")
+        
+        return recommendations
