@@ -56,7 +56,7 @@
   - Add logging to track fallback reasons and frequency for monitoring
   - _Requirements: 1.4, 2.4, 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 8. Update orchestrator intent routing
+- [x] 8. Update orchestrator intent routing
 
   - Modify `_get_handler_for_intent()` method in orchestrator.py to route 'question_answering' intent to QuestionAnsweringHandler
   - Remove question answering logic from existing `answer_question()` method in orchestrator

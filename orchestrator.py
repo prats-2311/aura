@@ -222,6 +222,12 @@ class Orchestrator:
     
     def _initialize_handlers(self):
         """Initialize command handlers for the new modular architecture."""
+        # Initialize handlers to None first
+        self.gui_handler = None
+        self.conversation_handler = None
+        self.deferred_action_handler = None
+        self.question_answering_handler = None
+        
         try:
             # Import handler classes
             from handlers.gui_handler import GUIHandler
@@ -229,29 +235,48 @@ class Orchestrator:
             from handlers.deferred_action_handler import DeferredActionHandler
             from handlers.question_answering_handler import QuestionAnsweringHandler
             
-            # Initialize handlers with orchestrator reference
-            self.gui_handler = GUIHandler(self)
-            self.conversation_handler = ConversationHandler(self)
-            self.deferred_action_handler = DeferredActionHandler(self)
-            self.question_answering_handler = QuestionAnsweringHandler(self)
+            # Initialize handlers with orchestrator reference and individual error handling
+            try:
+                self.gui_handler = GUIHandler(self)
+                logger.debug("GUIHandler initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize GUIHandler: {e}")
             
-            logger.info("Command handlers initialized successfully")
+            try:
+                self.conversation_handler = ConversationHandler(self)
+                logger.debug("ConversationHandler initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize ConversationHandler: {e}")
+            
+            try:
+                self.deferred_action_handler = DeferredActionHandler(self)
+                logger.debug("DeferredActionHandler initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize DeferredActionHandler: {e}")
+            
+            try:
+                self.question_answering_handler = QuestionAnsweringHandler(self)
+                logger.debug("QuestionAnsweringHandler initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize QuestionAnsweringHandler: {e}")
+                logger.warning("Question answering will fall back to legacy orchestrator method")
+            
+            # Log overall initialization status
+            initialized_handlers = []
+            if self.gui_handler: initialized_handlers.append("GUIHandler")
+            if self.conversation_handler: initialized_handlers.append("ConversationHandler")
+            if self.deferred_action_handler: initialized_handlers.append("DeferredActionHandler")
+            if self.question_answering_handler: initialized_handlers.append("QuestionAnsweringHandler")
+            
+            logger.info(f"Command handlers initialized: {', '.join(initialized_handlers) if initialized_handlers else 'None'}")
             
         except ImportError as e:
             logger.error(f"Failed to import handler classes: {e}")
-            # Set handlers to None so we can fall back to legacy methods
-            self.gui_handler = None
-            self.conversation_handler = None
-            self.deferred_action_handler = None
-            self.question_answering_handler = None
+            logger.warning("All handlers will fall back to legacy orchestrator methods")
             
         except Exception as e:
-            logger.error(f"Failed to initialize handlers: {e}")
-            # Set handlers to None so we can fall back to legacy methods
-            self.gui_handler = None
-            self.conversation_handler = None
-            self.deferred_action_handler = None
-            self.question_answering_handler = None
+            logger.error(f"Unexpected error during handler initialization: {e}")
+            logger.warning("Some handlers may not be available")
     
     def _recognize_intent(self, command: str) -> Dict[str, Any]:
         """
@@ -4824,10 +4849,10 @@ class Orchestrator:
     
     def answer_question(self, question: str) -> Dict[str, Any]:
         """
-        Answer a question about screen content using fast path content extraction with vision fallback.
+        Answer a question about screen content.
         
-        This method implements content type detection (browser vs PDF vs other applications)
-        and uses text-based fast path extraction before falling back to vision-based analysis.
+        This method now delegates to the QuestionAnsweringHandler when available,
+        falling back to a basic vision-based approach for backward compatibility.
         
         Args:
             question: User's question about screen content
@@ -4836,7 +4861,7 @@ class Orchestrator:
             Dictionary containing answer and metadata
             
         Raises:
-            OrchestratorError: If question answering fails
+            ValueError: If question is empty
         """
         if not question or not question.strip():
             raise ValueError("Question cannot be empty")
@@ -4846,114 +4871,91 @@ class Orchestrator:
         start_time = time.time()
         
         try:
-            logger.info(f"[{execution_id}] Processing question: '{question}'")
+            logger.info(f"[{execution_id}] Processing question (legacy method): '{question[:50]}...'")
             
-            # Provide thinking feedback
-            self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
-            
-            # Try fast path content extraction first
-            fast_path_result = self._try_fast_path_content_extraction(execution_id, question)
-            
-            if fast_path_result["success"]:
-                logger.info(f"[{execution_id}] Fast path extraction successful, using text-based analysis")
-                answer = fast_path_result["answer"]
-                method_used = fast_path_result["method"]
-                content_length = fast_path_result.get("content_length", 0)
+            # Use QuestionAnsweringHandler if available
+            if self.question_answering_handler:
+                logger.debug(f"[{execution_id}] Delegating to QuestionAnsweringHandler")
                 
-                # Provide the answer via TTS and console output
-                print(f"\n🤖 AURA: {answer}\n")
-                logger.info(f"[{execution_id}] AURA Response (via {method_used}): {answer}")
-                self.feedback_module.speak(answer, FeedbackPriority.NORMAL)
-                
-                # Format result with fast path metadata
-                result = {
+                # Create context for handler
+                handler_context = {
                     "execution_id": execution_id,
-                    "question": question,
-                    "answer": answer,
-                    "status": "completed",
-                    "duration": time.time() - start_time,
-                    "success": True,
-                    "metadata": {
-                        "method": method_used,
-                        "content_length": content_length,
-                        "fast_path_used": True,
-                        "vision_fallback_used": False,
-                        "timestamp": start_time,
-                        "extraction_time": fast_path_result.get("extraction_time", 0)
+                    "intent": {
+                        "intent": "question_answering",
+                        "confidence": 0.9,
+                        "parameters": {
+                            "action_type": "general_question",
+                            "target": question,
+                            "content_type": "explanation"
+                        },
+                        "reasoning": "Direct question answering call"
                     }
                 }
                 
-                logger.info(f"[{execution_id}] Question answered successfully via fast path ({method_used})")
+                # Call the QuestionAnsweringHandler
+                result = self.question_answering_handler.handle(question, handler_context)
+                
+                # Convert handler result to legacy format if needed
+                if "execution_id" not in result:
+                    result["execution_id"] = execution_id
+                if "question" not in result:
+                    result["question"] = question
+                if "duration" not in result:
+                    result["duration"] = time.time() - start_time
+                
+                logger.info(f"[{execution_id}] Question answered via QuestionAnsweringHandler")
                 return result
             
-            # Fast path failed, fall back to vision-based analysis
-            logger.info(f"[{execution_id}] Fast path failed ({fast_path_result.get('reason', 'unknown')}), falling back to vision analysis")
+            # Fallback to basic vision-based approach
+            logger.warning(f"[{execution_id}] QuestionAnsweringHandler not available, using basic vision fallback")
             
-            # Determine analysis type based on question
-            analysis_type = self._determine_analysis_type_for_question(question)
+            # Provide thinking feedback
+            if self.feedback_module:
+                self.feedback_module.play("thinking", FeedbackPriority.NORMAL)
             
-            # Capture and analyze screen for information extraction
-            logger.info(f"[{execution_id}] Analyzing screen for information extraction (type: {analysis_type})")
-            screen_context = self._analyze_screen_for_information(execution_id, analysis_type)
-            
-            # Create a specialized reasoning prompt for Q&A with enhanced context
-            qa_command = self._create_qa_reasoning_prompt(question, screen_context)
-            
-            # Use reasoning module to generate answer with retry logic
-            logger.info(f"[{execution_id}] Generating answer using reasoning module")
-            action_plan = self._get_qa_action_plan(execution_id, qa_command, screen_context)
-            
-            # Extract and validate answer from action plan
-            logger.debug(f"[{execution_id}] Action plan received: {action_plan}")
-            answer = self._extract_and_validate_answer(action_plan, question)
-            logger.debug(f"[{execution_id}] Extracted answer: '{answer}'")
+            # Basic vision-based fallback
+            answer = self._basic_vision_question_fallback(question, execution_id)
             
             # Provide the answer via TTS and console output
-            if answer and answer != "Information not available":
-                # Print to console for user feedback (since TTS may not be working)
+            if answer:
                 print(f"\n🤖 AURA: {answer}\n")
-                logger.info(f"[{execution_id}] AURA Response: {answer}")
-                self.feedback_module.speak(answer, FeedbackPriority.NORMAL)
+                logger.info(f"[{execution_id}] AURA Response (basic fallback): {answer}")
+                if self.feedback_module:
+                    self.feedback_module.speak(answer, FeedbackPriority.NORMAL)
                 success = True
             else:
-                fallback_answer = "I couldn't find the information you're looking for on the current screen."
-                print(f"\n🤖 AURA: {fallback_answer}\n")
-                logger.info(f"[{execution_id}] AURA Fallback Response: {fallback_answer}")
-                self.feedback_module.speak(fallback_answer, FeedbackPriority.NORMAL)
-                answer = fallback_answer
+                answer = "I couldn't analyze your screen content. Please try again."
+                print(f"\n🤖 AURA: {answer}\n")
+                logger.info(f"[{execution_id}] AURA Fallback Response: {answer}")
+                if self.feedback_module:
+                    self.feedback_module.speak(answer, FeedbackPriority.NORMAL)
                 success = False
             
-            # Format result with enhanced metadata
-            result = {
+            # Return result in legacy format
+            return {
                 "execution_id": execution_id,
                 "question": question,
                 "answer": answer,
-                "status": "completed",
+                "status": "completed" if success else "failed",
                 "duration": time.time() - start_time,
                 "success": success,
                 "metadata": {
-                    "method": "vision_analysis",
-                    "screen_elements_analyzed": len(screen_context.get("elements", [])),
-                    "text_blocks_analyzed": len(screen_context.get("text_blocks", [])),
-                    "confidence": action_plan.get("metadata", {}).get("confidence", 0.0),
-                    "fast_path_used": False,
-                    "vision_fallback_used": True,
-                    "fast_path_failure_reason": fast_path_result.get("reason", "unknown"),
-                    "timestamp": start_time,
-                    "screen_resolution": screen_context.get("metadata", {}).get("screen_resolution", [0, 0])
+                    "method": "basic_vision_fallback",
+                    "handler_available": False,
+                    "timestamp": start_time
                 }
             }
-            
-            logger.info(f"[{execution_id}] Question answered successfully via vision fallback: {success}")
-            return result
             
         except Exception as e:
             logger.error(f"[{execution_id}] Question answering failed: {e}")
             
             # Provide error feedback
-            self.feedback_module.play("failure", FeedbackPriority.HIGH)
-            error_message = f"I encountered an error while trying to answer your question: {str(e)}"
-            self.feedback_module.speak(error_message, FeedbackPriority.HIGH)
+            if self.feedback_module:
+                self.feedback_module.play("failure", FeedbackPriority.HIGH)
+                error_message = f"I encountered an error while trying to answer your question: {str(e)}"
+                self.feedback_module.speak(error_message, FeedbackPriority.HIGH)
+            else:
+                error_message = "I encountered an error while trying to answer your question."
             
             # Return error result
             return {
@@ -4966,13 +4968,58 @@ class Orchestrator:
                 "error": str(e),
                 "metadata": {
                     "timestamp": start_time,
-                    "information_extraction_mode": True
+                    "method": "error_fallback"
                 }
             }
     
+    def _basic_vision_question_fallback(self, question: str, execution_id: str) -> Optional[str]:
+        """
+        Basic vision-based fallback for question answering when QuestionAnsweringHandler is not available.
+        
+        This provides minimal functionality to maintain backward compatibility.
+        
+        Args:
+            question: The user's question
+            execution_id: Execution ID for logging
+            
+        Returns:
+            Basic answer string or None if failed
+        """
+        try:
+            logger.debug(f"[{execution_id}] Using basic vision fallback for question answering")
+            
+            # Check if vision module is available
+            if not self.vision_module or not self.module_availability.get('vision', False):
+                logger.warning(f"[{execution_id}] Vision module not available for basic fallback")
+                return None
+            
+            # Simple screen description
+            screen_description = self.vision_module.describe_screen(analysis_type="simple")
+            
+            if not screen_description:
+                logger.warning(f"[{execution_id}] Failed to get screen description")
+                return None
+            
+            # Extract text content if available
+            screen_text = screen_description.get("text_content", "")
+            if screen_text and len(screen_text.strip()) > 20:
+                return f"I can see text content on your screen. The main content appears to be: {screen_text[:200]}..."
+            
+            # Fallback to basic description
+            elements = screen_description.get("elements", [])
+            if elements:
+                element_count = len(elements)
+                return f"I can see {element_count} elements on your screen, but I need the QuestionAnsweringHandler for detailed analysis."
+            
+            return "I can see your screen but need the QuestionAnsweringHandler for detailed question answering."
+            
+        except Exception as e:
+            logger.error(f"[{execution_id}] Basic vision fallback failed: {e}")
+            return None
+    
     def _route_to_question_answering(self, question: str, execution_context: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Route question to information extraction mode.
+        Route question to information extraction mode using QuestionAnsweringHandler.
         
         Args:
             question: User's question
@@ -4984,18 +5031,45 @@ class Orchestrator:
         execution_id = execution_context["execution_id"]
         
         try:
-            logger.info(f"[{execution_id}] Processing question in information extraction mode")
+            logger.info(f"[{execution_id}] Processing question using QuestionAnsweringHandler")
             
-            # Call the answer_question method
-            qa_result = self.answer_question(question)
+            # Ensure execution context has required fields
+            execution_context["command"] = question
+            if "warnings" not in execution_context:
+                execution_context["warnings"] = []
             
-            # Convert Q&A result to execution result format
-            execution_context["status"] = CommandStatus.COMPLETED if qa_result["success"] else CommandStatus.FAILED
+            # Use QuestionAnsweringHandler if available, otherwise fallback to legacy method
+            if self.question_answering_handler:
+                # Create context for handler
+                handler_context = {
+                    "execution_id": execution_id,
+                    "intent": {
+                        "intent": "question_answering",
+                        "confidence": 0.9,
+                        "parameters": {
+                            "action_type": "general_question",
+                            "target": question,
+                            "content_type": "explanation"
+                        },
+                        "reasoning": "Direct question answering call"
+                    }
+                }
+                
+                # Call the QuestionAnsweringHandler
+                qa_result = self.question_answering_handler.handle(question, handler_context)
+                
+            else:
+                logger.warning(f"[{execution_id}] QuestionAnsweringHandler not available, falling back to legacy method")
+                # Fallback to legacy answer_question method
+                qa_result = self.answer_question(question)
+            
+            # Convert handler result to execution result format
+            execution_context["status"] = CommandStatus.COMPLETED if qa_result.get("success", False) else CommandStatus.FAILED
             execution_context["end_time"] = time.time()
             execution_context["total_duration"] = execution_context["end_time"] - execution_context["start_time"]
             execution_context["steps_completed"] = ["validation", "perception", "reasoning"]
             
-            if qa_result["success"]:
+            if qa_result.get("success", False):
                 execution_context["qa_result"] = qa_result
                 self._update_progress(execution_id, CommandStatus.COMPLETED, progress_percentage=100)
             else:
