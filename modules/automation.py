@@ -838,19 +838,36 @@ class AutomationModule:
         Returns:
             bool: True if typing succeeded, False otherwise
         """
+        import threading
+        import time
+        
+        # Set overall timeout for the entire multiline operation
+        overall_timeout = 15 if fast_path else 30  # Generous but not unlimited
+        path_type = "FAST" if fast_path else "SLOW"
+        start_time = time.time()
+        
         try:
+            logger.debug(f"cliclick {path_type} PATH: Starting multiline typing with {overall_timeout}s overall timeout")
             lines = text.split('\n')
             path_type = "FAST" if fast_path else "SLOW"
             
             logger.debug(f"cliclick {path_type} PATH: Typing {len(lines)} lines with preserved formatting")
             
-            # Increase timeout for better reliability - the main issue is timeout being too short
-            base_timeout = 5 if fast_path else 10  # Increased from 3/5 to 5/10
-            line_timeout = max(2, min(base_timeout, len(text) // 50))  # More generous timeout scaling
+            # Set timeout based on path type and content size - more generous for reliability
+            base_timeout = 5 if fast_path else 10  # Increased base timeouts
+            line_timeout = max(3, min(base_timeout, len(text) // 30))  # More generous scaling and minimum
             
             for i, line in enumerate(lines):
+                # Check overall timeout before each operation
+                elapsed_time = time.time() - start_time
+                if elapsed_time > overall_timeout:
+                    logger.error(f"cliclick {path_type} PATH: Overall timeout ({overall_timeout}s) exceeded at line {i+1}")
+                    return False
+                
                 # Type the line content (including empty lines for proper spacing)
                 if line.strip():  # Non-empty line
+                    logger.debug(f"cliclick {path_type} PATH: Typing line {i+1}: {repr(line[:50])}{'...' if len(line) > 50 else ''}")
+                    
                     # Use cliclick to type the line with increased timeout
                     result = subprocess.run(
                         ['cliclick', f't:{line}'],
@@ -860,44 +877,82 @@ class AutomationModule:
                     )
                     
                     if result.returncode != 0:
-                        logger.warning(f"cliclick {path_type} PATH: Failed to type line {i+1}: {result.stderr}")
+                        logger.error(f"cliclick {path_type} PATH: CRITICAL - Failed to type line {i+1}: {result.stderr}")
                         return False
+                    else:
+                        logger.debug(f"cliclick {path_type} PATH: Successfully typed line {i+1}")
                         
-                    # Slightly longer delay for better reliability
-                    if not fast_path:
-                        time.sleep(0.02)  # Increased from 0.01 to 0.02
+                    # Brief delay after typing each line for better reliability
+                    time.sleep(0.02 if fast_path else 0.03)  # Reduced delays for faster typing
                         
                 else:  # Empty line - just preserve the spacing
                     logger.debug(f"cliclick {path_type} PATH: Preserving empty line {i+1}")
                 
                 # Add newline after each line except the last one
                 if i < len(lines) - 1:
-                    # Use cliclick to press Return key with increased timeout
-                    result = subprocess.run(
-                        ['cliclick', 'kp:return'],
-                        capture_output=True,
-                        text=True,
-                        timeout=3  # Increased from 2 to 3
-                    )
-                    
-                    if result.returncode != 0:
-                        logger.warning(f"cliclick {path_type} PATH: Failed to press Return after line {i+1}: {result.stderr}")
+                    # Check overall timeout before Return key operations
+                    elapsed_time = time.time() - start_time
+                    if elapsed_time > overall_timeout:
+                        logger.error(f"cliclick {path_type} PATH: Overall timeout ({overall_timeout}s) exceeded before Return key {i+1}")
                         return False
                     
-                    # Slightly longer delay for proper line processing
-                    if not fast_path:
-                        time.sleep(0.02)  # Increased from 0.01 to 0.02
+                    logger.debug(f"cliclick {path_type} PATH: Pressing Return after line {i+1}")
+                    
+                    # Retry Return key press up to 3 times for reliability
+                    return_success = False
+                    for retry in range(3):
+                        # Check timeout before each retry
+                        elapsed_time = time.time() - start_time
+                        if elapsed_time > overall_timeout:
+                            logger.error(f"cliclick {path_type} PATH: Overall timeout ({overall_timeout}s) exceeded during Return key retry {retry+1}")
+                            return False
+                        
+                        try:
+                            result = subprocess.run(
+                                ['cliclick', 'kp:return'],
+                                capture_output=True,
+                                text=True,
+                                timeout=5  # Increased timeout for better reliability
+                            )
+                            
+                            if result.returncode == 0:
+                                logger.debug(f"cliclick {path_type} PATH: Successfully pressed Return after line {i+1} (attempt {retry+1})")
+                                return_success = True
+                                break
+                            else:
+                                logger.warning(f"cliclick {path_type} PATH: Return key attempt {retry+1} failed: {result.stderr}")
+                                if retry < 2:  # Not the last attempt
+                                    time.sleep(0.1)  # Brief delay before retry
+                                    
+                        except subprocess.TimeoutExpired:
+                            logger.warning(f"cliclick {path_type} PATH: Return key attempt {retry+1} timed out")
+                            if retry < 2:  # Not the last attempt
+                                time.sleep(0.1)  # Brief delay before retry
+                        except Exception as e:
+                            logger.warning(f"cliclick {path_type} PATH: Return key attempt {retry+1} error: {e}")
+                            if retry < 2:  # Not the last attempt
+                                time.sleep(0.1)  # Brief delay before retry
+                    
+                    if not return_success:
+                        logger.error(f"cliclick {path_type} PATH: CRITICAL - All Return key attempts failed after line {i+1}")
+                        logger.error(f"cliclick {path_type} PATH: This will cause newlines to be missing in output")
+                        return False
+                    
+                    # Brief delay after Return key for proper line processing
+                    time.sleep(0.02 if fast_path else 0.05)  # Reduced delays for faster typing
             
-            logger.debug(f"cliclick {path_type} PATH: Successfully typed {len(lines)} lines with preserved formatting")
+            # Final timeout check
+            elapsed_time = time.time() - start_time
+            logger.debug(f"cliclick {path_type} PATH: Successfully typed {len(lines)} lines with preserved formatting in {elapsed_time:.2f}s")
             return True
             
         except subprocess.TimeoutExpired:
-            path_type = "FAST" if fast_path else "SLOW"
-            logger.error(f"cliclick {path_type} PATH: Multi-line typing timed out - consider using AppleScript for very long content")
+            elapsed_time = time.time() - start_time
+            logger.error(f"cliclick {path_type} PATH: Individual operation timed out during multiline typing after {elapsed_time:.2f}s")
             return False
         except Exception as e:
-            path_type = "FAST" if fast_path else "SLOW"
-            logger.error(f"cliclick {path_type} PATH: Multi-line typing failed with exception: {e}")
+            elapsed_time = time.time() - start_time
+            logger.error(f"cliclick {path_type} PATH: Multiline typing failed with exception after {elapsed_time:.2f}s: {e}")
             return False
     
     def _cliclick_scroll(self, direction: str, amount: int, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:

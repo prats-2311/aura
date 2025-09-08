@@ -52,6 +52,7 @@ class QuestionAnsweringHandler(BaseHandler):
         self._fast_path_attempts = 0
         self._fast_path_successes = 0
         self._fallback_count = 0
+        self._last_fallback_reason = "unknown"
     
     def handle(self, command: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -86,7 +87,7 @@ class QuestionAnsweringHandler(BaseHandler):
             self.logger.info(f"Processing question answering command: '{command[:50]}...'")
             
             # Try fast path first
-            fast_path_result = self._try_fast_path(command)
+            fast_path_result, fallback_reason = self._try_fast_path_with_reason(command)
             
             if fast_path_result:
                 self.logger.info("Fast path successful, speaking result to user")
@@ -104,10 +105,10 @@ class QuestionAnsweringHandler(BaseHandler):
                 return result
             
             # Fast path failed, fall back to vision processing
-            self.logger.info("Fast path failed, falling back to vision processing")
+            self.logger.info(f"Fast path failed ({fallback_reason}), falling back to vision processing")
             self._fallback_count += 1
             
-            vision_result = self._fallback_to_vision(command)
+            vision_result = self._fallback_to_vision(command, fallback_reason)
             self._log_execution_end(start_time, vision_result, context)
             return vision_result
             
@@ -120,6 +121,43 @@ class QuestionAnsweringHandler(BaseHandler):
             )
             self._log_execution_end(start_time, result, context)
             return result
+    
+    def _try_fast_path_with_reason(self, command: str) -> tuple[Optional[str], str]:
+        """
+        Attempt fast-path content extraction and summarization with fallback reason tracking.
+        
+        This method coordinates the fast path process and returns both the result
+        and the specific reason for fallback if the fast path fails.
+        
+        Args:
+            command: The user command for context
+            
+        Returns:
+            Tuple of (summarized content string if successful or None if failed, fallback reason)
+        """
+        result = self._try_fast_path(command)
+        if result:
+            return result, ""
+        else:
+            # Determine specific fallback reason based on what failed
+            return None, self._determine_fallback_reason()
+    
+    def _determine_fallback_reason(self) -> str:
+        """
+        Determine the specific reason for fast path fallback.
+        
+        This method returns the most recent fallback reason that was set
+        during fast path processing, or a default reason if none was set.
+        
+        Returns:
+            String describing the reason for fallback
+        """
+        reason = getattr(self, '_last_fallback_reason', 'unknown')
+        
+        # Reset the reason for next attempt
+        self._last_fallback_reason = "unknown"
+        
+        return reason
     
     def _try_fast_path(self, command: str) -> Optional[str]:
         """
@@ -148,12 +186,14 @@ class QuestionAnsweringHandler(BaseHandler):
             app_info = self._detect_active_application()
             if not app_info:
                 self.logger.debug("Could not detect active application, falling back to vision")
+                self._last_fallback_reason = "application_detection_failed"
                 return None
             
             # Step 2: Check if application is supported for fast path
             self.logger.debug("Step 2: Checking application support")
             if not self._is_supported_application(app_info):
                 self.logger.debug(f"Application {app_info.name} ({app_info.app_type.value}) not supported for fast path")
+                self._last_fallback_reason = "unsupported_application"
                 return None
             
             # Step 3: Get appropriate extraction method
@@ -161,6 +201,7 @@ class QuestionAnsweringHandler(BaseHandler):
             extraction_method = self._get_extraction_method(app_info)
             if not extraction_method:
                 self.logger.debug("No extraction method available for this application")
+                self._last_fallback_reason = "no_extraction_method"
                 return None
             
             # Step 4: Extract content using the determined method
@@ -173,12 +214,16 @@ class QuestionAnsweringHandler(BaseHandler):
                 content = self._extract_pdf_content()
             else:
                 self.logger.warning(f"Unknown extraction method: {extraction_method}")
+                self._last_fallback_reason = "unknown_extraction_method"
                 return None
             
             extraction_time = time.time() - extraction_start_time
             
             if not content:
                 self.logger.debug(f"Content extraction failed using {extraction_method} method")
+                # Only set generic failure reason if no specific reason was already set
+                if self._last_fallback_reason == "unknown":
+                    self._last_fallback_reason = f"{extraction_method}_extraction_failed"
                 return None
             
             self.logger.info(f"Successfully extracted content using {extraction_method} method ({len(content)} characters) in {extraction_time:.2f}s")
@@ -188,6 +233,7 @@ class QuestionAnsweringHandler(BaseHandler):
             processed_content = self._process_content_for_summarization(content)
             if not processed_content:
                 self.logger.debug("Content processing failed validation")
+                self._last_fallback_reason = "content_validation_failed"
                 return None
             
             # Step 6: Summarize content using reasoning module
@@ -212,6 +258,7 @@ class QuestionAnsweringHandler(BaseHandler):
         except Exception as e:
             fast_path_time = time.time() - fast_path_start_time
             self.logger.error(f"Error in fast path processing after {fast_path_time:.2f}s: {e}")
+            self._last_fallback_reason = "exception_in_fast_path"
             return None
     
     def _extract_browser_content(self) -> Optional[str]:
@@ -274,6 +321,7 @@ class QuestionAnsweringHandler(BaseHandler):
             
             if extraction_thread.is_alive():
                 self.logger.warning("Browser content extraction timed out after 2 seconds")
+                self._last_fallback_reason = "browser_extraction_timeout"
                 return None
             
             # Check for errors
@@ -370,6 +418,7 @@ class QuestionAnsweringHandler(BaseHandler):
             
             if extraction_thread.is_alive():
                 self.logger.warning("PDF content extraction timed out after 2 seconds")
+                self._last_fallback_reason = "pdf_extraction_timeout"
                 return None
             
             # Check for errors
@@ -407,7 +456,7 @@ class QuestionAnsweringHandler(BaseHandler):
             self.logger.error(f"Error in PDF content extraction setup: {e}")
             return None
     
-    def _fallback_to_vision(self, command: str) -> Dict[str, Any]:
+    def _fallback_to_vision(self, command: str, fallback_reason: str = "fast_path_failed") -> Dict[str, Any]:
         """
         Fall back to vision-based question answering.
         
@@ -417,21 +466,513 @@ class QuestionAnsweringHandler(BaseHandler):
         
         Args:
             command: The user command to process with vision
+            fallback_reason: Reason for fallback (for monitoring and logging)
             
         Returns:
             Vision processing result dictionary
         """
-        self.logger.info("Executing vision fallback for question answering")
+        fallback_start_time = time.time()
+        self.logger.info(f"Executing vision fallback for question answering (reason: {fallback_reason})")
         
-        # Placeholder implementation - will be implemented in later tasks
-        # This should call the existing vision-based question answering logic
-        self.logger.debug("Vision fallback not yet implemented")
+        # Track fallback reason for monitoring
+        self._log_fallback_reason(fallback_reason)
         
-        return self._create_error_result(
-            "I'm having trouble processing your question right now. Please try again.",
-            method="vision_fallback",
-            fallback_reason="not_implemented"
-        )
+        try:
+            # Get required modules from orchestrator
+            vision_module = self._get_module_safely('vision_module')
+            reasoning_module = self._get_module_safely('reasoning_module')
+            audio_module = self._get_module_safely('audio_module')
+            
+            if not vision_module:
+                self.logger.error("Vision module not available for fallback")
+                return self._create_error_result(
+                    "I'm having trouble analyzing your screen right now. Please try again.",
+                    method="vision_fallback",
+                    fallback_reason=fallback_reason,
+                    error_type="module_unavailable"
+                )
+            
+            if not reasoning_module:
+                self.logger.error("Reasoning module not available for fallback")
+                return self._create_error_result(
+                    "I'm having trouble processing your question right now. Please try again.",
+                    method="vision_fallback",
+                    fallback_reason=fallback_reason,
+                    error_type="module_unavailable"
+                )
+            
+            # Determine analysis type based on question
+            analysis_type = self._determine_analysis_type_for_question(command)
+            self.logger.debug(f"Using {analysis_type} analysis for vision fallback")
+            
+            # Capture and analyze screen for information extraction
+            self.logger.info("Analyzing screen for information extraction using vision")
+            screen_context = self._analyze_screen_for_information(analysis_type)
+            
+            if not screen_context:
+                self.logger.error("Screen analysis failed during vision fallback")
+                return self._create_error_result(
+                    "I couldn't analyze your screen content. Please try again.",
+                    method="vision_fallback",
+                    fallback_reason=fallback_reason,
+                    error_type="screen_analysis_failed"
+                )
+            
+            # Create a specialized reasoning prompt for Q&A with enhanced context
+            qa_command = self._create_qa_reasoning_prompt(command, screen_context)
+            
+            # Use reasoning module to generate answer with retry logic
+            self.logger.info("Generating answer using reasoning module")
+            action_plan = self._get_qa_action_plan(qa_command, screen_context)
+            
+            if not action_plan:
+                self.logger.error("Failed to get action plan from reasoning module")
+                return self._create_error_result(
+                    "I couldn't process your question. Please try again.",
+                    method="vision_fallback",
+                    fallback_reason=fallback_reason,
+                    error_type="reasoning_failed"
+                )
+            
+            # Extract and validate answer from action plan
+            self.logger.debug(f"Action plan received: {action_plan}")
+            answer = self._extract_and_validate_answer(action_plan, command)
+            self.logger.debug(f"Extracted answer: '{answer}'")
+            
+            # Determine success based on answer quality
+            success = answer and answer != "Information not available" and "couldn't find" not in answer.lower()
+            
+            if not success:
+                # Provide fallback answer
+                answer = "I couldn't find the information you're looking for on the current screen."
+                self.logger.info("Vision fallback provided fallback answer due to low confidence")
+            
+            # Speak the result to the user (maintaining identical user experience)
+            if audio_module:
+                try:
+                    audio_module.speak(answer)
+                    self.logger.debug("Answer spoken to user via audio module")
+                except Exception as e:
+                    self.logger.warning(f"Failed to speak answer: {e}")
+            
+            # Print to console for user feedback (matching existing behavior)
+            print(f"\n🤖 AURA: {answer}\n")
+            self.logger.info(f"AURA Response (via vision fallback): {answer}")
+            
+            # Calculate execution time
+            fallback_time = time.time() - fallback_start_time
+            
+            # Create result with comprehensive metadata
+            result = self._create_success_result(
+                answer,
+                method="vision_fallback",
+                fallback_reason=fallback_reason,
+                extraction_method="vision_analysis",
+                success=success,
+                fallback_time=fallback_time,
+                screen_elements_analyzed=len(screen_context.get("elements", [])),
+                text_blocks_analyzed=len(screen_context.get("text_blocks", [])),
+                confidence=action_plan.get("metadata", {}).get("confidence", 0.0),
+                fast_path_used=False,
+                vision_fallback_used=True
+            )
+            
+            self.logger.info(f"Vision fallback completed successfully in {fallback_time:.2f}s (success: {success})")
+            return result
+            
+        except Exception as e:
+            fallback_time = time.time() - fallback_start_time
+            self.logger.error(f"Vision fallback failed after {fallback_time:.2f}s: {e}")
+            
+            # Provide error feedback (matching existing behavior)
+            error_message = "I encountered an error while trying to answer your question. Please try again."
+            
+            if audio_module:
+                try:
+                    audio_module.speak(error_message)
+                except Exception as audio_error:
+                    self.logger.warning(f"Failed to speak error message: {audio_error}")
+            
+            return self._create_error_result(
+                error_message,
+                error=e,
+                method="vision_fallback",
+                fallback_reason=fallback_reason,
+                fallback_time=fallback_time,
+                error_type="exception"
+            )
+    
+    def _log_fallback_reason(self, reason: str) -> None:
+        """
+        Log fallback reason for monitoring and frequency tracking.
+        
+        This method tracks different types of fallback scenarios to help
+        monitor system performance and identify areas for improvement.
+        
+        Args:
+            reason: The reason for falling back to vision processing
+        """
+        # Initialize fallback reason tracking if not exists
+        if not hasattr(self, '_fallback_reasons'):
+            self._fallback_reasons = {}
+        
+        # Track fallback reason frequency
+        self._fallback_reasons[reason] = self._fallback_reasons.get(reason, 0) + 1
+        
+        # Log the fallback reason
+        self.logger.info(f"Vision fallback triggered - Reason: {reason} (count: {self._fallback_reasons[reason]})")
+        
+        # Log summary of fallback reasons periodically
+        total_fallbacks = sum(self._fallback_reasons.values())
+        if total_fallbacks % 10 == 0:  # Every 10 fallbacks
+            self.logger.info(f"Fallback reason summary (total: {total_fallbacks}): {self._fallback_reasons}")
+    
+    def _determine_analysis_type_for_question(self, question: str) -> str:
+        """
+        Determine the appropriate analysis type for vision-based screen analysis.
+        
+        This method analyzes the question to determine what level of screen
+        analysis is needed for optimal information extraction.
+        
+        Args:
+            question: The user's question
+            
+        Returns:
+            Analysis type string ("simple", "detailed", or "form")
+        """
+        question_lower = question.lower().strip()
+        
+        # Detailed analysis patterns - require comprehensive screen understanding
+        detailed_patterns = [
+            "what are all", "list all", "show me all", "find all",
+            "how many", "count", "compare", "difference between",
+            "which one", "what options", "what choices",
+            "form", "input", "field", "button", "menu"
+        ]
+        
+        # Form analysis patterns - focus on interactive elements
+        form_patterns = [
+            "fill", "enter", "type", "select", "choose",
+            "form", "input", "field", "dropdown", "checkbox",
+            "submit", "save", "login", "sign in"
+        ]
+        
+        # Check for form-specific analysis needs
+        if any(pattern in question_lower for pattern in form_patterns):
+            self.logger.debug("Selected 'form' analysis type for question")
+            return "form"
+        
+        # Check for detailed analysis needs
+        if any(pattern in question_lower for pattern in detailed_patterns):
+            self.logger.debug("Selected 'detailed' analysis type for question")
+            return "detailed"
+        
+        # Default to simple analysis for basic questions
+        self.logger.debug("Selected 'simple' analysis type for question")
+        return "simple"
+    
+    def _analyze_screen_for_information(self, analysis_type: str = "simple") -> Dict[str, Any]:
+        """
+        Analyze screen content specifically for information extraction.
+        
+        This method captures and analyzes the screen using the vision module
+        with appropriate analysis type for the question being asked.
+        
+        Args:
+            analysis_type: Type of analysis ("simple", "detailed", or "form")
+            
+        Returns:
+            Enhanced screen context with information extraction focus
+        """
+        try:
+            # Get vision module
+            vision_module = self._get_module_safely('vision_module')
+            if not vision_module:
+                self.logger.error("Vision module not available for screen analysis")
+                return {}
+            
+            # Capture screen with appropriate analysis type
+            self.logger.info(f"Using {analysis_type} analysis for screen capture")
+            screen_context = vision_module.describe_screen(analysis_type=analysis_type)
+            
+            if not screen_context:
+                self.logger.warning("Vision module returned empty screen context")
+                return {}
+            
+            # Enhance context for information extraction
+            if "elements" in screen_context:
+                # Filter and categorize elements for better information extraction
+                text_elements = []
+                interactive_elements = []
+                
+                for element in screen_context["elements"]:
+                    element_type = element.get("type", "")
+                    element_text = element.get("text", "")
+                    
+                    if element_type in ["text", "label", "heading"] or element_text:
+                        text_elements.append(element)
+                    
+                    if element_type in ["button", "link", "input", "dropdown"]:
+                        interactive_elements.append(element)
+                
+                # Add categorized elements to context
+                screen_context["text_elements"] = text_elements
+                screen_context["interactive_elements"] = interactive_elements
+                
+                # Extract and summarize text content
+                screen_context["extracted_text"] = self._extract_text_content_from_elements(text_elements)
+                screen_context["text_summary"] = self._summarize_extracted_text(screen_context["extracted_text"])
+                
+                self.logger.debug(f"Categorized {len(text_elements)} text elements and {len(interactive_elements)} interactive elements")
+                self.logger.debug(f"Extracted {len(screen_context['extracted_text'])} text blocks")
+            
+            return screen_context
+            
+        except Exception as e:
+            self.logger.error(f"Screen analysis for information extraction failed: {e}")
+            return {}
+    
+    def _extract_text_content_from_elements(self, text_elements: list) -> list:
+        """
+        Extract and organize text content from screen elements.
+        
+        Args:
+            text_elements: List of text-containing elements
+            
+        Returns:
+            List of extracted text blocks with metadata
+        """
+        extracted_text = []
+        
+        for element in text_elements:
+            text_content = element.get("text", "").strip()
+            if text_content and len(text_content) > 1:  # Skip single characters
+                text_block = {
+                    "content": text_content,
+                    "type": element.get("type", "text"),
+                    "coordinates": element.get("coordinates", []),
+                    "length": len(text_content),
+                    "word_count": len(text_content.split()),
+                    "is_heading": element.get("type") == "heading" or text_content.isupper(),
+                    "contains_numbers": any(char.isdigit() for char in text_content),
+                    "contains_special_chars": any(char in "!@#$%^&*()_+-=[]{}|;:,.<>?" for char in text_content)
+                }
+                extracted_text.append(text_block)
+        
+        return extracted_text
+    
+    def _summarize_extracted_text(self, extracted_text: list) -> str:
+        """
+        Create a summary of extracted text content.
+        
+        Args:
+            extracted_text: List of text blocks with metadata
+            
+        Returns:
+            Summary string of the extracted text
+        """
+        if not extracted_text:
+            return "No text content found on screen"
+        
+        # Sort by importance (headings first, then by length)
+        sorted_text = sorted(extracted_text, key=lambda x: (
+            0 if x.get("is_heading") else 1,  # Headings first
+            -x.get("word_count", 0)  # Then by word count (descending)
+        ))
+        
+        # Create summary with most important content
+        summary_parts = []
+        total_chars = 0
+        max_summary_length = 500  # Reasonable summary length
+        
+        for text_block in sorted_text:
+            content = text_block["content"]
+            if total_chars + len(content) <= max_summary_length:
+                summary_parts.append(content)
+                total_chars += len(content)
+            else:
+                # Add partial content if it fits
+                remaining_space = max_summary_length - total_chars
+                if remaining_space > 50:  # Only if meaningful space remains
+                    summary_parts.append(content[:remaining_space] + "...")
+                break
+        
+        return " | ".join(summary_parts) if summary_parts else "No substantial text content found"
+    
+    def _create_qa_reasoning_prompt(self, question: str, screen_context: Dict[str, Any]) -> str:
+        """
+        Create a specialized reasoning prompt for question answering.
+        
+        This method creates a prompt that helps the reasoning module understand
+        the user's question and the screen context to provide accurate answers.
+        
+        Args:
+            question: The user's question
+            screen_context: Screen analysis results from vision module
+            
+        Returns:
+            Formatted reasoning prompt for the question answering task
+        """
+        # Extract key information from screen context
+        elements = screen_context.get("elements", [])
+        text_summary = screen_context.get("text_summary", "No text content available")
+        interactive_elements = screen_context.get("interactive_elements", [])
+        
+        # Build context description
+        context_parts = []
+        
+        if elements:
+            context_parts.append(f"Screen contains {len(elements)} visual elements")
+        
+        if interactive_elements:
+            context_parts.append(f"{len(interactive_elements)} interactive elements (buttons, links, inputs)")
+        
+        context_description = ", ".join(context_parts) if context_parts else "Limited screen information available"
+        
+        # Create the reasoning prompt
+        qa_prompt = f"""You are helping answer a user's question about what they can see on their screen.
+
+User's Question: "{question}"
+
+Screen Context:
+- {context_description}
+- Text Content Summary: {text_summary}
+
+Your task is to answer the user's question based on the screen content provided. Be specific and helpful.
+
+If the screen content doesn't contain enough information to answer the question, say "I couldn't find that information on your current screen."
+
+Provide a clear, concise answer that directly addresses the user's question."""
+        
+        return qa_prompt
+    
+    def _get_qa_action_plan(self, qa_command: str, screen_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Get action plan for question answering with retry logic.
+        
+        This method sends the reasoning prompt to the reasoning module
+        and handles retries and error recovery.
+        
+        Args:
+            qa_command: The reasoning prompt for question answering
+            screen_context: Screen context for additional information
+            
+        Returns:
+            Action plan dictionary from reasoning module
+        """
+        try:
+            # Get reasoning module
+            reasoning_module = self._get_module_safely('reasoning_module')
+            if not reasoning_module:
+                self.logger.error("Reasoning module not available for Q&A action plan")
+                return {}
+            
+            # Generate action plan with retry logic
+            max_retries = 2
+            for attempt in range(max_retries + 1):
+                try:
+                    self.logger.debug(f"Generating Q&A action plan (attempt {attempt + 1}/{max_retries + 1})")
+                    
+                    action_plan = reasoning_module.generate_action_plan(
+                        qa_command,
+                        screen_context,
+                        mode="question_answering"
+                    )
+                    
+                    if action_plan and isinstance(action_plan, dict):
+                        self.logger.debug("Successfully generated Q&A action plan")
+                        return action_plan
+                    else:
+                        self.logger.warning(f"Invalid action plan received on attempt {attempt + 1}")
+                        
+                except Exception as e:
+                    self.logger.warning(f"Q&A action plan generation failed on attempt {attempt + 1}: {e}")
+                    if attempt == max_retries:
+                        raise
+                    time.sleep(0.5)  # Brief delay before retry
+            
+            self.logger.error("Failed to generate Q&A action plan after all retries")
+            return {}
+            
+        except Exception as e:
+            self.logger.error(f"Error in Q&A action plan generation: {e}")
+            return {}
+    
+    def _extract_and_validate_answer(self, action_plan: Dict[str, Any], question: str) -> str:
+        """
+        Extract and validate answer from action plan with enhanced fallback responses.
+        
+        This method extracts the answer from the reasoning module's action plan
+        and validates it for quality and relevance.
+        
+        Args:
+            action_plan: Action plan from reasoning module
+            question: Original user question for validation
+            
+        Returns:
+            Validated answer string
+        """
+        if not action_plan or not isinstance(action_plan, dict):
+            self.logger.warning("Invalid or empty action plan for answer extraction")
+            return "Information not available"
+        
+        # Try to extract answer from various possible fields
+        answer_fields = ["answer", "response", "result", "content", "message"]
+        answer = None
+        
+        for field in answer_fields:
+            if field in action_plan and action_plan[field]:
+                answer = str(action_plan[field]).strip()
+                if answer:
+                    self.logger.debug(f"Extracted answer from field '{field}': {answer[:100]}...")
+                    break
+        
+        # If no answer found in direct fields, try nested structures
+        if not answer:
+            if "actions" in action_plan and action_plan["actions"]:
+                for action in action_plan["actions"]:
+                    if isinstance(action, dict) and "response" in action:
+                        answer = str(action["response"]).strip()
+                        if answer:
+                            self.logger.debug(f"Extracted answer from nested action: {answer[:100]}...")
+                            break
+        
+        # Validate answer quality
+        if not answer:
+            self.logger.warning("No answer found in action plan")
+            return "Information not available"
+        
+        # Clean up the answer
+        answer = answer.strip()
+        
+        # Check for common failure patterns
+        failure_patterns = [
+            "i cannot", "i can't", "unable to", "not possible",
+            "error", "failed", "exception", "invalid"
+        ]
+        
+        answer_lower = answer.lower()
+        if any(pattern in answer_lower for pattern in failure_patterns):
+            self.logger.debug(f"Answer contains failure pattern: {answer}")
+            return "Information not available"
+        
+        # Check minimum answer length
+        if len(answer) < 10:
+            self.logger.debug(f"Answer too short ({len(answer)} chars): {answer}")
+            return "Information not available"
+        
+        # Check if answer is relevant to question (basic check)
+        question_words = set(question.lower().split())
+        answer_words = set(answer.lower().split())
+        
+        # If there's some word overlap or answer is substantial, consider it valid
+        word_overlap = len(question_words.intersection(answer_words))
+        if word_overlap > 0 or len(answer) > 50:
+            self.logger.debug(f"Answer validated (overlap: {word_overlap}, length: {len(answer)})")
+            return answer
+        
+        self.logger.debug(f"Answer failed relevance check: {answer}")
+        return "Information not available"
     
     def _detect_active_application(self) -> Optional['ApplicationInfo']:
         """
