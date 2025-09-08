@@ -247,54 +247,64 @@ class QuestionAnsweringHandler(BaseHandler):
                 return None
             
             # Set up timeout for extraction (2 second limit as per requirements)
-            import signal
+            import threading
+            import queue
             
-            def timeout_handler(signum, frame):
-                raise TimeoutError("Browser content extraction timed out")
+            # Use threading approach for timeout (works in any thread)
+            result_queue = queue.Queue()
+            error_queue = queue.Queue()
             
-            # Store old handler to restore later
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(2)  # 2 second timeout
+            def extraction_worker():
+                try:
+                    self.logger.info(f"Extracting content from {app_info.name} ({app_info.browser_type.value if app_info.browser_type else 'unknown browser'})")
+                    
+                    # Extract text content using browser-specific method
+                    content = self._browser_handler.get_page_text_content(app_info)
+                    result_queue.put(content)
+                    
+                except Exception as e:
+                    error_queue.put(e)
             
-            try:
-                self.logger.info(f"Extracting content from {app_info.name} ({app_info.browser_type.value if app_info.browser_type else 'unknown browser'})")
-                
-                # Extract text content using browser-specific method
-                content = self._browser_handler.get_page_text_content(app_info)
-                
-                # Cancel timeout
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
-                
-                if not content:
-                    self.logger.warning("Browser content extraction returned empty content")
-                    return None
-                
-                # Validate content is substantial (>50 characters as per requirements)
-                if len(content.strip()) <= 50:
-                    self.logger.warning(f"Extracted content too short ({len(content.strip())} characters), likely not substantial page content")
-                    return None
-                
-                # Additional content validation - check for meaningful content
-                if not self._validate_browser_content(content):
-                    self.logger.warning("Extracted content failed validation checks")
-                    return None
-                
-                self.logger.info(f"Successfully extracted {len(content)} characters of browser content")
-                return content
-                
-            except TimeoutError:
-                # Cancel timeout and restore handler
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
+            # Start extraction in thread
+            extraction_thread = threading.Thread(target=extraction_worker, daemon=True)
+            extraction_thread.start()
+            
+            # Wait for result with 2 second timeout
+            extraction_thread.join(timeout=2.0)
+            
+            if extraction_thread.is_alive():
                 self.logger.warning("Browser content extraction timed out after 2 seconds")
                 return None
-            except Exception as e:
-                # Cancel timeout and restore handler
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
-                self.logger.error(f"Error during browser content extraction: {e}")
+            
+            # Check for errors
+            if not error_queue.empty():
+                extraction_error = error_queue.get()
+                self.logger.error(f"Error during browser content extraction: {extraction_error}")
                 return None
+            
+            # Get result
+            if result_queue.empty():
+                self.logger.warning("No browser content extraction result received")
+                return None
+            
+            content = result_queue.get()
+            
+            if not content:
+                self.logger.warning("Browser content extraction returned empty content")
+                return None
+            
+            # Validate content is substantial (>50 characters as per requirements)
+            if len(content.strip()) <= 50:
+                self.logger.warning(f"Extracted content too short ({len(content.strip())} characters), likely not substantial page content")
+                return None
+            
+            # Additional content validation - check for meaningful content
+            if not self._validate_browser_content(content):
+                self.logger.warning("Extracted content failed validation checks")
+                return None
+            
+            self.logger.info(f"Successfully extracted {len(content)} characters of browser content")
+            return content
                 
         except Exception as e:
             self.logger.error(f"Error in browser content extraction setup: {e}")
@@ -333,55 +343,65 @@ class QuestionAnsweringHandler(BaseHandler):
                 return None
             
             # Set up timeout for extraction (2 second limit as per requirements)
-            import signal
+            import threading
+            import queue
             
-            def timeout_handler(signum, frame):
-                raise TimeoutError("PDF content extraction timed out")
+            # Use threading approach for timeout (works in any thread)
+            result_queue = queue.Queue()
+            error_queue = queue.Queue()
             
-            # Store old handler to restore later
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(2)  # 2 second timeout
+            def extraction_worker():
+                try:
+                    self.logger.info(f"Extracting content from PDF reader: {app_info.name}")
+                    
+                    # Extract text content using PDFHandler
+                    content = self._pdf_handler.extract_text_from_open_document(app_info.name)
+                    result_queue.put(content)
+                    
+                except Exception as e:
+                    error_queue.put(e)
             
-            try:
-                self.logger.info(f"Extracting content from PDF reader: {app_info.name}")
-                
-                # Extract text content using PDFHandler
-                content = self._pdf_handler.extract_text_from_open_document(app_info.name)
-                
-                # Cancel timeout
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
-                
-                if not content:
-                    self.logger.warning("PDF content extraction returned empty content")
-                    return None
-                
-                # Validate content is substantial (>50 characters as per requirements)
-                if len(content.strip()) <= 50:
-                    self.logger.warning(f"Extracted PDF content too short ({len(content.strip())} characters), likely not substantial document content")
-                    return None
-                
-                # Additional content validation and cleaning
-                cleaned_content = self._validate_and_clean_pdf_content(content)
-                if not cleaned_content:
-                    self.logger.warning("PDF content failed validation checks")
-                    return None
-                
-                self.logger.info(f"Successfully extracted {len(cleaned_content)} characters of PDF content")
-                return cleaned_content
-                
-            except TimeoutError:
-                # Cancel timeout and restore handler
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
+            # Start extraction in thread
+            extraction_thread = threading.Thread(target=extraction_worker, daemon=True)
+            extraction_thread.start()
+            
+            # Wait for result with 2 second timeout
+            extraction_thread.join(timeout=2.0)
+            
+            if extraction_thread.is_alive():
                 self.logger.warning("PDF content extraction timed out after 2 seconds")
                 return None
-            except Exception as e:
-                # Cancel timeout and restore handler
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
-                self.logger.error(f"Error during PDF content extraction: {e}")
+            
+            # Check for errors
+            if not error_queue.empty():
+                extraction_error = error_queue.get()
+                self.logger.error(f"Error during PDF content extraction: {extraction_error}")
                 return None
+            
+            # Get result
+            if result_queue.empty():
+                self.logger.warning("No PDF content extraction result received")
+                return None
+            
+            content = result_queue.get()
+            
+            if not content:
+                self.logger.warning("PDF content extraction returned empty content")
+                return None
+            
+            # Validate content is substantial (>50 characters as per requirements)
+            if len(content.strip()) <= 50:
+                self.logger.warning(f"Extracted PDF content too short ({len(content.strip())} characters), likely not substantial document content")
+                return None
+            
+            # Additional content validation and cleaning
+            cleaned_content = self._validate_and_clean_pdf_content(content)
+            if not cleaned_content:
+                self.logger.warning("PDF content failed validation checks")
+                return None
+            
+            self.logger.info(f"Successfully extracted {len(cleaned_content)} characters of PDF content")
+            return cleaned_content
                 
         except Exception as e:
             self.logger.error(f"Error in PDF content extraction setup: {e}")
@@ -782,12 +802,9 @@ class QuestionAnsweringHandler(BaseHandler):
             summarization_prompt = self._build_summarization_prompt(content, command)
             
             # Set up timeout for summarization (3 second limit as per requirements)
-            import signal
             import threading
             import queue
             
-            def timeout_handler(signum, frame):
-                raise TimeoutError("Content summarization timed out")
             
             # Use threading approach for timeout to avoid signal issues
             result_queue = queue.Queue()
@@ -1041,12 +1058,9 @@ Please provide a summary that I can speak to the user as a direct response to th
                 self.logger.debug("ReasoningModule initialized for summarization")
             
             # Set up timeout for summarization (3 second limit as per requirements)
-            import signal
             import threading
             import queue
             
-            def timeout_handler(signum, frame):
-                raise TimeoutError("Content summarization timed out")
             
             # Use threading approach for timeout to avoid signal issues
             result_queue = queue.Queue()

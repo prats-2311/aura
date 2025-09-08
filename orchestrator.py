@@ -227,11 +227,13 @@ class Orchestrator:
             from handlers.gui_handler import GUIHandler
             from handlers.conversation_handler import ConversationHandler
             from handlers.deferred_action_handler import DeferredActionHandler
+            from handlers.question_answering_handler import QuestionAnsweringHandler
             
             # Initialize handlers with orchestrator reference
             self.gui_handler = GUIHandler(self)
             self.conversation_handler = ConversationHandler(self)
             self.deferred_action_handler = DeferredActionHandler(self)
+            self.question_answering_handler = QuestionAnsweringHandler(self)
             
             logger.info("Command handlers initialized successfully")
             
@@ -241,6 +243,7 @@ class Orchestrator:
             self.gui_handler = None
             self.conversation_handler = None
             self.deferred_action_handler = None
+            self.question_answering_handler = None
             
         except Exception as e:
             logger.error(f"Failed to initialize handlers: {e}")
@@ -248,6 +251,7 @@ class Orchestrator:
             self.gui_handler = None
             self.conversation_handler = None
             self.deferred_action_handler = None
+            self.question_answering_handler = None
     
     def _recognize_intent(self, command: str) -> Dict[str, Any]:
         """
@@ -454,7 +458,7 @@ class Orchestrator:
             "gui_interaction": self.gui_handler,
             "conversational_chat": self.conversation_handler,
             "deferred_action": self.deferred_action_handler,
-            "question_answering": self.gui_handler  # Reuse GUI handler for now
+            "question_answering": self.question_answering_handler  # Use dedicated QuestionAnsweringHandler
         }
         
         handler = handler_map.get(intent)
