@@ -674,25 +674,18 @@ class AutomationModule:
             logger.debug(f"cliclick {path_type} PATH: Original text length: {len(text)}, lines: {text.count(chr(10)) + 1}")
             logger.debug(f"cliclick {path_type} PATH: Formatted text length: {len(formatted_text)}")
             
-            # Choose typing method based on content
-            if '\n' in text:
-                # Multi-line text - use line-by-line approach for better formatting preservation
-                logger.debug(f"cliclick {path_type} PATH: Using multiline typing for {text.count(chr(10)) + 1} lines")
-                success = self._cliclick_type_multiline(formatted_text, fast_path, element_info)
-            else:
-                # Single line - use standard cliclick typing with optimized timeout
-                timeout = 3 if fast_path else 6  # Optimized timeouts for better performance
-                logger.debug(f"cliclick {path_type} PATH: Using single-line typing with {timeout}s timeout")
-                
-                result = subprocess.run(
-                    ['cliclick', f't:{formatted_text}'],
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout
-                )
-                success = result.returncode == 0
-                if not success:
-                    logger.warning(f"cliclick {path_type} PATH: Single-line typing failed: {result.stderr}")
+            # UNIVERSAL CLIPBOARD METHOD: Use clipboard for ALL content types
+            # This eliminates method selection bugs and provides consistent, fast, reliable typing
+            newline_count = text.count('\n')
+            content_type = "multiline" if newline_count > 0 else "single-line"
+            
+            logger.info(f"cliclick {path_type} PATH: 📋 UNIVERSAL CLIPBOARD METHOD")
+            logger.info(f"cliclick {path_type} PATH:   Content type: {content_type} ({newline_count} newlines)")
+            logger.info(f"cliclick {path_type} PATH:   Content length: {len(text)} characters")
+            logger.info(f"cliclick {path_type} PATH:   Using clipboard method for ALL content - eliminates corruption!")
+            
+            # Use clipboard method for ALL content - no more method selection bugs!
+            success = self._cliclick_type_clipboard_method(text, fast_path, element_info)
             
             execution_time = time.time() - start_time
             
@@ -972,6 +965,13 @@ class AutomationModule:
             
             logger.debug(f"cliclick {path_type} PATH: Typing {len(lines)} lines with preserved formatting")
             
+            # CRITICAL DEBUG: Log the exact lines being typed
+            logger.info(f"cliclick {path_type} PATH: MULTILINE DEBUG - Lines to type:")
+            for i, line in enumerate(lines[:5]):  # Show first 5 lines
+                logger.info(f"cliclick {path_type} PATH:   Line {i+1}: {repr(line)}")
+            if len(lines) > 5:
+                logger.info(f"cliclick {path_type} PATH:   ... and {len(lines) - 5} more lines")
+            
             # FIXED timeout settings for reliability over speed
             base_timeout = 8 if fast_path else 15  # Increased significantly for reliability
             line_timeout = max(5, min(base_timeout, len(text) // 20))  # More generous scaling for large content
@@ -987,9 +987,13 @@ class AutomationModule:
                 if line.strip():  # Non-empty line
                     logger.debug(f"cliclick {path_type} PATH: Typing line {i+1}: {repr(line[:50])}{'...' if len(line) > 50 else ''}")
                     
+                    # CRITICAL DEBUG: Log the exact cliclick command
+                    cliclick_cmd = ['cliclick', f't:{line}']
+                    logger.info(f"cliclick {path_type} PATH: EXECUTING: {' '.join(cliclick_cmd)}")
+                    
                     # Use cliclick to type the line with increased timeout
                     result = subprocess.run(
-                        ['cliclick', f't:{line}'],
+                        cliclick_cmd,
                         capture_output=True,
                         text=True,
                         timeout=line_timeout
@@ -997,12 +1001,13 @@ class AutomationModule:
                     
                     if result.returncode != 0:
                         logger.error(f"cliclick {path_type} PATH: CRITICAL - Failed to type line {i+1}: {result.stderr}")
+                        logger.error(f"cliclick {path_type} PATH: FAILED COMMAND: {' '.join(cliclick_cmd)}")
                         return False
                     else:
-                        logger.debug(f"cliclick {path_type} PATH: Successfully typed line {i+1}")
+                        logger.info(f"cliclick {path_type} PATH: ✅ Successfully typed line {i+1}: {repr(line[:30])}{'...' if len(line) > 30 else ''}")
                         
-                    # Minimal delay after typing each line - optimized for speed
-                    time.sleep(0.01 if fast_path else 0.02)  # Further reduced delays for faster typing
+                    # CRITICAL FIX: Longer delay after typing each line for application processing
+                    time.sleep(0.1 if fast_path else 0.2)  # Increased delays for application processing
                         
                 else:  # Empty line - just preserve the spacing
                     logger.debug(f"cliclick {path_type} PATH: Preserving empty line {i+1}")
@@ -1017,6 +1022,10 @@ class AutomationModule:
                     
                     logger.debug(f"cliclick {path_type} PATH: Pressing Return after line {i+1}")
                     
+                    # CRITICAL DEBUG: Log Return key command
+                    return_cmd = ['cliclick', 'kp:return']
+                    logger.info(f"cliclick {path_type} PATH: EXECUTING RETURN: {' '.join(return_cmd)}")
+                    
                     # Retry Return key press up to 3 times for reliability
                     return_success = False
                     for retry in range(3):
@@ -1028,37 +1037,38 @@ class AutomationModule:
                         
                         try:
                             result = subprocess.run(
-                                ['cliclick', 'kp:return'],
+                                return_cmd,
                                 capture_output=True,
                                 text=True,
                                 timeout=10  # FIXED: Much longer timeout for Return key reliability
                             )
                             
                             if result.returncode == 0:
-                                logger.debug(f"cliclick {path_type} PATH: Successfully pressed Return after line {i+1} (attempt {retry+1})")
+                                logger.info(f"cliclick {path_type} PATH: ✅ Successfully pressed Return after line {i+1} (attempt {retry+1})")
                                 return_success = True
                                 break
                             else:
-                                logger.warning(f"cliclick {path_type} PATH: Return key attempt {retry+1} failed: {result.stderr}")
+                                logger.error(f"cliclick {path_type} PATH: ❌ Return key attempt {retry+1} failed: {result.stderr}")
+                                logger.error(f"cliclick {path_type} PATH: FAILED RETURN COMMAND: {' '.join(return_cmd)}")
                                 if retry < 2:  # Not the last attempt
-                                    time.sleep(0.05)  # Reduced delay before retry for faster execution
+                                    time.sleep(0.2)  # Longer delay before retry for reliability
                                     
                         except subprocess.TimeoutExpired:
                             logger.warning(f"cliclick {path_type} PATH: Return key attempt {retry+1} timed out")
                             if retry < 2:  # Not the last attempt
-                                time.sleep(0.05)  # Reduced delay before retry for faster execution
+                                time.sleep(0.2)  # Longer delay before retry for reliability
                         except Exception as e:
                             logger.warning(f"cliclick {path_type} PATH: Return key attempt {retry+1} error: {e}")
                             if retry < 2:  # Not the last attempt
-                                time.sleep(0.05)  # Reduced delay before retry for faster execution
+                                time.sleep(0.2)  # Longer delay before retry for reliability
                     
                     if not return_success:
                         logger.error(f"cliclick {path_type} PATH: CRITICAL - All Return key attempts failed after line {i+1}")
                         logger.error(f"cliclick {path_type} PATH: This will cause newlines to be missing in output")
                         return False
                     
-                    # Minimal delay after Return key for proper line processing - optimized
-                    time.sleep(0.01 if fast_path else 0.03)  # Further reduced delays for faster typing
+                    # CRITICAL FIX: Longer delay after Return key for proper line processing
+                    time.sleep(0.2 if fast_path else 0.3)  # Increased delays for proper line processing
             
             # Final timeout check
             elapsed_time = time.time() - start_time
@@ -1072,6 +1082,59 @@ class AutomationModule:
         except Exception as e:
             elapsed_time = time.time() - start_time
             logger.error(f"cliclick {path_type} PATH: Multiline typing failed with exception after {elapsed_time:.2f}s: {e}")
+            return False
+    
+    def _cliclick_type_clipboard_method(self, text: str, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Type text using clipboard method with cliclick to avoid Return key issues.
+        CRITICAL FIX: Bypasses problematic Return key handling in some applications.
+        """
+        try:
+            path_type = "FAST" if fast_path else "SLOW"
+            logger.info(f"cliclick {path_type} PATH: Using clipboard method to avoid Return key issues")
+            
+            # Copy text to clipboard using pbcopy (macOS clipboard utility)
+            import subprocess
+            
+            # Use pbcopy to set clipboard content
+            process = subprocess.Popen(
+                ['pbcopy'],
+                stdin=subprocess.PIPE,
+                text=True
+            )
+            
+            process.communicate(input=text)
+            
+            if process.returncode != 0:
+                logger.error(f"cliclick {path_type} PATH: Failed to copy text to clipboard")
+                return False
+            
+            logger.debug(f"cliclick {path_type} PATH: Successfully copied {len(text)} characters to clipboard")
+            
+            # Small delay to ensure clipboard is set
+            time.sleep(0.1)
+            
+            # Paste using Cmd+V with cliclick (correct syntax for key combination)
+            # Method 1: Use single command for Cmd+V
+            result = subprocess.run(
+                ['cliclick', 'kd:cmd', 't:v', 'ku:cmd'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"cliclick {path_type} PATH: Cmd+V paste failed: {result.stderr}")
+                return False
+            
+            # Command executed above, check if successful
+            logger.debug(f"cliclick {path_type} PATH: Cmd+V paste command executed successfully")
+            
+            logger.info(f"cliclick {path_type} PATH: Successfully pasted {len(text)} characters using clipboard method")
+            return True
+            
+        except Exception as e:
+            logger.error(f"cliclick {path_type} PATH: Clipboard method failed with exception: {e}")
             return False
     
     def _cliclick_scroll(self, direction: str, amount: int, fast_path: bool = False, element_info: Optional[Dict[str, Any]] = None) -> bool:
@@ -1372,8 +1435,14 @@ class AutomationModule:
         """
         Execute typing using AppleScript on macOS.
         Enhanced to handle special characters and prevent corruption.
+        CRITICAL FIX: Prevents auto-indentation corruption.
         """
         try:
+            # CRITICAL FIX: For multiline content, use a different approach to prevent auto-indentation
+            if '\n' in text and len(text) > 100:
+                logger.warning("AppleScript fallback: Large multiline content detected - using paste method to prevent auto-indentation corruption")
+                return self._macos_type_paste(text)
+            
             # Format text specifically for AppleScript (different from cliclick formatting)
             formatted_text = self._format_text_for_typing(text, 'applescript')
             
@@ -1452,6 +1521,60 @@ class AutomationModule:
             return False
         except Exception as e:
             logger.error(f"AppleScript typing failed with exception: {e}")
+            return False
+    
+    def _macos_type_paste(self, text: str) -> bool:
+        """
+        Type text using clipboard paste method to avoid auto-indentation issues.
+        CRITICAL FIX: Prevents exponential indentation growth in smart editors.
+        """
+        try:
+            logger.info("AppleScript: Using clipboard paste method for multiline content")
+            
+            # Copy text to clipboard using AppleScript
+            # Escape the text for AppleScript string literal
+            escaped_text = text.replace('\\', '\\\\').replace('"', '\\"').replace('\r', '\\r')
+            
+            clipboard_script = f'''
+            set the clipboard to "{escaped_text}"
+            '''
+            
+            result = subprocess.run(
+                ['osascript', '-e', clipboard_script],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"AppleScript clipboard copy failed: {result.stderr}")
+                return False
+            
+            logger.debug("AppleScript: Text copied to clipboard successfully")
+            
+            # Paste from clipboard using Cmd+V
+            paste_script = '''
+            tell application "System Events"
+                keystroke "v" using command down
+            end tell
+            '''
+            
+            result = subprocess.run(
+                ['osascript', '-e', paste_script],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"AppleScript paste failed: {result.stderr}")
+                return False
+            
+            logger.info(f"AppleScript: Successfully pasted {len(text)} characters using clipboard method")
+            return True
+            
+        except Exception as e:
+            logger.error(f"AppleScript clipboard paste failed with exception: {e}")
             return False
     
     def _macos_scroll(self, direction: str, amount: int) -> bool:
