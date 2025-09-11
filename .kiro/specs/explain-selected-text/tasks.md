@@ -23,7 +23,7 @@
   - Create unit tests for text capture functionality with mocked accessibility and clipboard operations
   - _Requirements: 2.1, 2.2, 2.3, 5.2_
 
-- [ ] 4. Update intent recognition system for explain selected text commands
+- [x] 4. Update intent recognition system for explain selected text commands
 
   - Modify INTENT_RECOGNITION_PROMPT in config.py to include "explain_selected_text" intent category
   - Add pattern recognition for commands like "explain this", "explain the selected text", "what does this mean"

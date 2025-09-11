@@ -83,6 +83,7 @@ Intent categories:
 - "conversational_chat": General conversation, greetings, or casual questions
 - "deferred_action": Requests for content generation that will be placed later (e.g., "write code for X")
 - "question_answering": Information requests about screen content, system status, or content comprehension
+- "explain_selected_text": User has highlighted text and is asking for an explanation, summary, or definition of it
 
 Special focus for question_answering intent:
 - Screen content queries: "what's on my screen", "what do you see", "describe this page", "summarize this"
@@ -90,12 +91,18 @@ Special focus for question_answering intent:
 - Information extraction: "what are the main points", "what's the title", "what buttons are available"
 - Document queries: "what's in this PDF", "summarize this document", "what's this article about"
 
+Special focus for explain_selected_text intent:
+- Text explanation requests: "explain this", "explain the selected text", "what does this mean"
+- Definition requests: "define this", "what is this", "tell me about this"
+- Summary requests: "summarize this", "give me a summary of this", "break this down"
+- Code explanation: "explain this code", "what does this function do", "how does this work"
+
 Return your response in this exact JSON format:
 {{
-    "intent": "gui_interaction|conversational_chat|deferred_action|question_answering",
+    "intent": "gui_interaction|conversational_chat|deferred_action|question_answering|explain_selected_text",
     "confidence": 0.95,
     "parameters": {{
-        "action_type": "click|type|scroll|generate_code|general_question|screen_analysis|content_summary|document_query",
+        "action_type": "click|type|scroll|generate_code|general_question|screen_analysis|content_summary|document_query|explain_text",
         "target": "extracted target or content request",
         "content_type": "code|text|explanation|screen_content|document_content"
     }},
