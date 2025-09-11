@@ -1,412 +1,462 @@
-# modules/performance_dashboard.py
 """
 Performance Dashboard for AURA
 
-Provides real-time performance monitoring and optimization recommendations.
+This module provides a comprehensive performance dashboard and alerting system
+for monitoring the explain selected text feature and other AURA operations.
+It includes real-time metrics, trend analysis, and optimization recommendations.
 """
 
 import logging
 import time
-import json
-from typing import Dict, Any, List, Optional
-from dataclasses import asdict
+import threading
+from typing import Dict, Any, Optional, List, Tuple
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+import json
+import statistics
 
-from .performance import (
-    performance_monitor,
-    hybrid_performance_monitor,
-    connection_pool,
-    image_cache,
-    parallel_processor
-)
-from performance_config import *
 
-logger = logging.getLogger(__name__)
+@dataclass
+class PerformanceTrend:
+    """Performance trend analysis result."""
+    metric_name: str
+    current_value: float
+    previous_value: float
+    change_percent: float
+    trend_direction: str  # 'improving', 'degrading', 'stable'
+    significance: str  # 'high', 'medium', 'low'
+
+
+@dataclass
+class OptimizationRecommendation:
+    """Performance optimization recommendation."""
+    category: str
+    priority: str  # 'high', 'medium', 'low'
+    title: str
+    description: str
+    expected_improvement: str
+    implementation_effort: str  # 'low', 'medium', 'high'
 
 
 class PerformanceDashboard:
     """
-    Performance dashboard for monitoring and optimization.
+    Real-time performance dashboard for AURA operations.
     
-    Provides real-time metrics, performance analysis, and optimization recommendations.
+    Provides comprehensive monitoring, trend analysis, and optimization
+    recommendations for the explain selected text feature.
     """
     
-    def __init__(self):
-        """Initialize the performance dashboard."""
-        self.start_time = time.time()
-        self.last_optimization_check = time.time()
-        self.optimization_recommendations = []
-        
-        logger.info("Performance dashboard initialized")
-    
-    def get_real_time_metrics(self) -> Dict[str, Any]:
+    def __init__(self, performance_monitor):
         """
-        Get real-time performance metrics.
-        
-        Returns:
-            Dictionary containing current performance metrics
-        """
-        try:
-            # Get performance summary
-            summary = performance_monitor.get_performance_summary(time_window_minutes=5)
-            
-            # Get hybrid performance statistics
-            hybrid_stats = hybrid_performance_monitor.get_hybrid_stats(time_window_minutes=5)
-            
-            # Get system metrics
-            system_metrics = performance_monitor.get_system_metrics()
-            
-            # Get cache statistics
-            cache_stats = image_cache.get_cache_stats()
-            
-            # Get operation statistics
-            operation_stats = performance_monitor.get_operation_stats()
-            
-            # Calculate uptime
-            uptime_seconds = time.time() - self.start_time
-            
-            return {
-                'timestamp': time.time(),
-                'uptime_seconds': uptime_seconds,
-                'uptime_formatted': self._format_duration(uptime_seconds),
-                'performance_summary': summary,
-                'hybrid_performance': hybrid_stats,
-                'system_metrics': system_metrics,
-                'cache_statistics': cache_stats,
-                'operation_statistics': operation_stats,
-                'optimization_recommendations': self.get_optimization_recommendations(),
-                'health_status': self._calculate_health_status(summary, system_metrics, cache_stats, hybrid_stats)
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to get real-time metrics: {e}")
-            return {
-                'timestamp': time.time(),
-                'error': str(e),
-                'health_status': 'unknown'
-            }
-    
-    def get_optimization_recommendations(self) -> List[Dict[str, Any]]:
-        """
-        Generate optimization recommendations based on current performance.
-        
-        Returns:
-            List of optimization recommendations
-        """
-        try:
-            recommendations = []
-            
-            # Check if we should run optimization analysis
-            if time.time() - self.last_optimization_check < 60:  # Check every minute
-                return self.optimization_recommendations
-            
-            self.last_optimization_check = time.time()
-            
-            # Get current metrics
-            summary = performance_monitor.get_performance_summary(time_window_minutes=15)
-            hybrid_stats = hybrid_performance_monitor.get_hybrid_stats(time_window_minutes=15)
-            system_metrics = performance_monitor.get_system_metrics()
-            cache_stats = image_cache.get_cache_stats()
-            
-            # Memory optimization recommendations
-            if system_metrics.get('memory_mb', 0) > MEMORY_WARNING_THRESHOLD_MB:
-                recommendations.append({
-                    'type': 'memory',
-                    'priority': 'high' if system_metrics['memory_mb'] > MEMORY_CRITICAL_THRESHOLD_MB else 'medium',
-                    'title': 'High Memory Usage Detected',
-                    'description': f"Memory usage is {system_metrics['memory_mb']:.1f}MB. Consider reducing cache size or restarting the application.",
-                    'action': 'reduce_cache_size',
-                    'current_value': system_metrics['memory_mb'],
-                    'threshold': MEMORY_WARNING_THRESHOLD_MB
-                })
-            
-            # CPU optimization recommendations
-            if system_metrics.get('cpu_percent', 0) > CPU_WARNING_THRESHOLD_PERCENT:
-                recommendations.append({
-                    'type': 'cpu',
-                    'priority': 'high' if system_metrics['cpu_percent'] > CPU_CRITICAL_THRESHOLD_PERCENT else 'medium',
-                    'title': 'High CPU Usage Detected',
-                    'description': f"CPU usage is {system_metrics['cpu_percent']:.1f}%. Consider reducing parallel processing or optimizing operations.",
-                    'action': 'reduce_parallelization',
-                    'current_value': system_metrics['cpu_percent'],
-                    'threshold': CPU_WARNING_THRESHOLD_PERCENT
-                })
-            
-            # Cache optimization recommendations
-            cache_hit_rate = cache_stats.get('hit_rate_percent', 0)
-            if cache_hit_rate < TARGET_CACHE_HIT_RATE_PERCENT and cache_stats.get('total_requests', 0) > 10:
-                recommendations.append({
-                    'type': 'cache',
-                    'priority': 'medium',
-                    'title': 'Low Cache Hit Rate',
-                    'description': f"Cache hit rate is {cache_hit_rate:.1f}%. Consider increasing cache size or adjusting cache expiry.",
-                    'action': 'increase_cache_size',
-                    'current_value': cache_hit_rate,
-                    'threshold': TARGET_CACHE_HIT_RATE_PERCENT
-                })
-            
-            # Performance optimization recommendations
-            avg_duration = summary.get('avg_duration_seconds', 0)
-            if avg_duration > TARGET_API_RESPONSE_TIME_MS / 1000:
-                recommendations.append({
-                    'type': 'performance',
-                    'priority': 'medium',
-                    'title': 'Slow Operation Performance',
-                    'description': f"Average operation time is {avg_duration:.2f}s. Consider optimizing API calls or enabling more parallelization.",
-                    'action': 'optimize_api_calls',
-                    'current_value': avg_duration,
-                    'threshold': TARGET_API_RESPONSE_TIME_MS / 1000
-                })
-            
-            # Success rate recommendations
-            success_rate = summary.get('success_rate_percent', 100)
-            if success_rate < 95 and summary.get('total_operations', 0) > 5:
-                recommendations.append({
-                    'type': 'reliability',
-                    'priority': 'high',
-                    'title': 'Low Success Rate',
-                    'description': f"Operation success rate is {success_rate:.1f}%. Check error logs and consider improving error handling.",
-                    'action': 'improve_error_handling',
-                    'current_value': success_rate,
-                    'threshold': 95
-                })
-            
-            # Cache size recommendations
-            cache_size_mb = cache_stats.get('size_mb', 0)
-            cache_max_mb = cache_stats.get('max_size_mb', IMAGE_CACHE_MAX_SIZE_MB)
-            if cache_size_mb > cache_max_mb * 0.9:
-                recommendations.append({
-                    'type': 'cache',
-                    'priority': 'low',
-                    'title': 'Cache Nearly Full',
-                    'description': f"Cache is {cache_size_mb:.1f}MB of {cache_max_mb}MB. Consider increasing cache size or reducing cache expiry.",
-                    'action': 'manage_cache_size',
-                    'current_value': cache_size_mb,
-                    'threshold': cache_max_mb * 0.9
-                })
-            
-            # Hybrid performance recommendations
-            fast_path_usage = hybrid_stats.get('fast_path_usage_percent', 0)
-            if fast_path_usage < 50 and hybrid_stats.get('total_commands', 0) > 5:
-                recommendations.append({
-                    'type': 'hybrid',
-                    'priority': 'medium',
-                    'title': 'Low Fast Path Usage',
-                    'description': f"Fast path is only used {fast_path_usage:.1f}% of the time. Check accessibility API availability and application compatibility.",
-                    'action': 'improve_fast_path_usage',
-                    'current_value': fast_path_usage,
-                    'threshold': 50
-                })
-            
-            fallback_rate = hybrid_stats.get('fallback_rate_percent', 0)
-            if fallback_rate > 30 and hybrid_stats.get('total_commands', 0) > 5:
-                recommendations.append({
-                    'type': 'hybrid',
-                    'priority': 'medium',
-                    'title': 'High Fallback Rate',
-                    'description': f"Fast path falls back to slow path {fallback_rate:.1f}% of the time. Consider improving element detection accuracy.",
-                    'action': 'reduce_fallback_rate',
-                    'current_value': fallback_rate,
-                    'threshold': 30
-                })
-            
-            performance_improvement = hybrid_stats.get('performance_improvement', 0)
-            if performance_improvement < 50 and hybrid_stats.get('total_commands', 0) > 5:
-                recommendations.append({
-                    'type': 'hybrid',
-                    'priority': 'low',
-                    'title': 'Limited Performance Improvement',
-                    'description': f"Fast path only provides {performance_improvement:.1f}% performance improvement. Consider optimizing fast path implementation.",
-                    'action': 'optimize_fast_path',
-                    'current_value': performance_improvement,
-                    'threshold': 50
-                })
-            
-            self.optimization_recommendations = recommendations
-            return recommendations
-            
-        except Exception as e:
-            logger.error(f"Failed to generate optimization recommendations: {e}")
-            return []
-    
-    def _calculate_health_status(self, summary: Dict, system_metrics: Dict, cache_stats: Dict, hybrid_stats: Dict = None) -> str:
-        """
-        Calculate overall system health status.
+        Initialize performance dashboard.
         
         Args:
-            summary: Performance summary
-            system_metrics: System metrics
-            cache_stats: Cache statistics
-            hybrid_stats: Hybrid performance statistics
+            performance_monitor: PerformanceMonitor instance to track
+        """
+        self.logger = logging.getLogger(__name__)
+        self.monitor = performance_monitor
+        
+        # Dashboard configuration
+        self.update_interval = 30.0  # Update dashboard every 30 seconds
+        self.trend_analysis_window = 300.0  # 5 minutes for trend analysis
+        self.alert_cooldown = 60.0  # 1 minute cooldown between similar alerts
+        
+        # Dashboard state
+        self._dashboard_data = {}
+        self._last_update = 0.0
+        self._last_alerts = {}
+        self._trend_history = []
+        
+        # Background update thread
+        self._update_thread = None
+        self._stop_updates = threading.Event()
+        
+        # Alert callbacks
+        self._alert_callbacks = []
+        
+        # Start dashboard updates
+        self._start_dashboard_updates()
+        
+        self.logger.info("Performance dashboard initialized")
+    
+    def _start_dashboard_updates(self) -> None:
+        """Start background dashboard update thread."""
+        def update_worker():
+            while not self._stop_updates.wait(self.update_interval):
+                try:
+                    self._update_dashboard_data()
+                    self._analyze_performance_trends()
+                    self._check_performance_alerts()
+                except Exception as e:
+                    self.logger.error(f"Dashboard update error: {e}")
+        
+        self._update_thread = threading.Thread(target=update_worker, daemon=True)
+        self._update_thread.start()
+    
+    def _update_dashboard_data(self) -> None:
+        """Update dashboard data with current metrics."""
+        current_time = time.time()
+        
+        # Get current performance summary
+        summary = self.monitor.get_performance_summary()
+        
+        # Get operation-specific statistics
+        text_capture_stats = self.monitor.get_operation_stats('text_capture')
+        explanation_stats = self.monitor.get_operation_stats('explanation_generation')
+        
+        # Get cache statistics
+        cache_stats = self.monitor.get_cache_stats()
+        
+        # Calculate derived metrics
+        overall_health_score = self._calculate_health_score(summary, text_capture_stats, explanation_stats)
+        
+        # Update dashboard data
+        self._dashboard_data = {
+            'timestamp': current_time,
+            'overall_health_score': overall_health_score,
+            'summary': summary,
+            'text_capture': text_capture_stats,
+            'explanation_generation': explanation_stats,
+            'cache_performance': cache_stats,
+            'recent_alerts': self.monitor.get_recent_alerts(5),
+            'optimization_recommendations': self._generate_optimization_recommendations()
+        }
+        
+        self._last_update = current_time
+    
+    def _calculate_health_score(self, summary: Dict[str, Any], 
+                               text_capture_stats: Dict[str, Any],
+                               explanation_stats: Dict[str, Any]) -> float:
+        """
+        Calculate overall system health score (0-100).
+        
+        Args:
+            summary: Overall performance summary
+            text_capture_stats: Text capture performance statistics
+            explanation_stats: Explanation generation performance statistics
             
         Returns:
-            Health status string
+            Health score from 0 (poor) to 100 (excellent)
         """
-        try:
-            health_score = 100
-            
-            # Factor in success rate
-            success_rate = summary.get('success_rate_percent', 100)
-            if success_rate < 95:
-                health_score -= (95 - success_rate) * 2
-            
-            # Factor in memory usage
-            memory_mb = system_metrics.get('memory_mb', 0)
-            if memory_mb > MEMORY_WARNING_THRESHOLD_MB:
-                health_score -= min(30, (memory_mb - MEMORY_WARNING_THRESHOLD_MB) / 10)
-            
-            # Factor in CPU usage
-            cpu_percent = system_metrics.get('cpu_percent', 0)
-            if cpu_percent > CPU_WARNING_THRESHOLD_PERCENT:
-                health_score -= min(20, (cpu_percent - CPU_WARNING_THRESHOLD_PERCENT) / 2)
-            
-            # Factor in average response time
-            avg_duration = summary.get('avg_duration_seconds', 0)
-            target_duration = TARGET_API_RESPONSE_TIME_MS / 1000
-            if avg_duration > target_duration:
-                health_score -= min(15, (avg_duration - target_duration) * 5)
-            
-            # Factor in hybrid performance if available
-            if hybrid_stats and hybrid_stats.get('total_commands', 0) > 0:
-                # Bonus for good fast path usage
-                fast_path_usage = hybrid_stats.get('fast_path_usage_percent', 0)
-                if fast_path_usage > 70:
-                    health_score += 5  # Bonus for good fast path usage
-                elif fast_path_usage < 30:
-                    health_score -= 5  # Penalty for poor fast path usage
-                
-                # Factor in fallback rate
-                fallback_rate = hybrid_stats.get('fallback_rate_percent', 0)
-                if fallback_rate > 50:
-                    health_score -= min(10, fallback_rate / 10)
-                
-                # Factor in performance improvement
-                performance_improvement = hybrid_stats.get('performance_improvement', 0)
-                if performance_improvement > 70:
-                    health_score += 3  # Bonus for significant improvement
-            
-            # Determine health status
-            if health_score >= 90:
-                return 'excellent'
-            elif health_score >= 75:
-                return 'good'
-            elif health_score >= 60:
-                return 'fair'
-            elif health_score >= 40:
-                return 'poor'
-            else:
-                return 'critical'
-                
-        except Exception as e:
-            logger.error(f"Health status calculation failed: {e}")
-            return 'unknown'
+        score = 100.0
+        
+        # Success rate impact (40% of score)
+        overall_success_rate = summary.get('success_rate', 0.0)
+        score *= (0.6 + 0.4 * overall_success_rate)
+        
+        # Performance impact (30% of score)
+        avg_duration = summary.get('avg_duration_ms', 0.0)
+        if avg_duration > 0:
+            # Penalize slow operations (target: < 2000ms)
+            performance_factor = min(1.0, 2000.0 / avg_duration)
+            score *= (0.7 + 0.3 * performance_factor)
+        
+        # Cache effectiveness impact (20% of score)
+        cache_stats = self.monitor.get_cache_stats()
+        avg_hit_rate = 0.0
+        cache_count = 0
+        
+        for cache_name, stats in cache_stats.items():
+            if 'hit_rate' in stats:
+                avg_hit_rate += stats['hit_rate']
+                cache_count += 1
+        
+        if cache_count > 0:
+            avg_hit_rate /= cache_count
+            score *= (0.8 + 0.2 * avg_hit_rate)
+        
+        # Alert frequency impact (10% of score)
+        recent_alerts = len(self.monitor.get_recent_alerts(10))
+        alert_penalty = min(0.1, recent_alerts * 0.01)
+        score *= (1.0 - alert_penalty)
+        
+        return max(0.0, min(100.0, score))
     
-    def _format_duration(self, seconds: float) -> str:
-        """Format duration in human-readable format."""
-        if seconds < 60:
-            return f"{seconds:.1f}s"
-        elif seconds < 3600:
-            minutes = seconds / 60
-            return f"{minutes:.1f}m"
+    def _analyze_performance_trends(self) -> None:
+        """Analyze performance trends over time."""
+        current_time = time.time()
+        
+        # Get current metrics
+        current_summary = self.monitor.get_performance_summary()
+        
+        # Store trend data point
+        trend_point = {
+            'timestamp': current_time,
+            'success_rate': current_summary.get('success_rate', 0.0),
+            'avg_duration_ms': current_summary.get('avg_duration_ms', 0.0),
+            'total_operations': current_summary.get('total_operations', 0),
+            'health_score': self._dashboard_data.get('overall_health_score', 0.0)
+        }
+        
+        self._trend_history.append(trend_point)
+        
+        # Keep only recent history (last hour)
+        cutoff_time = current_time - 3600.0
+        self._trend_history = [p for p in self._trend_history if p['timestamp'] > cutoff_time]
+        
+        # Analyze trends if we have enough data
+        if len(self._trend_history) >= 10:
+            trends = self._calculate_trends()
+            self._dashboard_data['trends'] = trends
+    
+    def _calculate_trends(self) -> List[PerformanceTrend]:
+        """Calculate performance trends from historical data."""
+        trends = []
+        
+        if len(self._trend_history) < 10:
+            return trends
+        
+        # Split data into recent and previous periods
+        mid_point = len(self._trend_history) // 2
+        recent_data = self._trend_history[mid_point:]
+        previous_data = self._trend_history[:mid_point]
+        
+        # Calculate trends for key metrics
+        metrics = ['success_rate', 'avg_duration_ms', 'health_score']
+        
+        for metric in metrics:
+            recent_values = [p[metric] for p in recent_data if p[metric] is not None]
+            previous_values = [p[metric] for p in previous_data if p[metric] is not None]
+            
+            if recent_values and previous_values:
+                recent_avg = statistics.mean(recent_values)
+                previous_avg = statistics.mean(previous_values)
+                
+                if previous_avg > 0:
+                    change_percent = ((recent_avg - previous_avg) / previous_avg) * 100
+                else:
+                    change_percent = 0.0
+                
+                # Determine trend direction and significance
+                if abs(change_percent) < 5.0:
+                    direction = 'stable'
+                    significance = 'low'
+                elif change_percent > 0:
+                    direction = 'improving' if metric != 'avg_duration_ms' else 'degrading'
+                    significance = 'high' if abs(change_percent) > 20 else 'medium'
+                else:
+                    direction = 'degrading' if metric != 'avg_duration_ms' else 'improving'
+                    significance = 'high' if abs(change_percent) > 20 else 'medium'
+                
+                trend = PerformanceTrend(
+                    metric_name=metric,
+                    current_value=recent_avg,
+                    previous_value=previous_avg,
+                    change_percent=change_percent,
+                    trend_direction=direction,
+                    significance=significance
+                )
+                trends.append(trend)
+        
+        return trends
+    
+    def _check_performance_alerts(self) -> None:
+        """Check for performance issues and trigger alerts."""
+        current_time = time.time()
+        
+        # Check health score
+        health_score = self._dashboard_data.get('overall_health_score', 100.0)
+        if health_score < 70.0:
+            self._trigger_alert('health_score_low', {
+                'current_score': health_score,
+                'threshold': 70.0,
+                'severity': 'high' if health_score < 50.0 else 'medium'
+            })
+        
+        # Check success rate trends
+        trends = self._dashboard_data.get('trends', [])
+        for trend in trends:
+            if trend.metric_name == 'success_rate' and trend.trend_direction == 'degrading':
+                if trend.significance == 'high':
+                    self._trigger_alert('success_rate_degrading', {
+                        'current_rate': trend.current_value,
+                        'change_percent': trend.change_percent,
+                        'severity': 'high'
+                    })
+        
+        # Check cache performance
+        cache_stats = self._dashboard_data.get('cache_performance', {})
+        for cache_name, stats in cache_stats.items():
+            hit_rate = stats.get('hit_rate', 0.0)
+            if hit_rate < 0.2:  # Less than 20% hit rate
+                self._trigger_alert('cache_performance_low', {
+                    'cache_name': cache_name,
+                    'hit_rate': hit_rate,
+                    'threshold': 0.2,
+                    'severity': 'medium'
+                })
+    
+    def _trigger_alert(self, alert_type: str, data: Dict[str, Any]) -> None:
+        """Trigger a performance alert with cooldown."""
+        current_time = time.time()
+        
+        # Check cooldown
+        last_alert_time = self._last_alerts.get(alert_type, 0.0)
+        if current_time - last_alert_time < self.alert_cooldown:
+            return
+        
+        # Create alert
+        alert = {
+            'type': alert_type,
+            'timestamp': current_time,
+            'data': data,
+            'message': self._format_alert_message(alert_type, data)
+        }
+        
+        # Log alert
+        severity = data.get('severity', 'medium')
+        if severity == 'high':
+            self.logger.error(f"Performance alert: {alert['message']}")
         else:
-            hours = seconds / 3600
-            return f"{hours:.1f}h"
-    
-    def export_metrics(self, format: str = 'json', time_window_minutes: int = 60) -> str:
-        """
-        Export performance metrics in specified format.
+            self.logger.warning(f"Performance alert: {alert['message']}")
         
-        Args:
-            format: Export format ('json', 'csv')
-            time_window_minutes: Time window for metrics
-            
-        Returns:
-            Formatted metrics string
-        """
-        try:
-            metrics = self.get_real_time_metrics()
-            
-            if format.lower() == 'json':
-                return json.dumps(metrics, indent=2, default=str)
-            elif format.lower() == 'csv':
-                # Simple CSV export for key metrics
-                lines = [
-                    "metric,value,timestamp",
-                    f"uptime_seconds,{metrics.get('uptime_seconds', 0)},{metrics.get('timestamp', 0)}",
-                    f"memory_mb,{metrics.get('system_metrics', {}).get('memory_mb', 0)},{metrics.get('timestamp', 0)}",
-                    f"cpu_percent,{metrics.get('system_metrics', {}).get('cpu_percent', 0)},{metrics.get('timestamp', 0)}",
-                    f"cache_hit_rate,{metrics.get('cache_statistics', {}).get('hit_rate_percent', 0)},{metrics.get('timestamp', 0)}",
-                    f"success_rate,{metrics.get('performance_summary', {}).get('success_rate_percent', 0)},{metrics.get('timestamp', 0)}"
-                ]
-                return '\n'.join(lines)
-            else:
-                raise ValueError(f"Unsupported export format: {format}")
-                
-        except Exception as e:
-            logger.error(f"Failed to export metrics: {e}")
-            return f"Export failed: {e}"
-    
-    def apply_optimization_recommendation(self, recommendation_id: str) -> Dict[str, Any]:
-        """
-        Apply a specific optimization recommendation.
+        # Trigger callbacks
+        for callback in self._alert_callbacks:
+            try:
+                callback(alert)
+            except Exception as e:
+                self.logger.error(f"Alert callback error: {e}")
         
-        Args:
-            recommendation_id: ID of the recommendation to apply
-            
-        Returns:
-            Result of applying the optimization
-        """
-        try:
-            # This would implement automatic optimization based on recommendations
-            # For now, return a placeholder response
-            return {
-                'success': True,
-                'message': f"Optimization {recommendation_id} would be applied",
-                'timestamp': time.time()
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to apply optimization: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'timestamp': time.time()
-            }
+        # Update last alert time
+        self._last_alerts[alert_type] = current_time
     
-    def get_performance_trends(self, hours: int = 24) -> Dict[str, Any]:
-        """
-        Get performance trends over time.
+    def _format_alert_message(self, alert_type: str, data: Dict[str, Any]) -> str:
+        """Format alert message for display."""
+        if alert_type == 'health_score_low':
+            return f"System health score is low: {data['current_score']:.1f}/100"
+        elif alert_type == 'success_rate_degrading':
+            return f"Success rate degrading: {data['current_rate']:.1%} ({data['change_percent']:+.1f}%)"
+        elif alert_type == 'cache_performance_low':
+            return f"Cache '{data['cache_name']}' hit rate is low: {data['hit_rate']:.1%}"
+        else:
+            return f"Performance alert: {alert_type}"
+    
+    def _generate_optimization_recommendations(self) -> List[OptimizationRecommendation]:
+        """Generate optimization recommendations based on current performance."""
+        recommendations = []
         
-        Args:
-            hours: Number of hours to analyze
+        # Analyze text capture performance
+        text_capture_stats = self._dashboard_data.get('text_capture', {})
+        if text_capture_stats:
+            success_rate = text_capture_stats.get('success_rate', 1.0)
+            avg_duration = text_capture_stats.get('avg_duration_ms', 0.0)
             
-        Returns:
-            Performance trends data
-        """
-        try:
-            # This would analyze historical performance data
-            # For now, return current snapshot
-            current_metrics = self.get_real_time_metrics()
+            if success_rate < 0.9:
+                recommendations.append(OptimizationRecommendation(
+                    category='text_capture',
+                    priority='high',
+                    title='Improve Text Capture Reliability',
+                    description=f'Text capture success rate is {success_rate:.1%}. Consider improving fallback mechanisms and error handling.',
+                    expected_improvement='10-20% improvement in success rate',
+                    implementation_effort='medium'
+                ))
             
-            return {
-                'time_period_hours': hours,
-                'current_snapshot': current_metrics,
-                'trends': {
-                    'memory_usage': 'stable',
-                    'cpu_usage': 'stable',
-                    'cache_performance': 'improving',
-                    'success_rate': 'stable'
-                },
-                'timestamp': time.time()
-            }
+            if avg_duration > 1000.0:
+                recommendations.append(OptimizationRecommendation(
+                    category='text_capture',
+                    priority='medium',
+                    title='Optimize Text Capture Speed',
+                    description=f'Text capture is slow (avg: {avg_duration:.0f}ms). Consider caching accessibility connections.',
+                    expected_improvement='30-50% reduction in capture time',
+                    implementation_effort='low'
+                ))
+        
+        # Analyze explanation generation performance
+        explanation_stats = self._dashboard_data.get('explanation_generation', {})
+        if explanation_stats:
+            avg_duration = explanation_stats.get('avg_duration_ms', 0.0)
             
-        except Exception as e:
-            logger.error(f"Failed to get performance trends: {e}")
-            return {
-                'error': str(e),
-                'timestamp': time.time()
-            }
+            if avg_duration > 5000.0:
+                recommendations.append(OptimizationRecommendation(
+                    category='explanation_generation',
+                    priority='high',
+                    title='Optimize Explanation Generation',
+                    description=f'Explanation generation is slow (avg: {avg_duration:.0f}ms). Consider prompt optimization or model caching.',
+                    expected_improvement='20-40% reduction in generation time',
+                    implementation_effort='medium'
+                ))
+        
+        # Analyze cache performance
+        cache_stats = self._dashboard_data.get('cache_performance', {})
+        for cache_name, stats in cache_stats.items():
+            hit_rate = stats.get('hit_rate', 0.0)
+            if hit_rate < 0.3:
+                recommendations.append(OptimizationRecommendation(
+                    category='caching',
+                    priority='medium',
+                    title=f'Improve {cache_name.title()} Cache Effectiveness',
+                    description=f'Cache hit rate is low ({hit_rate:.1%}). Consider adjusting TTL or improving cache keys.',
+                    expected_improvement='15-25% improvement in response time',
+                    implementation_effort='low'
+                ))
+        
+        # Sort by priority
+        priority_order = {'high': 0, 'medium': 1, 'low': 2}
+        recommendations.sort(key=lambda r: priority_order.get(r.priority, 3))
+        
+        return recommendations
+    
+    def get_dashboard_data(self) -> Dict[str, Any]:
+        """Get current dashboard data."""
+        # Update if data is stale
+        if time.time() - self._last_update > self.update_interval:
+            self._update_dashboard_data()
+        
+        return self._dashboard_data.copy()
+    
+    def get_performance_report(self) -> Dict[str, Any]:
+        """Generate comprehensive performance report."""
+        dashboard_data = self.get_dashboard_data()
+        
+        return {
+            'report_timestamp': time.time(),
+            'health_score': dashboard_data.get('overall_health_score', 0.0),
+            'summary': dashboard_data.get('summary', {}),
+            'trends': [
+                {
+                    'metric': trend.metric_name,
+                    'direction': trend.trend_direction,
+                    'change_percent': trend.change_percent,
+                    'significance': trend.significance
+                }
+                for trend in dashboard_data.get('trends', [])
+            ],
+            'recommendations': [
+                {
+                    'category': rec.category,
+                    'priority': rec.priority,
+                    'title': rec.title,
+                    'description': rec.description,
+                    'expected_improvement': rec.expected_improvement,
+                    'implementation_effort': rec.implementation_effort
+                }
+                for rec in dashboard_data.get('optimization_recommendations', [])
+            ],
+            'recent_alerts': dashboard_data.get('recent_alerts', [])
+        }
+    
+    def add_alert_callback(self, callback: callable) -> None:
+        """Add callback for performance alerts."""
+        self._alert_callbacks.append(callback)
+    
+    def shutdown(self) -> None:
+        """Shutdown dashboard and cleanup resources."""
+        if self._update_thread:
+            self._stop_updates.set()
+            self._update_thread.join(timeout=5)
+        
+        self.logger.info("Performance dashboard shutdown complete")
 
 
-# Global dashboard instance
-performance_dashboard = PerformanceDashboard()
+def create_performance_dashboard() -> Optional[PerformanceDashboard]:
+    """Create and return a performance dashboard instance."""
+    try:
+        from .performance_monitor import get_performance_monitor
+        monitor = get_performance_monitor()
+        
+        if monitor.enabled:
+            return PerformanceDashboard(monitor)
+        else:
+            return None
+    except ImportError:
+        return None

@@ -237,7 +237,8 @@ class ExplainSelectionHandler(BaseHandler):
         
         This method creates a contextual prompt and uses the reasoning module
         to generate clear, accessible explanations suitable for spoken delivery.
-        Implements comprehensive error handling, timeout management, and quality validation.
+        Implements comprehensive error handling, timeout management, quality validation,
+        and performance monitoring with caching.
         
         Args:
             selected_text: The text to explain
@@ -246,6 +247,139 @@ class ExplainSelectionHandler(BaseHandler):
         Returns:
             Generated explanation string if successful, None if failed
         """
+        # Import performance monitor
+        try:
+            from modules.performance_monitor import get_performance_monitor
+            monitor = get_performance_monitor()
+        except ImportError:
+            monitor = None
+        
+        # Track explanation generation performance
+        if monitor:
+            with monitor.track_operation('explanation_generation', {
+                'text_length': len(selected_text),
+                'command': command[:50] + '...' if len(command) > 50 else command,
+                'content_type': self._determine_content_type(selected_text)
+            }) as metric:
+                return self._generate_explanation_with_monitoring(selected_text, command, monitor, metric)
+        else:
+            return self._generate_explanation_without_monitoring(selected_text, command)
+    
+    def _generate_explanation_with_monitoring(self, selected_text: str, command: str, monitor, metric) -> Optional[str]:
+        """Generate explanation with performance monitoring and caching."""
+        try:
+            # Check cache first for similar explanations
+            cache_key = self._create_explanation_cache_key(selected_text, command)
+            cached_explanation = monitor.explanation_cache.get(cache_key)
+            if cached_explanation:
+                metric.metadata['cache_hit'] = True
+                self.logger.debug(f"Explanation from cache: {len(cached_explanation)} chars")
+                return cached_explanation
+            
+            # Get reasoning module with enhanced error handling
+            reasoning_module = self._get_module_safely('reasoning_module')
+            if not reasoning_module:
+                self.logger.error("Reasoning module not available")
+                return None
+            
+            # Validate input parameters
+            if not selected_text or not selected_text.strip():
+                self.logger.error("Selected text is empty or invalid")
+                return None
+            
+            if len(selected_text) > 5000:  # Reasonable limit for explanation requests
+                self.logger.warning(f"Selected text is very long ({len(selected_text)} chars), truncating for explanation")
+                selected_text = selected_text[:5000] + "..."
+                metric.metadata['text_truncated'] = True
+            
+            # Create explanation prompt with enhanced context
+            explanation_prompt = self._create_explanation_prompt(selected_text, command)
+            
+            # Generate explanation using the reasoning module
+            self.logger.debug("Requesting explanation from reasoning module")
+            
+            with monitor.track_operation('reasoning_api_call') as api_metric:
+                try:
+                    # Use process_query method with the EXPLAIN_TEXT_PROMPT template
+                    from config import EXPLAIN_TEXT_PROMPT
+                    
+                    # Format the prompt with the selected text
+                    formatted_prompt = EXPLAIN_TEXT_PROMPT.format(selected_text=selected_text)
+                    
+                    # Call the reasoning module with timeout handling
+                    explanation_response = reasoning_module.process_query(
+                        query=formatted_prompt,
+                        context={
+                            "command": command,
+                            "text_length": len(selected_text),
+                            "content_type": self._determine_content_type(selected_text)
+                        }
+                    )
+                    api_metric.metadata['api_method'] = 'process_query'
+                    
+                except AttributeError:
+                    # Fallback to get_action_plan if process_query is not available
+                    self.logger.debug("process_query not available, falling back to get_action_plan")
+                    explanation_response = reasoning_module.get_action_plan(
+                        user_command=f"Explain this text: {command}",
+                        screen_context={
+                            "selected_text": selected_text,
+                            "command": command,
+                            "content_type": self._determine_content_type(selected_text)
+                        }
+                    )
+                    api_metric.metadata['api_method'] = 'get_action_plan'
+                
+                except Exception as api_error:
+                    api_metric.metadata['api_error'] = str(api_error)
+                    self.logger.error(f"Reasoning module API error: {api_error}")
+                    return self._handle_reasoning_failure(api_error, selected_text)
+            
+            # Handle empty or None response
+            if not explanation_response:
+                self.logger.error("Reasoning module returned empty response")
+                return self._handle_empty_response(selected_text)
+            
+            # Extract explanation from response with enhanced parsing
+            with monitor.track_operation('explanation_extraction') as extract_metric:
+                explanation = self._extract_explanation_from_response(explanation_response)
+                extract_metric.metadata['extraction_success'] = explanation is not None
+                
+                if not explanation:
+                    self.logger.error("Could not extract explanation from reasoning response")
+                    return self._handle_extraction_failure(explanation_response, selected_text)
+            
+            # Validate explanation quality with enhanced checks
+            with monitor.track_operation('explanation_validation') as validate_metric:
+                validation_result = self._validate_explanation_quality(explanation, selected_text)
+                validate_metric.metadata['validation_passed'] = validation_result
+                
+                if not validation_result:
+                    self.logger.warning("Generated explanation failed quality validation")
+                    # Try to improve the explanation or provide fallback
+                    explanation = self._improve_explanation_quality(explanation, selected_text)
+                    validate_metric.metadata['quality_improved'] = True
+            
+            # Final length and content validation for spoken delivery
+            explanation = self._optimize_for_spoken_delivery(explanation)
+            
+            # Cache successful explanation
+            if explanation and len(explanation) > 10:
+                cache_ttl = 300.0  # 5 minutes for explanations
+                monitor.explanation_cache.put(cache_key, explanation, ttl=cache_ttl)
+                metric.metadata['cached'] = True
+            
+            metric.metadata['explanation_length'] = len(explanation) if explanation else 0
+            self.logger.info(f"Successfully generated explanation ({len(explanation)} chars)")
+            return explanation
+            
+        except Exception as e:
+            metric.metadata['generation_error'] = str(e)
+            self.logger.error(f"Unexpected error during explanation generation: {e}")
+            return self._handle_generation_exception(e, selected_text)
+    
+    def _generate_explanation_without_monitoring(self, selected_text: str, command: str) -> Optional[str]:
+        """Generate explanation without performance monitoring (fallback)."""
         try:
             # Get reasoning module with enhanced error handling
             reasoning_module = self._get_module_safely('reasoning_module')
@@ -330,6 +464,21 @@ class ExplainSelectionHandler(BaseHandler):
         except Exception as e:
             self.logger.error(f"Unexpected error during explanation generation: {e}")
             return self._handle_generation_exception(e, selected_text)
+    
+    def _create_explanation_cache_key(self, selected_text: str, command: str) -> str:
+        """Create a cache key for explanation caching."""
+        import hashlib
+        
+        # Create a hash of the selected text and command for caching
+        # Normalize text for better cache hits
+        normalized_text = selected_text.strip().lower()
+        normalized_command = command.strip().lower()
+        
+        # Create hash key
+        key_content = f"{normalized_text}:{normalized_command}"
+        cache_key = hashlib.md5(key_content.encode()).hexdigest()
+        
+        return f"explanation_{cache_key}"
     
     def _create_explanation_prompt(self, selected_text: str, command: str) -> str:
         """
