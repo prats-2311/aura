@@ -1,0 +1,68 @@
+# AURA - Minimal Requirements
+# Essential packages only for basic functionality
+#
+# Installation:
+# conda create --name aura python=3.11 -y
+# conda activate aura
+# pip install -r requirements-minimal.txt
+
+# Core AI/ML
+torch>=2.8.0
+transformers>=4.56.0
+huggingface-hub>=0.34.4
+
+# Audio Processing
+openai-whisper>=20250625
+sounddevice>=0.5.2
+pydub>=0.25.1
+pyttsx3>=2.99
+pvporcupine>=3.0.5
+
+# GUI Automation
+pyautogui>=0.9.54
+pyperclip>=1.9.0
+pynput>=1.8.1
+mss>=10.1.0
+
+# macOS Integration (Essential)
+pyobjc>=11.1
+pyobjc-framework-Cocoa>=11.1
+pyobjc-framework-ApplicationServices>=11.1
+pyobjc-framework-Accessibility>=11.1
+
+# Web Framework
+fastapi>=0.116.1
+uvicorn>=0.35.0
+
+# HTTP Requests
+requests>=2.32.5
+httpx>=0.28.1
+
+# Data Processing
+numpy>=2.2.6
+pandas>=2.3.2
+
+# Gaming/Graphics
+pygame>=2.6.1
+
+# Text Processing
+thefuzz>=0.22.1
+beautifulsoup4>=4.13.5
+
+# Configuration
+pyyaml>=6.0.2
+python-dotenv>=1.1.1
+
+# Validation
+pydantic>=2.11.7
+
+# Cloud Integration
+ollama>=0.5.3
+
+# Development
+pytest>=8.4.1
+black>=25.1.0
+
+# System Utilities
+psutil>=7.0.0
+structlog>=25.4.0

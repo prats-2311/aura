@@ -1,2 +1,173 @@
-# ...existing code...
-pyperclip>=1.8.2
+# AURA - Autonomous User-side Robotic Assistant
+# Requirements file for conda environment setup
+# 
+# Installation:
+# 1. Create conda environment: conda create --name aura python=3.11 -y
+# 2. Activate environment: conda activate aura
+# 3. Install requirements: pip install -r requirements.txt
+
+# Core Python packages
+setuptools>=80.9.0
+wheel>=0.45.1
+pip>=25.2
+
+# AI/ML and Language Models
+torch>=2.8.0
+transformers>=4.56.0
+tokenizers>=0.22.0
+huggingface-hub>=0.34.4
+safetensors>=0.6.2
+accelerate>=1.10.1
+tiktoken>=0.11.0
+
+# Audio Processing and Speech
+openai-whisper>=20250625
+sounddevice>=0.5.2
+pydub>=0.25.1
+pyttsx3>=2.99
+pvporcupine>=3.0.5
+
+# Computer Vision and GUI Automation
+opencv-python>=4.12.0.88
+pillow>=11.3.0
+pyautogui>=0.9.54
+pyscreeze>=1.0.1
+pygetwindow>=0.0.9
+pymsgbox>=1.0.9
+pytweening>=1.2.0
+pyrect>=0.2.0
+mouseinfo>=0.1.3
+mss>=10.1.0
+
+# macOS Integration (PyObjC frameworks)
+pyobjc>=11.1
+pyobjc-core>=11.1
+pyobjc-framework-Cocoa>=11.1
+pyobjc-framework-ApplicationServices>=11.1
+pyobjc-framework-Accessibility>=11.1
+pyobjc-framework-AppKit>=11.1
+pyobjc-framework-CoreFoundation>=11.1
+pyobjc-framework-CoreServices>=11.1
+pyobjc-framework-CoreText>=11.1
+pyobjc-framework-Quartz>=11.1
+pyobjc-framework-Vision>=11.1
+pyobjc-framework-Speech>=11.1
+pyobjc-framework-AVFoundation>=11.1
+pyobjc-framework-CoreAudio>=11.1
+pyobjc-framework-CoreMedia>=11.1
+pyobjc-framework-Security>=11.1
+pyobjc-framework-SystemConfiguration>=11.1
+rubicon-objc>=0.5.2
+
+# Web Framework and API
+fastapi>=0.116.1
+uvicorn>=0.35.0
+starlette>=0.47.3
+flask>=3.1.2
+werkzeug>=3.1.3
+jinja2>=3.1.6
+itsdangerous>=2.2.0
+blinker>=1.9.0
+
+# HTTP and Networking
+requests>=2.32.5
+httpx>=0.28.1
+httpcore>=1.0.9
+h11>=0.16.0
+websockets>=15.0.1
+urllib3>=2.5.0
+certifi>=2025.8.3
+idna>=3.10
+charset-normalizer>=3.4.3
+anyio>=4.10.0
+sniffio>=1.3.1
+
+# Data Processing and Analysis
+pandas>=2.3.2
+numpy>=2.2.6
+scipy>=1.14.0
+sympy>=1.14.0
+networkx>=3.5
+more-itertools>=10.7.0
+
+# Gaming and Graphics
+pygame>=2.6.1
+pycairo>=1.28.0
+pygobject>=3.52.3
+
+# Input/Output and System
+pynput>=1.8.1
+pyperclip>=1.9.0
+psutil>=7.0.0
+filelock>=3.19.1
+fsspec>=2025.7.0
+pathspec>=0.12.1
+platformdirs>=4.4.0
+
+# Text Processing and Fuzzy Matching
+thefuzz>=0.22.1
+rapidfuzz>=3.14.0
+levenshtein>=0.27.1
+beautifulsoup4>=4.13.5
+soupsieve>=2.8
+
+# Configuration and Serialization
+pyyaml>=6.0.2
+python-dotenv>=1.1.1
+packaging>=25.0
+attrs>=25.3.0
+annotated-types>=0.7.0
+
+# Validation and Schema
+pydantic>=2.11.7
+pydantic-core>=2.33.2
+jsonschema>=4.25.1
+jsonschema-specifications>=2025.4.1
+referencing>=0.36.2
+rpds-py>=0.27.1
+
+# Date and Time
+python-dateutil>=2.9.0.post0
+pytz>=2025.2
+tzdata>=2025.2
+
+# Development and Testing
+pytest>=8.4.1
+pytest-asyncio>=1.1.0
+pytest-mock>=3.14.1
+black>=25.1.0
+flake8>=7.3.0
+mypy>=1.17.1
+mypy-extensions>=1.1.0
+pycodestyle>=2.14.0
+pyflakes>=3.4.0
+mccabe>=0.7.0
+pluggy>=1.6.0
+iniconfig>=2.1.0
+
+# Logging and Monitoring
+structlog>=25.4.0
+tqdm>=4.67.1
+pygments>=2.19.2
+
+# Cloud and API Integration
+ollama>=0.5.3
+
+# Numerical Computing (for ML acceleration)
+llvmlite>=0.44.0
+numba>=0.61.2
+mpmath>=1.3.0
+
+# Type Checking and Inspection
+typing-extensions>=4.15.0
+typing-inspection>=0.4.1
+
+# Cryptography and Security
+cffi>=1.17.1
+pycparser>=2.22
+
+# Additional Utilities
+click>=8.2.1
+six>=1.17.0
+regex>=2025.8.29
+
