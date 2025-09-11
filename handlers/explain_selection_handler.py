@@ -222,6 +222,7 @@ class ExplainSelectionHandler(BaseHandler):
         
         This method creates a contextual prompt and uses the reasoning module
         to generate clear, accessible explanations suitable for spoken delivery.
+        Implements comprehensive error handling, timeout management, and quality validation.
         
         Args:
             selected_text: The text to explain
@@ -231,42 +232,89 @@ class ExplainSelectionHandler(BaseHandler):
             Generated explanation string if successful, None if failed
         """
         try:
-            # Get reasoning module
+            # Get reasoning module with enhanced error handling
             reasoning_module = self._get_module_safely('reasoning_module')
             if not reasoning_module:
                 self.logger.error("Reasoning module not available")
                 return None
             
-            # Create explanation prompt
-            explanation_prompt = self._create_explanation_prompt(selected_text, command)
-            
-            # Generate explanation with timeout
-            self.logger.debug("Requesting explanation from reasoning module")
-            
-            # Use the reasoning module's get_action_plan method which is the standard interface
-            explanation_response = reasoning_module.get_action_plan(explanation_prompt)
-            
-            if not explanation_response:
-                self.logger.error("Reasoning module returned empty response")
+            # Validate input parameters
+            if not selected_text or not selected_text.strip():
+                self.logger.error("Selected text is empty or invalid")
                 return None
             
-            # Extract explanation from response
+            if len(selected_text) > 5000:  # Reasonable limit for explanation requests
+                self.logger.warning(f"Selected text is very long ({len(selected_text)} chars), truncating for explanation")
+                selected_text = selected_text[:5000] + "..."
+            
+            # Create explanation prompt with enhanced context
+            explanation_prompt = self._create_explanation_prompt(selected_text, command)
+            
+            # Generate explanation using the reasoning module's process_query method
+            # which is more appropriate for text explanation than get_action_plan
+            self.logger.debug("Requesting explanation from reasoning module")
+            
+            try:
+                # Use process_query method with the EXPLAIN_TEXT_PROMPT template
+                from config import EXPLAIN_TEXT_PROMPT
+                
+                # Format the prompt with the selected text
+                formatted_prompt = EXPLAIN_TEXT_PROMPT.format(selected_text=selected_text)
+                
+                # Call the reasoning module with timeout handling
+                explanation_response = reasoning_module.process_query(
+                    query=formatted_prompt,
+                    context={
+                        "command": command,
+                        "text_length": len(selected_text),
+                        "content_type": self._determine_content_type(selected_text)
+                    }
+                )
+                
+            except AttributeError:
+                # Fallback to get_action_plan if process_query is not available
+                self.logger.debug("process_query not available, falling back to get_action_plan")
+                explanation_response = reasoning_module.get_action_plan(
+                    user_command=f"Explain this text: {command}",
+                    screen_context={
+                        "selected_text": selected_text,
+                        "command": command,
+                        "content_type": self._determine_content_type(selected_text)
+                    }
+                )
+            
+            except Exception as api_error:
+                self.logger.error(f"Reasoning module API error: {api_error}")
+                return self._handle_reasoning_failure(api_error, selected_text)
+            
+            # Handle empty or None response
+            if not explanation_response:
+                self.logger.error("Reasoning module returned empty response")
+                return self._handle_empty_response(selected_text)
+            
+            # Extract explanation from response with enhanced parsing
             explanation = self._extract_explanation_from_response(explanation_response)
             
             if not explanation:
                 self.logger.error("Could not extract explanation from reasoning response")
-                return None
+                return self._handle_extraction_failure(explanation_response, selected_text)
             
-            # Validate explanation quality
-            if not self._validate_explanation_quality(explanation, selected_text):
+            # Validate explanation quality with enhanced checks
+            validation_result = self._validate_explanation_quality(explanation, selected_text)
+            if not validation_result:
                 self.logger.warning("Generated explanation failed quality validation")
-                # Return it anyway as it's better than nothing
+                # Try to improve the explanation or provide fallback
+                explanation = self._improve_explanation_quality(explanation, selected_text)
             
+            # Final length and content validation for spoken delivery
+            explanation = self._optimize_for_spoken_delivery(explanation)
+            
+            self.logger.info(f"Successfully generated explanation ({len(explanation)} chars)")
             return explanation
             
         except Exception as e:
-            self.logger.error(f"Error during explanation generation: {e}")
-            return None
+            self.logger.error(f"Unexpected error during explanation generation: {e}")
+            return self._handle_generation_exception(e, selected_text)
     
     def _create_explanation_prompt(self, selected_text: str, command: str) -> str:
         """
@@ -274,6 +322,7 @@ class ExplainSelectionHandler(BaseHandler):
         
         This method creates a specialized prompt that instructs the reasoning module
         to generate clear, accessible explanations suitable for spoken delivery.
+        Enhanced with content type detection and context-aware formatting.
         
         Args:
             selected_text: The text to explain
@@ -285,8 +334,28 @@ class ExplainSelectionHandler(BaseHandler):
         # Determine content type for specialized handling
         content_type = self._determine_content_type(selected_text)
         
-        # Create base prompt with content type awareness
-        prompt = f"""You are AURA, a helpful AI assistant. Please provide a clear and concise explanation of the following text. The explanation should be in simple, accessible language suitable for spoken delivery.
+        # Get the configured explanation prompt template
+        try:
+            from config import EXPLAIN_TEXT_PROMPT
+            base_prompt = EXPLAIN_TEXT_PROMPT
+        except ImportError:
+            # Fallback prompt if config is not available
+            base_prompt = """You are AURA, a helpful AI assistant. Please provide a clear and concise explanation of the following text suitable for spoken delivery.
+
+Selected text to explain:
+---
+{selected_text}
+---
+
+Provide a clear, conversational explanation in simple language."""
+        
+        # Format the prompt with the selected text
+        try:
+            formatted_prompt = base_prompt.format(selected_text=selected_text)
+        except KeyError as e:
+            self.logger.warning(f"Prompt template formatting error: {e}, using fallback")
+            # Fallback formatting
+            formatted_prompt = f"""You are AURA, a helpful AI assistant. Please explain the following text in simple, conversational language suitable for spoken delivery.
 
 Content type: {content_type}
 User command: {command}
@@ -296,17 +365,9 @@ Text to explain:
 {selected_text}
 ---
 
-Instructions:
-- Provide a clear, concise explanation in simple language
-- If this is code, explain what it does and its purpose
-- If this contains technical terms, provide definitions and context
-- If the text is very long, provide a summary rather than detailed explanation
-- Keep the explanation conversational and suitable for speaking aloud
-- Focus on the most important aspects that would help someone understand the content
-
-Please provide your explanation:"""
+Provide a clear, concise explanation."""
         
-        return prompt
+        return formatted_prompt
     
     def _determine_content_type(self, text: str) -> str:
         """
@@ -343,46 +404,112 @@ Please provide your explanation:"""
         # Default to general text
         return "general text"
     
-    def _extract_explanation_from_response(self, response: Dict[str, Any]) -> Optional[str]:
+    def _extract_explanation_from_response(self, response: Any) -> Optional[str]:
         """
-        Extract the explanation text from the reasoning module response.
+        Extract the explanation text from the reasoning module response with enhanced parsing.
         
         Args:
-            response: Response dictionary from reasoning module
+            response: Response from reasoning module (can be string, dict, or other format)
             
         Returns:
             Extracted explanation string or None if extraction failed
         """
         try:
-            # The reasoning module typically returns responses in different formats
-            # Try to extract the explanation from common response structures
-            
+            # Handle direct string responses (most common for process_query)
             if isinstance(response, str):
-                return response.strip()
+                explanation = response.strip()
+                
+                # Remove common wrapper text that might be added by the model
+                unwrap_patterns = [
+                    "Here's an explanation:",
+                    "Here is an explanation:",
+                    "Explanation:",
+                    "The explanation is:",
+                    "This text means:",
+                    "This means:"
+                ]
+                
+                for pattern in unwrap_patterns:
+                    if explanation.lower().startswith(pattern.lower()):
+                        explanation = explanation[len(pattern):].strip()
+                        break
+                
+                return explanation if explanation else None
             
+            # Handle dictionary responses (from get_action_plan or structured responses)
             if isinstance(response, dict):
                 # Try common keys where explanation might be stored
-                for key in ['explanation', 'response', 'answer', 'result', 'content', 'text']:
+                explanation_keys = [
+                    'explanation', 'response', 'answer', 'result', 'content', 'text',
+                    'message', 'output', 'generated_text', 'completion'
+                ]
+                
+                for key in explanation_keys:
                     if key in response and response[key]:
-                        return str(response[key]).strip()
+                        extracted = str(response[key]).strip()
+                        if extracted:
+                            return extracted
                 
-                # If it's an action plan format, try to extract from action or description
-                if 'action' in response:
-                    return str(response['action']).strip()
+                # Handle action plan format (if get_action_plan was used)
+                if 'plan' in response and isinstance(response['plan'], list):
+                    # Look for speak actions that might contain the explanation
+                    for action in response['plan']:
+                        if isinstance(action, dict) and action.get('action') == 'speak':
+                            message = action.get('message', '')
+                            if message and len(message) > 5:  # Any reasonable message length
+                                return message.strip()
                 
-                # Last resort: convert entire response to string
-                return str(response).strip()
+                # Try to extract from nested structures
+                for key, value in response.items():
+                    if isinstance(value, dict):
+                        nested_result = self._extract_explanation_from_response(value)
+                        if nested_result:
+                            return nested_result
+                
+                # Last resort for dict: try to find the longest string value
+                string_values = []
+                for value in response.values():
+                    if isinstance(value, str) and len(value.strip()) > 10:
+                        string_values.append(value.strip())
+                
+                if string_values:
+                    # Return the longest string as it's most likely the explanation
+                    return max(string_values, key=len)
             
-            # Fallback: convert to string
-            return str(response).strip()
+            # Handle list responses
+            if isinstance(response, list) and response:
+                # Try to extract from first item or find the best candidate
+                for item in response:
+                    extracted = self._extract_explanation_from_response(item)
+                    if extracted:
+                        return extracted
+            
+            # Final fallback: convert to string and clean up
+            fallback_text = str(response).strip()
+            
+            # Remove obvious JSON artifacts
+            if fallback_text.startswith('{') and fallback_text.endswith('}'):
+                # This looks like a JSON string representation, skip it
+                return None
+            
+            if fallback_text.startswith('[') and fallback_text.endswith(']'):
+                # This looks like a list string representation, skip it
+                return None
+            
+            # Return if it looks like reasonable text
+            if len(fallback_text) > 10 and not fallback_text.startswith('{'): 
+                return fallback_text
+            
+            return None
             
         except Exception as e:
             self.logger.error(f"Error extracting explanation from response: {e}")
+            self.logger.debug(f"Response type: {type(response)}, Response: {str(response)[:200]}...")
             return None
     
     def _validate_explanation_quality(self, explanation: str, original_text: str) -> bool:
         """
-        Validate the quality of the generated explanation.
+        Validate the quality of the generated explanation with enhanced checks.
         
         Args:
             explanation: The generated explanation
@@ -392,30 +519,63 @@ Please provide your explanation:"""
             True if explanation meets quality standards, False otherwise
         """
         try:
-            # Basic length validation
-            if len(explanation.strip()) < 10:
-                self.logger.warning("Explanation too short")
+            # Basic validation checks
+            if not explanation or not explanation.strip():
+                self.logger.warning("Explanation is empty or whitespace only")
+                return False
+            
+            # Length validation with more nuanced rules
+            explanation_length = len(explanation.strip())
+            original_length = len(original_text.strip())
+            
+            if explanation_length < 10:
+                self.logger.warning("Explanation too short (< 10 characters)")
+                return False
+            
+            if explanation_length > 1000:
+                self.logger.warning("Explanation too long for spoken delivery (> 1000 characters)")
                 return False
             
             # Check for reasonable length relative to original text
-            if len(explanation) > len(original_text) * 3:
-                self.logger.warning("Explanation significantly longer than original text")
-                # Don't fail validation, just log warning
+            length_ratio = explanation_length / max(original_length, 1)
+            if length_ratio > 5.0:
+                self.logger.warning(f"Explanation much longer than original (ratio: {length_ratio:.1f})")
+                # Don't fail validation, but log for monitoring
             
-            # Check for common failure patterns
+            # Enhanced failure pattern detection
             failure_patterns = [
                 "i cannot", "i can't", "unable to", "don't understand",
-                "not clear", "insufficient information", "cannot determine"
+                "not clear", "insufficient information", "cannot determine",
+                "i don't know", "unclear", "ambiguous", "not enough context",
+                "cannot explain", "difficult to explain", "hard to understand"
             ]
             
             explanation_lower = explanation.lower()
-            if any(pattern in explanation_lower for pattern in failure_patterns):
-                self.logger.warning("Explanation contains failure indicators")
+            failure_count = sum(1 for pattern in failure_patterns if pattern in explanation_lower)
+            if failure_count > 0:
+                self.logger.warning(f"Explanation contains {failure_count} failure indicators")
                 return False
             
             # Check for reasonable content (not just repeated text)
-            if explanation.strip().lower() == original_text.strip().lower():
-                self.logger.warning("Explanation is identical to original text")
+            if self._is_text_repetition(explanation, original_text):
+                self.logger.warning("Explanation appears to be repetition of original text")
+                return False
+            
+            # Check for meaningful content indicators
+            meaningful_indicators = [
+                "means", "refers to", "describes", "indicates", "represents",
+                "this is", "this code", "this function", "this text", "in other words",
+                "essentially", "basically", "simply put", "to explain"
+            ]
+            
+            has_meaningful_content = any(indicator in explanation_lower for indicator in meaningful_indicators)
+            if not has_meaningful_content and explanation_length < 50:
+                self.logger.warning("Explanation lacks meaningful content indicators")
+                return False
+            
+            # Validate sentence structure for spoken delivery
+            if not self._has_proper_sentence_structure(explanation):
+                self.logger.warning("Explanation has poor sentence structure for spoken delivery")
                 return False
             
             return True
@@ -487,6 +647,254 @@ Please provide your explanation:"""
             self.logger.error(f"Failed to speak error feedback: {e}")
             # Fallback to console output
             print(f"\n🤖 AURA: {error_message}\n")
+    
+    def _handle_reasoning_failure(self, error: Exception, selected_text: str) -> Optional[str]:
+        """
+        Handle reasoning module API failures with fallback strategies.
+        
+        Args:
+            error: The exception that occurred
+            selected_text: The original selected text
+            
+        Returns:
+            Fallback explanation or None if all strategies fail
+        """
+        self.logger.error(f"Reasoning module API failure: {error}")
+        
+        # Try to provide a basic fallback explanation
+        try:
+            content_type = self._determine_content_type(selected_text)
+            
+            if content_type == "code snippet":
+                return f"This appears to be a code snippet. The code contains {len(selected_text)} characters and may involve programming logic or functions."
+            elif len(selected_text) > 500:
+                return f"This is a longer text passage with {len(selected_text)} characters. It appears to contain detailed information that would benefit from careful reading."
+            else:
+                return f"This text contains {len(selected_text)} characters and appears to be {content_type}. I'm having trouble providing a detailed explanation right now."
+                
+        except Exception as fallback_error:
+            self.logger.error(f"Fallback explanation generation failed: {fallback_error}")
+            return None
+    
+    def _handle_empty_response(self, selected_text: str) -> Optional[str]:
+        """
+        Handle empty responses from the reasoning module.
+        
+        Args:
+            selected_text: The original selected text
+            
+        Returns:
+            Fallback explanation or None
+        """
+        self.logger.warning("Reasoning module returned empty response")
+        
+        # Provide a basic acknowledgment
+        try:
+            word_count = len(selected_text.split())
+            return f"I can see you've selected text with approximately {word_count} words, but I'm having trouble generating a detailed explanation right now. Please try again."
+        except Exception:
+            return None
+    
+    def _handle_extraction_failure(self, response: Any, selected_text: str) -> Optional[str]:
+        """
+        Handle failures in extracting explanation from reasoning response.
+        
+        Args:
+            response: The raw response from reasoning module
+            selected_text: The original selected text
+            
+        Returns:
+            Fallback explanation or None
+        """
+        self.logger.error(f"Failed to extract explanation from response: {type(response)}")
+        
+        # Try to extract any useful text from the response
+        try:
+            if isinstance(response, str) and len(response) > 10:
+                return response[:500]  # Truncate if too long
+            elif isinstance(response, dict):
+                # Try to find any text content in the response
+                for key in ['text', 'content', 'message', 'explanation', 'response']:
+                    if key in response and isinstance(response[key], str):
+                        return response[key][:500]
+        except Exception as e:
+            self.logger.error(f"Error in extraction fallback: {e}")
+        
+        return None
+    
+    def _handle_generation_exception(self, error: Exception, selected_text: str) -> Optional[str]:
+        """
+        Handle unexpected exceptions during explanation generation.
+        
+        Args:
+            error: The exception that occurred
+            selected_text: The original selected text
+            
+        Returns:
+            Fallback explanation or None
+        """
+        self.logger.error(f"Unexpected error in explanation generation: {error}")
+        
+        # Provide a minimal fallback
+        try:
+            return f"I encountered an issue while analyzing the selected text. The text appears to contain {len(selected_text)} characters."
+        except Exception:
+            return None
+    
+    def _improve_explanation_quality(self, explanation: str, original_text: str) -> str:
+        """
+        Attempt to improve explanation quality for better spoken delivery.
+        
+        Args:
+            explanation: The original explanation
+            original_text: The original selected text
+            
+        Returns:
+            Improved explanation
+        """
+        try:
+            # Clean up common issues
+            improved = explanation.strip()
+            
+            # Remove markdown formatting that doesn't work well in speech
+            improved = improved.replace('**', '').replace('*', '').replace('`', '')
+            
+            # Ensure it starts with a capital letter
+            if improved and not improved[0].isupper():
+                improved = improved[0].upper() + improved[1:]
+            
+            # Ensure it ends with proper punctuation
+            if improved and improved[-1] not in '.!?':
+                improved += '.'
+            
+            # Replace technical abbreviations with spoken forms
+            replacements = {
+                ' & ': ' and ',
+                ' w/ ': ' with ',
+                ' w/o ': ' without ',
+                ' etc.': ' and so on',
+                ' i.e.': ' that is',
+                ' e.g.': ' for example'
+            }
+            
+            for old, new in replacements.items():
+                improved = improved.replace(old, new)
+            
+            return improved
+            
+        except Exception as e:
+            self.logger.error(f"Error improving explanation quality: {e}")
+            return explanation
+    
+    def _optimize_for_spoken_delivery(self, explanation: str) -> str:
+        """
+        Optimize explanation for spoken delivery by text-to-speech.
+        
+        Args:
+            explanation: The explanation to optimize
+            
+        Returns:
+            Optimized explanation
+        """
+        try:
+            # Ensure reasonable length for speech (aim for 30-60 seconds at normal speaking pace)
+            max_chars = 400  # Approximately 60 seconds of speech
+            if len(explanation) > max_chars:
+                # Find a good breaking point
+                truncated = explanation[:max_chars]
+                last_sentence_end = max(
+                    truncated.rfind('.'),
+                    truncated.rfind('!'),
+                    truncated.rfind('?')
+                )
+                
+                if last_sentence_end > max_chars * 0.7:  # If we can keep most of the content
+                    explanation = truncated[:last_sentence_end + 1]
+                else:
+                    explanation = truncated + "..."
+            
+            # Ensure good flow for speech
+            explanation = explanation.replace('\n', ' ').replace('\t', ' ')
+            
+            # Remove excessive whitespace
+            import re
+            explanation = re.sub(r'\s+', ' ', explanation).strip()
+            
+            return explanation
+            
+        except Exception as e:
+            self.logger.error(f"Error optimizing for spoken delivery: {e}")
+            return explanation
+    
+    def _is_text_repetition(self, explanation: str, original_text: str) -> bool:
+        """
+        Check if explanation is just repetition of original text.
+        
+        Args:
+            explanation: The generated explanation
+            original_text: The original selected text
+            
+        Returns:
+            True if explanation appears to be repetition
+        """
+        try:
+            # Normalize both texts for comparison
+            exp_normalized = explanation.lower().strip()
+            orig_normalized = original_text.lower().strip()
+            
+            # Check for exact match
+            if exp_normalized == orig_normalized:
+                return True
+            
+            # Check for substantial overlap (more than 80% of explanation is from original)
+            exp_words = set(exp_normalized.split())
+            orig_words = set(orig_normalized.split())
+            
+            if len(exp_words) == 0:
+                return True
+            
+            overlap = len(exp_words.intersection(orig_words))
+            overlap_ratio = overlap / len(exp_words)
+            
+            return overlap_ratio > 0.8
+            
+        except Exception as e:
+            self.logger.error(f"Error checking text repetition: {e}")
+            return False
+    
+    def _has_proper_sentence_structure(self, explanation: str) -> bool:
+        """
+        Check if explanation has proper sentence structure for spoken delivery.
+        
+        Args:
+            explanation: The explanation to check
+            
+        Returns:
+            True if structure is suitable for speech
+        """
+        try:
+            # Check for basic sentence structure
+            sentences = explanation.split('.')
+            
+            # Should have at least one complete sentence
+            if len(sentences) < 1:
+                return False
+            
+            # Check for reasonable sentence length (not too long for speech)
+            for sentence in sentences:
+                if len(sentence.strip()) > 200:  # Very long sentences are hard to follow in speech
+                    return False
+            
+            # Check for basic grammatical structure (has some common words)
+            common_words = ['the', 'a', 'an', 'is', 'are', 'was', 'were', 'this', 'that', 'it']
+            explanation_lower = explanation.lower()
+            has_common_words = any(word in explanation_lower for word in common_words)
+            
+            return has_common_words
+            
+        except Exception as e:
+            self.logger.error(f"Error checking sentence structure: {e}")
+            return True  # Default to accepting if we can't check
     
     def get_performance_stats(self) -> Dict[str, Any]:
         """
