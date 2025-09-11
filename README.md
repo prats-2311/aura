@@ -1,4 +1,3 @@
-
 ### Testing Instructions
 
 This guide provides the necessary steps to set up and test the AURA project. The primary testing path is configured to use a locally-hosted `gpt-oss` model via Ollama, showcasing AURA's capabilities as a true local agent.
@@ -115,25 +114,26 @@ To test AURA's core features, please use the wake word **"Computer"** before eac
   * `"Computer, introduce yourself."`
   * `"Computer, how are you today?"`
 
-**B. Test GUI Automation**
 
-  * (With your browser open) `"Computer, search for the OpenAI Open Model Hackathon."`
-  * (With a text editor open) `"Computer, type 'Hello, world!'"`
-
-**C. Test Stateful Task Context (Deferred Action - *Wildcard* Feature)**
+**B. Test Stateful Task Context (Deferred Action - *Wildcard* Feature)**
 
 1.  Open a code editor (like VS Code or TextEdit) with a blank file.
 2.  Say: `"Computer, write a Python function that calculates the Fibonacci sequence."`
 3.  AURA will respond: *"Code generated. Click where you want me to place it."*
 4.  Click your mouse anywhere in the blank file. AURA will type the complete, formatted function.
 
-**D. Test Conversational Context (Follow-up Command)**
+**C. Test Conversational Context (The Correct Way)**
 
-1.  Immediately after the Fibonacci function is written, say:
-2.  `"Computer, now can you write that in TensorFlow?"`
-3.  AURA should understand that "that" refers to the previous request and generate a new machine learning-focused code snippet.
+This test shows how AURA remembers the context of a conversation to inform a later action.
 
-**E. Test Visual & Accessibility Context ("Explain Selected Text" - *Wildcard* Feature)**
+1.  First, have a brief conversation to establish context. Say:
+    `"Computer, what is a neural network?"`
+    *(AURA will give you a spoken explanation. This conversation is now in its short-term memory.)*
+2.  Now, with a code editor open, give a follow-up action command:
+    `"Computer, write a simple one for me in PyTorch."`
+3.  AURA will use the context from your question to understand that **"one"** refers to a neural network and will generate the correct code. This demonstrates its ability to blend conversational context with direct action.
+
+**D. Test Visual & Accessibility Context ("Explain Selected Text" - *Wildcard* Feature)**
 
 1.  Open any webpage or PDF with a substantial amount of text.
 2.  Use your mouse to highlight a paragraph.
