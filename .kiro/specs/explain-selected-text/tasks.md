@@ -77,7 +77,7 @@
   - Add performance tests to verify text capture speed and end-to-end explanation timing meets requirements
   - _Requirements: 1.1, 1.3, 1.4, 1.5, 2.1, 2.2, 2.4, 3.4, 5.5_
 
-- [ ] 11. Test feature across different macOS applications
+- [x] 11. Test feature across different macOS applications
 
   - Test text selection and explanation in web browsers (Chrome, Safari) with various content types
   - Verify functionality in PDF readers (Preview) with formatted documents and technical content
