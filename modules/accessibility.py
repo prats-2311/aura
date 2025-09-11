@@ -4099,8 +4099,8 @@ class AccessibilityModule:
             if selected_text_result[0] == 0 and selected_text_result[1]:
                 selected_text = selected_text_result[1]
                 
-                # Validate that we got actual text
-                if isinstance(selected_text, str) and selected_text.strip():
+                # Validate that we got a string (including empty strings)
+                if isinstance(selected_text, str):
                     duration_ms = (time.time() - start_time) * 1000
                     self._log_performance_metrics(operation_name, duration_ms, True, {
                         'text_length': len(selected_text),
@@ -4113,7 +4113,7 @@ class AccessibilityModule:
                     
                     return selected_text
                 else:
-                    self.logger.debug("Selected text attribute returned empty or invalid value")
+                    self.logger.debug("Selected text attribute returned invalid value (not a string)")
                     return None
             else:
                 # Attribute access failed - this is normal if no text is selected
@@ -4145,6 +4145,254 @@ class AccessibilityModule:
             else:
                 self.logger.debug(f"Unexpected error during text capture: {e}")
                 return None
+    
+    def get_selected_text(self) -> Optional[str]:
+        """
+        Get selected text using accessibility API first, then clipboard fallback.
+        
+        This is the main public interface for text capture. It tries the accessibility
+        API method first for speed and non-intrusiveness, then falls back to the
+        clipboard method if needed.
+        
+        Returns:
+            Optional[str]: The selected text if successful, None if no text is selected
+            
+        Raises:
+            Exception: If both capture methods fail due to system errors
+        """
+        from dataclasses import dataclass
+        from typing import Optional
+        
+        @dataclass
+        class TextCaptureResult:
+            """Result from text capture operations."""
+            text: Optional[str]
+            method_used: str  # "accessibility_api" | "clipboard_fallback"
+            success: bool
+            error_message: Optional[str] = None
+            capture_time_ms: float = 0.0
+        
+        start_time = time.time()
+        operation_name = "get_selected_text_unified"
+        
+        # Track performance metrics for both methods
+        accessibility_result = None
+        clipboard_result = None
+        
+        try:
+            # Method 1: Try accessibility API first (fast, non-intrusive)
+            self.logger.debug("Attempting text capture via accessibility API")
+            accessibility_start = time.time()
+            
+            try:
+                selected_text = self.get_selected_text_via_accessibility()
+                accessibility_time = (time.time() - accessibility_start) * 1000
+                
+                if selected_text is not None:
+                    # Success with accessibility API - return even empty strings
+                    accessibility_result = TextCaptureResult(
+                        text=selected_text,
+                        method_used="accessibility_api",
+                        success=True,
+                        capture_time_ms=accessibility_time
+                    )
+                    
+                    total_time = (time.time() - start_time) * 1000
+                    self._log_performance_metrics(operation_name, total_time, True, {
+                        'method_used': 'accessibility_api',
+                        'text_length': len(selected_text),
+                        'fallback_triggered': False
+                    })
+                    
+                    if self.debug_logging:
+                        self.logger.debug(f"Text capture successful via accessibility API: "
+                                        f"{len(selected_text)} chars in {accessibility_time:.1f}ms")
+                    
+                    return selected_text
+                else:
+                    # No text selected, but method worked
+                    accessibility_result = TextCaptureResult(
+                        text=None,
+                        method_used="accessibility_api",
+                        success=True,
+                        error_message="No text selected",
+                        capture_time_ms=accessibility_time
+                    )
+                    self.logger.debug("Accessibility API: No text selected")
+                    
+            except AccessibilityPermissionError as e:
+                accessibility_time = (time.time() - accessibility_start) * 1000
+                accessibility_result = TextCaptureResult(
+                    text=None,
+                    method_used="accessibility_api",
+                    success=False,
+                    error_message=f"Permission error: {e}",
+                    capture_time_ms=accessibility_time
+                )
+                self.logger.debug(f"Accessibility API failed due to permissions: {e}")
+                
+            except AccessibilityAPIUnavailableError as e:
+                accessibility_time = (time.time() - accessibility_start) * 1000
+                accessibility_result = TextCaptureResult(
+                    text=None,
+                    method_used="accessibility_api",
+                    success=False,
+                    error_message=f"API unavailable: {e}",
+                    capture_time_ms=accessibility_time
+                )
+                self.logger.debug(f"Accessibility API unavailable: {e}")
+                
+            except Exception as e:
+                accessibility_time = (time.time() - accessibility_start) * 1000
+                accessibility_result = TextCaptureResult(
+                    text=None,
+                    method_used="accessibility_api",
+                    success=False,
+                    error_message=f"Unexpected error: {e}",
+                    capture_time_ms=accessibility_time
+                )
+                self.logger.debug(f"Accessibility API failed with unexpected error: {e}")
+            
+            # Method 2: Fall back to clipboard method
+            self.logger.debug("Falling back to clipboard-based text capture")
+            clipboard_start = time.time()
+            
+            try:
+                # Import automation module for clipboard method
+                from .automation import AutomationModule
+                
+                # Create automation module instance if we don't have one
+                if not hasattr(self, '_automation_module'):
+                    self._automation_module = AutomationModule()
+                
+                selected_text = self._automation_module.get_selected_text_via_clipboard()
+                clipboard_time = (time.time() - clipboard_start) * 1000
+                
+                if selected_text is not None:
+                    # Success with clipboard method
+                    clipboard_result = TextCaptureResult(
+                        text=selected_text,
+                        method_used="clipboard_fallback",
+                        success=True,
+                        capture_time_ms=clipboard_time
+                    )
+                    
+                    total_time = (time.time() - start_time) * 1000
+                    self._log_performance_metrics(operation_name, total_time, True, {
+                        'method_used': 'clipboard_fallback',
+                        'text_length': len(selected_text),
+                        'fallback_triggered': True,
+                        'accessibility_error': accessibility_result.error_message if accessibility_result else None
+                    })
+                    
+                    if self.debug_logging:
+                        self.logger.debug(f"Text capture successful via clipboard fallback: "
+                                        f"{len(selected_text)} chars in {clipboard_time:.1f}ms")
+                    
+                    return selected_text
+                else:
+                    # No text selected
+                    clipboard_result = TextCaptureResult(
+                        text=None,
+                        method_used="clipboard_fallback",
+                        success=True,
+                        error_message="No text selected",
+                        capture_time_ms=clipboard_time
+                    )
+                    self.logger.debug("Clipboard method: No text selected")
+                    
+            except Exception as e:
+                clipboard_time = (time.time() - clipboard_start) * 1000
+                clipboard_result = TextCaptureResult(
+                    text=None,
+                    method_used="clipboard_fallback",
+                    success=False,
+                    error_message=f"Clipboard error: {e}",
+                    capture_time_ms=clipboard_time
+                )
+                self.logger.debug(f"Clipboard method failed: {e}")
+            
+            # Both methods completed - determine final result
+            total_time = (time.time() - start_time) * 1000
+            
+            # Check if both methods failed with errors (not just no text selected)
+            accessibility_failed = accessibility_result and not accessibility_result.success
+            clipboard_failed = clipboard_result and not clipboard_result.success
+            
+            if accessibility_failed and clipboard_failed:
+                # Both methods failed with errors - this is a system failure
+                self._log_performance_metrics(operation_name, total_time, False, {
+                    'method_used': 'both_failed',
+                    'fallback_triggered': True,
+                    'accessibility_error': accessibility_result.error_message,
+                    'clipboard_error': clipboard_result.error_message
+                })
+                
+                # Provide specific error feedback based on the type of failures
+                if "permission" in accessibility_result.error_message.lower():
+                    raise Exception(
+                        "Text capture failed: Accessibility permissions required. "
+                        "Please grant accessibility permissions in System Preferences > "
+                        "Security & Privacy > Privacy > Accessibility"
+                    )
+                elif "clipboard" in clipboard_result.error_message.lower():
+                    raise Exception(
+                        "Text capture failed: Cannot access clipboard. "
+                        "Please ensure the application has permission to access the clipboard."
+                    )
+                else:
+                    raise Exception(
+                        f"Text capture failed: Both accessibility API and clipboard methods failed. "
+                        f"Accessibility: {accessibility_result.error_message}. "
+                        f"Clipboard: {clipboard_result.error_message}"
+                    )
+            
+            # If we got here, no text was selected (both methods returned None successfully)
+            # This is a successful operation - just no text to capture
+            self._log_performance_metrics(operation_name, total_time, True, {
+                'method_used': 'both_attempted',
+                'text_length': 0,
+                'fallback_triggered': True,
+                'result': 'no_text_selected',
+                'accessibility_time_ms': accessibility_result.capture_time_ms if accessibility_result else 0,
+                'clipboard_time_ms': clipboard_result.capture_time_ms if clipboard_result else 0
+            })
+            
+            self.logger.info("No text is currently selected")
+            return None
+            
+        except Exception as e:
+            # Unexpected error in the unified method itself
+            total_time = (time.time() - start_time) * 1000
+            self._log_performance_metrics(operation_name, total_time, False, {
+                'error': str(e),
+                'method_used': 'unified_interface',
+                'fallback_triggered': clipboard_result is not None
+            })
+            
+            error_details = {
+                'accessibility_result': accessibility_result.error_message if accessibility_result else "Not attempted",
+                'clipboard_result': clipboard_result.error_message if clipboard_result else "Not attempted",
+                'unified_error': str(e)
+            }
+            
+            self.logger.error(f"Unified text capture failed: {e}")
+            self.logger.debug(f"Text capture error details: {error_details}")
+            
+            # Provide clear feedback for different failure scenarios
+            if accessibility_result and "permission" in accessibility_result.error_message.lower():
+                raise Exception(
+                    "Text capture failed: Accessibility permissions required. "
+                    "Please grant accessibility permissions in System Preferences > "
+                    "Security & Privacy > Privacy > Accessibility"
+                )
+            elif clipboard_result and "clipboard" in clipboard_result.error_message.lower():
+                raise Exception(
+                    "Text capture failed: Cannot access clipboard. "
+                    "Please ensure the application has permission to access the clipboard."
+                )
+            else:
+                raise Exception(f"Text capture failed: {e}")
     
     def _get_focused_element_in_application(self, app_element) -> Optional[Any]:
         """

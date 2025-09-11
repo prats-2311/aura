@@ -15,7 +15,7 @@
   - Add performance monitoring and logging for clipboard-based capture method
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 3. Create unified text capture interface in AccessibilityModule
+- [x] 3. Create unified text capture interface in AccessibilityModule
 
   - Implement main `get_selected_text()` method that tries accessibility API first, then falls back to clipboard method
   - Add comprehensive error handling that provides clear feedback for different failure scenarios
