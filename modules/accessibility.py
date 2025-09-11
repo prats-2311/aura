@@ -53,7 +53,9 @@ try:
         kAXEnabledAttribute,
         kAXChildrenAttribute,
         kAXPositionAttribute,
-        kAXSizeAttribute
+        kAXSizeAttribute,
+        kAXSelectedTextAttribute,
+        kAXFocusedUIElementAttribute
     )
     ACCESSIBILITY_FUNCTIONS_AVAILABLE = True
 except ImportError:
@@ -4035,6 +4037,142 @@ class AccessibilityModule:
             return "Unknown"
         except Exception:
             return "Unknown"
+    
+    # Text Capture Methods
+    
+    def get_selected_text_via_accessibility(self) -> Optional[str]:
+        """
+        Get selected text from the focused element using accessibility API.
+        
+        This method queries the focused element for the AXSelectedText attribute,
+        providing a fast, non-intrusive way to capture selected text without
+        affecting the clipboard.
+        
+        Returns:
+            Selected text string if available, None if no text is selected or
+            accessibility API is unavailable
+            
+        Raises:
+            AccessibilityPermissionError: If accessibility permissions are not granted
+            AccessibilityAPIUnavailableError: If accessibility API is not available
+        """
+        start_time = time.time()
+        operation_name = "get_selected_text_via_accessibility"
+        
+        try:
+            # Check if accessibility is available
+            if not self.accessibility_enabled:
+                if self.degraded_mode:
+                    self.logger.debug("Accessibility API unavailable - in degraded mode")
+                    return None
+                else:
+                    raise AccessibilityAPIUnavailableError(
+                        "Accessibility API not available for text capture"
+                    )
+            
+            # Check permissions
+            if not self.validate_permissions_for_fast_path():
+                raise AccessibilityPermissionError(
+                    "Insufficient accessibility permissions for text capture"
+                )
+            
+            # Get the focused application element
+            focused_app = self._get_focused_application_element()
+            if not focused_app:
+                self.logger.debug("Cannot access focused application for text capture")
+                return None
+            
+            # Get the focused element within the application
+            focused_element = self._get_focused_element_in_application(focused_app)
+            if not focused_element:
+                self.logger.debug("Cannot access focused element for text capture")
+                return None
+            
+            # Try to get selected text from the focused element
+            selected_text_result = AXUIElementCopyAttributeValue(
+                focused_element, 
+                kAXSelectedTextAttribute, 
+                None
+            )
+            
+            # Check if the attribute access was successful
+            if selected_text_result[0] == 0 and selected_text_result[1]:
+                selected_text = selected_text_result[1]
+                
+                # Validate that we got actual text
+                if isinstance(selected_text, str) and selected_text.strip():
+                    duration_ms = (time.time() - start_time) * 1000
+                    self._log_performance_metrics(operation_name, duration_ms, True, {
+                        'text_length': len(selected_text),
+                        'method': 'accessibility_api'
+                    })
+                    
+                    if self.debug_logging:
+                        self.logger.debug(f"Successfully captured selected text via accessibility API: "
+                                        f"{len(selected_text)} characters in {duration_ms:.1f}ms")
+                    
+                    return selected_text
+                else:
+                    self.logger.debug("Selected text attribute returned empty or invalid value")
+                    return None
+            else:
+                # Attribute access failed - this is normal if no text is selected
+                self.logger.debug(f"No selected text available (error code: {selected_text_result[0]})")
+                return None
+                
+        except AccessibilityPermissionError:
+            # Re-raise permission errors
+            raise
+        except AccessibilityAPIUnavailableError:
+            # Re-raise API unavailable errors
+            raise
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            self._log_performance_metrics(operation_name, duration_ms, False, {
+                'error': str(e),
+                'method': 'accessibility_api'
+            })
+            
+            # Handle different types of errors
+            if "permission" in str(e).lower():
+                raise AccessibilityPermissionError(
+                    f"Permission error during text capture: {e}"
+                )
+            elif "unavailable" in str(e).lower() or "not found" in str(e).lower():
+                raise AccessibilityAPIUnavailableError(
+                    f"Accessibility API error during text capture: {e}"
+                )
+            else:
+                self.logger.debug(f"Unexpected error during text capture: {e}")
+                return None
+    
+    def _get_focused_element_in_application(self, app_element) -> Optional[Any]:
+        """
+        Get the focused element within a specific application.
+        
+        Args:
+            app_element: The application accessibility element
+            
+        Returns:
+            The focused element within the application, or None if not found
+        """
+        try:
+            # Try to get the focused element from the application
+            focused_element_result = AXUIElementCopyAttributeValue(
+                app_element,
+                kAXFocusedUIElementAttribute,
+                None
+            )
+            
+            if focused_element_result[0] == 0 and focused_element_result[1]:
+                return focused_element_result[1]
+            else:
+                self.logger.debug(f"Cannot get focused element from application (error code: {focused_element_result[0]})")
+                return None
+                
+        except Exception as e:
+            self.logger.debug(f"Error getting focused element in application: {e}")
+            return None
     
     # Element Classification and Filtering Methods
     

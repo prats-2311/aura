@@ -5197,6 +5197,9 @@ class Orchestrator:
             
             # Extract page text content
             page_content = self.browser_accessibility_handler.get_page_text_content(app_info)
+            logger.debug(f"Full extracted content: {page_content}") # <-- ADD THIS LINE
+            logger.info(f"Full extracted content: {page_content}") # <-- ADD THIS LINE
+
             
             if not page_content or len(page_content.strip()) < 50:
                 return {
@@ -5207,7 +5210,7 @@ class Orchestrator:
                 }
             
             extraction_time = time.time() - extraction_start
-            logger.info(f"[{execution_id}] Extracted {len(page_content)} characters from browser in {extraction_time:.2f}s")
+            logger.info(f"Full extracted content: {page_content}") # <-- ADD THIS LINE
             
             # Use reasoning module to answer question based on extracted content
             reasoning_start = time.time()
