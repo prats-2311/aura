@@ -11,6 +11,7 @@ import time
 import logging
 import platform
 import subprocess
+import pyperclip
 from typing import Dict, Any, Tuple, Optional, List
 from config import MOUSE_MOVE_DURATION, TYPE_INTERVAL, SCROLL_AMOUNT
 from .error_handler import (
@@ -2777,6 +2778,182 @@ class AutomationModule:
             logger.error(f"Failed to handle validation error: {e}")
             return False
     
+    def get_selected_text_via_clipboard(self) -> Optional[str]:
+        """
+        Capture selected text using clipboard fallback method.
+        
+        This method preserves the original clipboard content, simulates Cmd+C to copy
+        selected text, captures the text, and restores the original clipboard.
+        
+        Returns:
+            Optional[str]: The selected text if successful, None if failed
+        """
+        start_time = time.time()
+        original_clipboard = None
+        captured_text = None
+        
+        try:
+            # Step 1: Preserve original clipboard content
+            try:
+                original_clipboard = pyperclip.paste()
+                logger.debug(f"Preserved original clipboard content ({len(original_clipboard)} chars)")
+            except Exception as e:
+                logger.warning(f"Failed to preserve clipboard content: {e}")
+                # Continue anyway - we'll try to restore what we can
+                original_clipboard = ""
+            
+            # Step 2: Clear clipboard to detect if copy operation worked
+            try:
+                pyperclip.copy("")
+                logger.debug("Cleared clipboard for text capture")
+            except Exception as e:
+                logger.error(f"Failed to clear clipboard: {e}")
+                raise Exception("Clipboard access failed during clear operation")
+            
+            # Step 3: Simulate Cmd+C to copy selected text
+            try:
+                if self.is_macos:
+                    # Use cliclick for Cmd+C on macOS
+                    if self.has_cliclick:
+                        logger.debug("Using cliclick for Cmd+C simulation")
+                        result = subprocess.run(
+                            ['cliclick', 'kd:cmd', 't:c', 'ku:cmd'],
+                            capture_output=True,
+                            text=True,
+                            timeout=3
+                        )
+                        if result.returncode != 0:
+                            logger.warning(f"cliclick Cmd+C failed: {result.stderr}")
+                            # Fall back to AppleScript
+                            raise Exception("cliclick Cmd+C failed")
+                    else:
+                        # Use AppleScript for Cmd+C
+                        logger.debug("Using AppleScript for Cmd+C simulation")
+                        applescript = '''tell application "System Events"
+    key code 8 using command down
+end tell'''
+                        result = subprocess.run(
+                            ['osascript', '-e', applescript],
+                            capture_output=True,
+                            text=True,
+                            timeout=3
+                        )
+                        if result.returncode != 0:
+                            logger.error(f"AppleScript Cmd+C failed: {result.stderr}")
+                            raise Exception("AppleScript Cmd+C failed")
+                else:
+                    # Use PyAutoGUI for other platforms
+                    pyautogui.hotkey('ctrl', 'c')
+                    logger.debug("Used PyAutoGUI for Ctrl+C simulation")
+                
+                # Small delay to allow copy operation to complete
+                time.sleep(0.2)
+                
+            except Exception as e:
+                logger.error(f"Failed to simulate copy command: {e}")
+                raise Exception(f"Copy command simulation failed: {e}")
+            
+            # Step 4: Capture text from clipboard
+            try:
+                captured_text = pyperclip.paste()
+                if captured_text == "":
+                    logger.info("No text captured - clipboard is empty (no text selected)")
+                    captured_text = None
+                else:
+                    logger.info(f"Successfully captured {len(captured_text)} characters via clipboard")
+                    logger.debug(f"Captured text preview: {captured_text[:100]}...")
+            except Exception as e:
+                logger.error(f"Failed to read from clipboard: {e}")
+                raise Exception(f"Clipboard read failed: {e}")
+            
+        except Exception as e:
+            # Log the error with performance metrics
+            execution_time = time.time() - start_time
+            error_info = global_error_handler.handle_error(
+                error=e,
+                module="automation",
+                function="get_selected_text_via_clipboard",
+                category=ErrorCategory.HARDWARE_ERROR,
+                severity=ErrorSeverity.MEDIUM,
+                context={
+                    "execution_time": execution_time,
+                    "platform": platform.system(),
+                    "has_cliclick": getattr(self, 'has_cliclick', False)
+                }
+            )
+            logger.error(f"Clipboard text capture failed: {error_info.message}")
+            captured_text = None
+            
+        finally:
+            # Step 5: Always restore original clipboard content
+            try:
+                if original_clipboard is not None:
+                    pyperclip.copy(original_clipboard)
+                    logger.debug("Restored original clipboard content")
+                else:
+                    # If we couldn't preserve original content, clear clipboard
+                    pyperclip.copy("")
+                    logger.debug("Cleared clipboard (original content unavailable)")
+            except Exception as e:
+                logger.warning(f"Failed to restore clipboard content: {e}")
+                # This is not critical - continue anyway
+            
+            # Log performance metrics
+            execution_time = time.time() - start_time
+            self._log_clipboard_capture_performance(execution_time, captured_text is not None, captured_text)
+        
+        return captured_text
+    
+    def _log_clipboard_capture_performance(self, execution_time: float, success: bool, captured_text: Optional[str]) -> None:
+        """
+        Log performance metrics for clipboard-based text capture.
+        
+        Args:
+            execution_time: Time taken for the capture operation
+            success: Whether the capture was successful
+            captured_text: The captured text (for length metrics)
+        """
+        try:
+            # Create performance record
+            perf_record = {
+                'timestamp': time.time(),
+                'execution_time': execution_time,
+                'method': 'clipboard_fallback',
+                'success': success,
+                'action': 'text_capture',
+                'platform': platform.system(),
+                'has_cliclick': getattr(self, 'has_cliclick', False)
+            }
+            
+            if captured_text:
+                perf_record.update({
+                    'text_length': len(captured_text),
+                    'has_newlines': '\n' in captured_text,
+                    'has_special_chars': any(ord(c) > 127 for c in captured_text[:100])  # Check first 100 chars
+                })
+            
+            # Store in performance history
+            if not hasattr(self, 'text_capture_performance'):
+                self.text_capture_performance = []
+            self.text_capture_performance.append(perf_record)
+            
+            # Keep history manageable (last 50 records)
+            if len(self.text_capture_performance) > 50:
+                self.text_capture_performance = self.text_capture_performance[-25:]
+            
+            # Log summary
+            status = "SUCCESS" if success else "FAILED"
+            text_info = f" ({len(captured_text)} chars)" if captured_text else ""
+            logger.info(f"Clipboard capture {status}: {execution_time:.3f}s{text_info}")
+            
+            # Performance warning for slow operations
+            if execution_time > 2.0:
+                logger.warning(f"Clipboard capture took {execution_time:.3f}s - performance issue detected")
+            
+        except Exception as e:
+            logger.warning(f"Failed to log clipboard capture performance: {e}")
+            # Don't raise - this is just logging
+
     def execute_fast_path_action(self, action_type: str, coordinates: List[int], **kwargs) -> Dict[str, Any]:
         """
         Execute action with pre-validated coordinates from accessibility API.

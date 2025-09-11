@@ -7,7 +7,7 @@
   - Add logging and performance tracking for accessibility-based text capture
   - _Requirements: 2.1, 2.3_
 
-- [ ] 2. Implement clipboard fallback method in AutomationModule
+- [x] 2. Implement clipboard fallback method in AutomationModule
 
   - Add `pyperclip` dependency to requirements.txt for clipboard operations
   - Create `get_selected_text_via_clipboard()` method that preserves original clipboard, simulates Cmd+C, captures text, and restores clipboard
