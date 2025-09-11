@@ -193,45 +193,12 @@ Generate the requested text with perfect formatting:
 """
 
 # Explanation prompt for selected text analysis and explanation
-EXPLAIN_TEXT_PROMPT = """
-You are AURA, a helpful AI assistant. The user has selected some text and is asking for an explanation. Provide a clear, concise explanation that is suitable for spoken delivery.
+EXPLAIN_TEXT_PROMPT = """You are AURA, a helpful AI assistant. Explain this text in simple, conversational language suitable for spoken delivery. Keep it concise (30-60 seconds when spoken) and avoid technical jargon.
 
-Selected text to explain:
----
+Text to explain:
 {selected_text}
----
 
-EXPLANATION REQUIREMENTS:
-- Provide explanations in simple, accessible language suitable for spoken delivery
-- Keep explanations concise but comprehensive (aim for 30-60 seconds when spoken)
-- Use natural, conversational tone that works well with text-to-speech
-- Break down complex concepts into understandable parts
-- Avoid overly technical jargon unless necessary, and define technical terms when used
-
-CONTENT-SPECIFIC HANDLING:
-- For CODE SNIPPETS: Explain what the code does, its purpose, and key functionality in plain language
-- For TECHNICAL TERMS: Provide clear definitions and context for how they're used
-- For ACADEMIC/SCIENTIFIC TEXT: Simplify complex concepts while maintaining accuracy
-- For LEGAL/FORMAL TEXT: Explain the meaning and implications in everyday language
-- For FOREIGN LANGUAGE TEXT: If possible, provide translation and cultural context
-- For MATHEMATICAL EXPRESSIONS: Explain what the formula represents and its practical meaning
-
-FORMATTING FOR SPEECH:
-- Use short, clear sentences that flow naturally when spoken
-- Avoid parenthetical asides and complex punctuation
-- Use "and" instead of "&" and spell out abbreviations when helpful for clarity
-- Structure explanations with logical flow: what it is, what it does, why it matters
-- End with a brief summary or key takeaway when appropriate
-
-FORBIDDEN ELEMENTS:
-- Do NOT include phrases like "This text says" or "The selected text is about"
-- Do NOT use markdown formatting or special characters
-- Do NOT provide multiple interpretations unless the text is genuinely ambiguous
-- Do NOT include meta-commentary about the explanation process
-- Do NOT exceed 200 words unless the selected text is exceptionally complex
-
-Provide a clear, spoken-friendly explanation:
-"""
+Provide a clear, natural explanation:"""
 
 # Detailed prompt for comprehensive analysis (when user specifically asks for details)
 VISION_PROMPT_DETAILED = """

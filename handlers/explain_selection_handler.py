@@ -287,10 +287,17 @@ class ExplainSelectionHandler(BaseHandler):
                 self.logger.error("Selected text is empty or invalid")
                 return None
             
-            if len(selected_text) > 5000:  # Reasonable limit for explanation requests
-                self.logger.warning(f"Selected text is very long ({len(selected_text)} chars), truncating for explanation")
-                selected_text = selected_text[:5000] + "..."
+            # Handle long text to stay within reasoning module limits
+            # The reasoning module has a 2000 character limit for queries
+            # We need to account for the prompt template overhead (~265 chars)
+            max_text_length = 1685  # Leave room for prompt template (2000 - 265 - 50 buffer)
+            
+            if len(selected_text) > max_text_length:
+                self.logger.warning(f"Selected text is long ({len(selected_text)} chars), truncating to {max_text_length} chars for explanation")
+                original_length = len(selected_text)
+                selected_text = selected_text[:max_text_length] + "..."
                 metric.metadata['text_truncated'] = True
+                metric.metadata['original_length'] = original_length
             
             # Create explanation prompt with enhanced context
             explanation_prompt = self._create_explanation_prompt(selected_text, command)
@@ -333,6 +340,12 @@ class ExplainSelectionHandler(BaseHandler):
                 except Exception as api_error:
                     api_metric.metadata['api_error'] = str(api_error)
                     self.logger.error(f"Reasoning module API error: {api_error}")
+                    
+                    # Check if it's a length error and provide specific feedback
+                    if "too long" in str(api_error).lower():
+                        self.logger.error(f"Text too long for reasoning module: {len(selected_text)} chars")
+                        return "I'm sorry, the selected text is too long for me to explain right now. Please try selecting a shorter piece of text."
+                    
                     return self._handle_reasoning_failure(api_error, selected_text)
             
             # Handle empty or None response
@@ -392,9 +405,15 @@ class ExplainSelectionHandler(BaseHandler):
                 self.logger.error("Selected text is empty or invalid")
                 return None
             
-            if len(selected_text) > 5000:  # Reasonable limit for explanation requests
-                self.logger.warning(f"Selected text is very long ({len(selected_text)} chars), truncating for explanation")
-                selected_text = selected_text[:5000] + "..."
+            # Handle long text to stay within reasoning module limits
+            # The reasoning module has a 2000 character limit for queries
+            # We need to account for the prompt template overhead (~265 chars)
+            max_text_length = 1685  # Leave room for prompt template (2000 - 265 - 50 buffer)
+            
+            if len(selected_text) > max_text_length:
+                self.logger.warning(f"Selected text is long ({len(selected_text)} chars), truncating to {max_text_length} chars for explanation")
+                original_length = len(selected_text)
+                selected_text = selected_text[:max_text_length] + "..."
             
             # Create explanation prompt with enhanced context
             explanation_prompt = self._create_explanation_prompt(selected_text, command)
@@ -434,6 +453,12 @@ class ExplainSelectionHandler(BaseHandler):
             
             except Exception as api_error:
                 self.logger.error(f"Reasoning module API error: {api_error}")
+                
+                # Check if it's a length error and provide specific feedback
+                if "too long" in str(api_error).lower():
+                    self.logger.error(f"Text too long for reasoning module: {len(selected_text)} chars")
+                    return "I'm sorry, the selected text is too long for me to explain right now. Please try selecting a shorter piece of text."
+                
                 return self._handle_reasoning_failure(api_error, selected_text)
             
             # Handle empty or None response

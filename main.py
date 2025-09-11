@@ -25,7 +25,7 @@ from orchestrator import Orchestrator
 from modules.audio import AudioModule
 from modules.feedback import FeedbackModule
 from modules.performance import cleanup_performance_resources
-from modules.performance_dashboard import performance_dashboard
+from modules.performance_dashboard import create_performance_dashboard
 
 
 class AURAApplication:
@@ -374,6 +374,12 @@ class AURAApplication:
     def _cleanup_performance_resources(self) -> None:
         """Clean up performance-related resources."""
         try:
+            # Clean up performance dashboard
+            if hasattr(self, '_performance_dashboard') and self._performance_dashboard:
+                self._performance_dashboard.shutdown()
+                logger.debug("Performance dashboard shut down")
+            
+            # Clean up other performance resources
             cleanup_performance_resources()
             logger.debug("Performance resources cleaned up")
         except Exception as e:
@@ -730,24 +736,37 @@ class AURAApplication:
         
         # Get performance metrics
         try:
-            perf_metrics = performance_dashboard.get_real_time_metrics()
-            cache_stats = perf_metrics.get('cache_statistics', {})
-            system_metrics = perf_metrics.get('system_metrics', {})
-            health_status = perf_metrics.get('health_status', 'unknown')
+            # Create performance dashboard if not already created
+            if not hasattr(self, '_performance_dashboard'):
+                self._performance_dashboard = create_performance_dashboard()
             
-            # Log comprehensive status with performance data
-            logger.info(
-                f"AURA Status Report - "
-                f"Uptime: {uptime:.1f}s, "
-                f"Wake words: {self.wake_words_detected} ({wake_word_rate:.1f}/hr), "
-                f"Commands: {self.commands_processed} ({command_rate:.1f}/hr), "
-                f"Errors: {self.errors_count}, "
-                f"Threads: {active_threads} (Wake: {wake_word_status}, Health: {health_monitor_status}), "
-                f"Memory: {system_metrics.get('memory_mb', self.resource_usage['memory_mb']):.1f}MB, "
-                f"CPU: {system_metrics.get('cpu_percent', 0):.1f}%, "
-                f"Cache: {cache_stats.get('hit_rate_percent', 0):.1f}% hit rate, "
-                f"Health: {health_status}"
-            )
+            if self._performance_dashboard:
+                dashboard_data = self._performance_dashboard.get_dashboard_data()
+                cache_stats = dashboard_data.get('cache_performance', {})
+                health_score = dashboard_data.get('overall_health_score', 0)
+                
+                # Log comprehensive status with performance data
+                logger.info(
+                    f"AURA Status Report - "
+                    f"Uptime: {uptime:.1f}s, "
+                    f"Wake words: {self.wake_words_detected} ({wake_word_rate:.1f}/hr), "
+                    f"Commands: {self.commands_processed} ({command_rate:.1f}/hr), "
+                    f"Errors: {self.errors_count}, "
+                    f"Threads: {active_threads} (Wake: {wake_word_status}, Health: {health_monitor_status}), "
+                    f"Memory: {self.resource_usage['memory_mb']:.1f}MB, "
+                    f"Health Score: {health_score:.1f}/100"
+                )
+            else:
+                # Fallback logging without performance metrics
+                logger.info(
+                    f"AURA Status Report - "
+                    f"Uptime: {uptime:.1f}s, "
+                    f"Wake words: {self.wake_words_detected} ({wake_word_rate:.1f}/hr), "
+                    f"Commands: {self.commands_processed} ({command_rate:.1f}/hr), "
+                    f"Errors: {self.errors_count}, "
+                    f"Threads: {active_threads} (Wake: {wake_word_status}, Health: {health_monitor_status}), "
+                    f"Memory: {self.resource_usage['memory_mb']:.1f}MB"
+                )
         except Exception as e:
             # Fallback to basic status if performance metrics fail
             logger.info(
