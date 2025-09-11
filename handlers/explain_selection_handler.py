@@ -429,9 +429,9 @@ Please provide your explanation:"""
         Play thinking sound to indicate processing has started.
         """
         try:
-            audio_module = self._get_module_safely('audio_module')
-            if audio_module and hasattr(audio_module, 'play_thinking_sound'):
-                audio_module.play_thinking_sound()
+            feedback_module = self._get_module_safely('feedback_module')
+            if feedback_module and hasattr(feedback_module, 'play'):
+                feedback_module.play("thinking")
                 self.logger.debug("Thinking sound played")
         except Exception as e:
             self.logger.warning(f"Failed to play thinking sound: {e}")
@@ -445,8 +445,8 @@ Please provide your explanation:"""
         """
         try:
             audio_module = self._get_module_safely('audio_module')
-            if audio_module and hasattr(audio_module, 'speak'):
-                audio_module.speak(explanation)
+            if audio_module and hasattr(audio_module, 'text_to_speech'):
+                audio_module.text_to_speech(explanation)
                 self.logger.debug("Explanation spoken to user")
                 
                 # Also print to console for user feedback
@@ -469,16 +469,16 @@ Please provide your explanation:"""
             error_message: The error message to speak
         """
         try:
+            # Play failure sound using feedback module
+            feedback_module = self._get_module_safely('feedback_module')
+            if feedback_module and hasattr(feedback_module, 'play'):
+                feedback_module.play("failure")
+            
+            # Speak error message using audio module
             audio_module = self._get_module_safely('audio_module')
-            if audio_module:
-                # Play failure sound if available
-                if hasattr(audio_module, 'play_failure_sound'):
-                    audio_module.play_failure_sound()
-                
-                # Speak error message
-                if hasattr(audio_module, 'speak'):
-                    audio_module.speak(error_message)
-                    self.logger.debug("Error feedback spoken to user")
+            if audio_module and hasattr(audio_module, 'text_to_speech'):
+                audio_module.text_to_speech(error_message)
+                self.logger.debug("Error feedback spoken to user")
             
             # Always print to console as fallback
             print(f"\n🤖 AURA: {error_message}\n")

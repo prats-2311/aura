@@ -227,6 +227,7 @@ class Orchestrator:
         self.conversation_handler = None
         self.deferred_action_handler = None
         self.question_answering_handler = None
+        self.explain_selection_handler = None
         
         try:
             # Import handler classes
@@ -234,6 +235,7 @@ class Orchestrator:
             from handlers.conversation_handler import ConversationHandler
             from handlers.deferred_action_handler import DeferredActionHandler
             from handlers.question_answering_handler import QuestionAnsweringHandler
+            from handlers.explain_selection_handler import ExplainSelectionHandler
             
             # Initialize handlers with orchestrator reference and individual error handling
             try:
@@ -261,12 +263,20 @@ class Orchestrator:
                 logger.error(f"Failed to initialize QuestionAnsweringHandler: {e}")
                 logger.warning("Question answering will fall back to legacy orchestrator method")
             
+            try:
+                self.explain_selection_handler = ExplainSelectionHandler(self)
+                logger.debug("ExplainSelectionHandler initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize ExplainSelectionHandler: {e}")
+                logger.warning("Explain selected text will fall back to legacy orchestrator method")
+            
             # Log overall initialization status
             initialized_handlers = []
             if self.gui_handler: initialized_handlers.append("GUIHandler")
             if self.conversation_handler: initialized_handlers.append("ConversationHandler")
             if self.deferred_action_handler: initialized_handlers.append("DeferredActionHandler")
             if self.question_answering_handler: initialized_handlers.append("QuestionAnsweringHandler")
+            if self.explain_selection_handler: initialized_handlers.append("ExplainSelectionHandler")
             
             logger.info(f"Command handlers initialized: {', '.join(initialized_handlers) if initialized_handlers else 'None'}")
             
@@ -358,7 +368,7 @@ class Orchestrator:
                     raise ValueError("Missing required fields in intent recognition response")
                 
                 # Validate intent type
-                valid_intents = ["gui_interaction", "conversational_chat", "deferred_action", "question_answering"]
+                valid_intents = ["gui_interaction", "conversational_chat", "deferred_action", "question_answering", "explain_selected_text"]
                 if intent_result["intent"] not in valid_intents:
                     logger.warning(f"Invalid intent type: {intent_result['intent']}, defaulting to gui_interaction")
                     intent_result["intent"] = "gui_interaction"
@@ -411,6 +421,15 @@ class Orchestrator:
             "compose", "draft"
         ]
         
+        # Explain selected text patterns - highest priority for text explanation requests
+        explain_selected_patterns = [
+            "explain this", "explain the selected text", "explain selected text",
+            "what does this mean", "what does this say", "define this",
+            "what is this", "tell me about this", "explain what this means",
+            "explain the text", "what does the selected text mean",
+            "define the selected text", "what is the selected text"
+        ]
+        
         # Question answering patterns - enhanced for screen content queries
         question_patterns = [
             # Basic question words
@@ -434,7 +453,20 @@ class Orchestrator:
             "what options do i have", "what can i click", "options do i have"
         ]
         
-        # Check for question answering intent FIRST (highest priority for content queries)
+        # Check for explain selected text intent FIRST (highest priority for text explanation)
+        if any(pattern in command_lower for pattern in explain_selected_patterns):
+            return {
+                "intent": "explain_selected_text",
+                "confidence": 0.9,  # High confidence for specific text explanation patterns
+                "parameters": {
+                    "action_type": "explain_text",
+                    "target": "selected text content",
+                    "content_type": "explanation"
+                },
+                "reasoning": "Matched explain selected text patterns in fallback classification"
+            }
+        
+        # Check for question answering intent (high priority for content queries)
         if any(pattern in command_lower for pattern in question_patterns):
             # Determine more specific action type based on command content
             action_type = "general_question"
@@ -524,7 +556,8 @@ class Orchestrator:
             "gui_interaction": self.gui_handler,
             "conversational_chat": self.conversation_handler,
             "deferred_action": self.deferred_action_handler,
-            "question_answering": self.question_answering_handler  # Use dedicated QuestionAnsweringHandler
+            "question_answering": self.question_answering_handler,  # Use dedicated QuestionAnsweringHandler
+            "explain_selected_text": self.explain_selection_handler
         }
         
         handler = handler_map.get(intent)
