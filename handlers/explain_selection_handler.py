@@ -781,7 +781,7 @@ Provide a clear, concise explanation."""
         explanation request has been received and is being processed.
         """
         try:
-            feedback_module = self._get_module_safely('feedback_module')
+            feedback_module = getattr(self.orchestrator, 'feedback_module', None)
             if feedback_module and hasattr(feedback_module, 'play'):
                 # Use high priority for thinking sound to ensure immediate feedback
                 feedback_module.play("thinking", priority=FeedbackPriority.HIGH)
@@ -804,7 +804,7 @@ Provide a clear, concise explanation."""
         """
         try:
             # Use FeedbackModule for enhanced conversational feedback
-            feedback_module = self._get_module_safely('feedback_module')
+            feedback_module = getattr(self.orchestrator, 'feedback_module', None)
             if feedback_module and hasattr(feedback_module, 'provide_conversational_feedback'):
                 # Use conversational feedback for natural explanation delivery
                 feedback_module.provide_conversational_feedback(
@@ -819,7 +819,7 @@ Provide a clear, concise explanation."""
                 self.logger.debug("Explanation delivered via basic speak method")
             else:
                 # Final fallback to audio module
-                audio_module = self._get_module_safely('audio_module')
+                audio_module = getattr(self.orchestrator, 'audio_module', None)
                 if audio_module and hasattr(audio_module, 'text_to_speech'):
                     audio_module.text_to_speech(explanation)
                     self.logger.debug("Explanation delivered via audio module")
@@ -846,7 +846,7 @@ Provide a clear, concise explanation."""
             error_message: The error message to speak
         """
         try:
-            feedback_module = self._get_module_safely('feedback_module')
+            feedback_module = getattr(self.orchestrator, 'feedback_module', None)
             
             if feedback_module and hasattr(feedback_module, 'play_with_message'):
                 # Use combined feedback for failure sound + error message
@@ -870,7 +870,7 @@ Provide a clear, concise explanation."""
                     feedback_module.speak(error_message)
                 else:
                     # Final fallback to audio module
-                    audio_module = self._get_module_safely('audio_module')
+                    audio_module = getattr(self.orchestrator, 'audio_module', None)
                     if audio_module and hasattr(audio_module, 'text_to_speech'):
                         audio_module.text_to_speech(error_message)
                         
@@ -893,7 +893,7 @@ Provide a clear, concise explanation."""
         for new commands.
         """
         try:
-            feedback_module = self._get_module_safely('feedback_module')
+            feedback_module = getattr(self.orchestrator, 'feedback_module', None)
             
             if feedback_module and hasattr(feedback_module, 'play'):
                 # Play subtle success sound with normal priority
