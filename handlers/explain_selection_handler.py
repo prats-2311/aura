@@ -12,6 +12,17 @@ import time
 from typing import Dict, Any, Optional
 from handlers.base_handler import BaseHandler
 
+# Import FeedbackPriority for audio feedback priority handling
+try:
+    from modules.feedback import FeedbackPriority
+except ImportError:
+    # Fallback if FeedbackPriority is not available
+    class FeedbackPriority:
+        LOW = 1
+        NORMAL = 2
+        HIGH = 3
+        CRITICAL = 4
+
 
 class ExplainSelectionHandler(BaseHandler):
     """
@@ -144,7 +155,11 @@ class ExplainSelectionHandler(BaseHandler):
             self.logger.debug("Step 3: Speaking explanation to user")
             self._speak_explanation(explanation)
             
-            # Step 4: Track success and return result
+            # Step 4: Provide success confirmation and return to ready state
+            self.logger.debug("Step 4: Providing success confirmation")
+            self._provide_success_confirmation()
+            
+            # Step 5: Track success and return result
             self._explanation_successes += 1
             
             result = self._create_success_result(
@@ -587,66 +602,143 @@ Provide a clear, concise explanation."""
     def _play_thinking_sound(self) -> None:
         """
         Play thinking sound to indicate processing has started.
+        
+        This method provides immediate audio feedback to the user that their
+        explanation request has been received and is being processed.
         """
         try:
             feedback_module = self._get_module_safely('feedback_module')
             if feedback_module and hasattr(feedback_module, 'play'):
-                feedback_module.play("thinking")
-                self.logger.debug("Thinking sound played")
+                # Use high priority for thinking sound to ensure immediate feedback
+                feedback_module.play("thinking", priority=FeedbackPriority.HIGH)
+                self.logger.debug("Thinking sound played with high priority")
+            else:
+                self.logger.warning("Feedback module not available for thinking sound")
         except Exception as e:
             self.logger.warning(f"Failed to play thinking sound: {e}")
+            # Continue execution even if thinking sound fails
     
     def _speak_explanation(self, explanation: str) -> None:
         """
-        Speak the explanation to the user using the audio module.
+        Speak the explanation to the user using the FeedbackModule for enhanced delivery.
+        
+        This method provides the spoken explanation with optimized settings for
+        clear, conversational delivery suitable for educational content.
         
         Args:
             explanation: The explanation text to speak
         """
         try:
-            audio_module = self._get_module_safely('audio_module')
-            if audio_module and hasattr(audio_module, 'text_to_speech'):
-                audio_module.text_to_speech(explanation)
-                self.logger.debug("Explanation spoken to user")
-                
-                # Also print to console for user feedback
-                print(f"\n🤖 AURA: {explanation}\n")
-                self.logger.info(f"AURA Explanation: {explanation}")
+            # Use FeedbackModule for enhanced conversational feedback
+            feedback_module = self._get_module_safely('feedback_module')
+            if feedback_module and hasattr(feedback_module, 'provide_conversational_feedback'):
+                # Use conversational feedback for natural explanation delivery
+                feedback_module.provide_conversational_feedback(
+                    message=explanation,
+                    priority=FeedbackPriority.HIGH,
+                    include_thinking_sound=False  # Already played thinking sound
+                )
+                self.logger.debug("Explanation delivered via conversational feedback")
+            elif feedback_module and hasattr(feedback_module, 'speak'):
+                # Fallback to basic speak method
+                feedback_module.speak(explanation, priority=FeedbackPriority.HIGH)
+                self.logger.debug("Explanation delivered via basic speak method")
             else:
-                self.logger.warning("Audio module not available, printing explanation only")
-                print(f"\n🤖 AURA: {explanation}\n")
+                # Final fallback to audio module
+                audio_module = self._get_module_safely('audio_module')
+                if audio_module and hasattr(audio_module, 'text_to_speech'):
+                    audio_module.text_to_speech(explanation)
+                    self.logger.debug("Explanation delivered via audio module")
+                else:
+                    self.logger.warning("No audio modules available for explanation delivery")
+            
+            # Always print to console for visual feedback
+            print(f"\n🤖 AURA: {explanation}\n")
+            self.logger.info(f"AURA Explanation delivered: {explanation[:100]}...")
                 
         except Exception as e:
             self.logger.error(f"Failed to speak explanation: {e}")
-            # Fallback to console output
+            # Fallback to console output only
             print(f"\n🤖 AURA: {explanation}\n")
     
     def _speak_error_feedback(self, error_message: str) -> None:
         """
-        Speak error feedback to the user with failure sound.
+        Speak error feedback to the user with failure sound and clear messaging.
+        
+        This method provides comprehensive error feedback including failure sound
+        and spoken error message with appropriate priority and timing.
         
         Args:
             error_message: The error message to speak
         """
         try:
-            # Play failure sound using feedback module
             feedback_module = self._get_module_safely('feedback_module')
-            if feedback_module and hasattr(feedback_module, 'play'):
-                feedback_module.play("failure")
             
-            # Speak error message using audio module
-            audio_module = self._get_module_safely('audio_module')
-            if audio_module and hasattr(audio_module, 'text_to_speech'):
-                audio_module.text_to_speech(error_message)
-                self.logger.debug("Error feedback spoken to user")
+            if feedback_module and hasattr(feedback_module, 'play_with_message'):
+                # Use combined feedback for failure sound + error message
+                feedback_module.play_with_message(
+                    sound_name="failure",
+                    message=error_message,
+                    priority=FeedbackPriority.HIGH
+                )
+                self.logger.debug("Error feedback delivered with failure sound and message")
+            else:
+                # Fallback to separate sound and speech
+                if feedback_module and hasattr(feedback_module, 'play'):
+                    feedback_module.play("failure")
+                    
+                # Brief pause before speaking error message
+                import time
+                time.sleep(0.2)
+                
+                # Speak error message
+                if feedback_module and hasattr(feedback_module, 'speak'):
+                    feedback_module.speak(error_message)
+                else:
+                    # Final fallback to audio module
+                    audio_module = self._get_module_safely('audio_module')
+                    if audio_module and hasattr(audio_module, 'text_to_speech'):
+                        audio_module.text_to_speech(error_message)
+                        
+                self.logger.debug("Error feedback delivered with separate sound and speech")
             
-            # Always print to console as fallback
-            print(f"\n🤖 AURA: {error_message}\n")
+            # Always print to console for visual feedback
+            print(f"\n❌ AURA: {error_message}\n")
             
         except Exception as e:
             self.logger.error(f"Failed to speak error feedback: {e}")
-            # Fallback to console output
-            print(f"\n🤖 AURA: {error_message}\n")
+            # Fallback to console output only
+            print(f"\n❌ AURA: {error_message}\n")
+    
+    def _provide_success_confirmation(self) -> None:
+        """
+        Provide success confirmation and return to ready state after explanation delivery.
+        
+        This method plays a subtle success sound and provides confirmation that
+        the explanation has been completed, then returns AURA to ready state
+        for new commands.
+        """
+        try:
+            feedback_module = self._get_module_safely('feedback_module')
+            
+            if feedback_module and hasattr(feedback_module, 'play'):
+                # Play subtle success sound with normal priority
+                feedback_module.play("success", priority=FeedbackPriority.NORMAL)
+                self.logger.debug("Success confirmation sound played")
+            
+            # Brief pause to allow success sound to complete
+            import time
+            time.sleep(0.3)
+            
+            # Log return to ready state
+            self.logger.info("Explanation completed successfully - AURA ready for new commands")
+            
+            # Optional: Could add a brief "Ready" confirmation sound or message
+            # For now, we'll keep it subtle to avoid being intrusive
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to provide success confirmation: {e}")
+            # Continue execution even if success confirmation fails
     
     def _handle_reasoning_failure(self, error: Exception, selected_text: str) -> Optional[str]:
         """
