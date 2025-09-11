@@ -38,7 +38,7 @@
   - Implement proper logging using BaseHandler's standardized logging methods
   - _Requirements: 1.1, 1.2, 4.2, 4.3, 4.4, 5.1, 5.4_
 
-- [ ] 6. Add explanation prompt template to configuration
+- [x] 6. Add explanation prompt template to configuration
 
   - Add EXPLAIN_TEXT_PROMPT constant to config.py with template for generating clear, contextual explanations
   - Include special handling instructions for code snippets, technical terms, and different content types
