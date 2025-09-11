@@ -1,8 +1,3 @@
-Of course. Granting Accessibility permissions is a critical step for AURA to function correctly on macOS. It's what allows the "fast path" and automation features to see and control other applications.
-
-Here are the updated testing instructions for your `README.md` file, now including a dedicated section for enabling these permissions.
-
------
 
 ### Testing Instructions
 
