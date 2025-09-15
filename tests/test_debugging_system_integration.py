@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Import debugging modules
 from modules.accessibility_debugger import AccessibilityDebugger
 from modules.permission_validator import PermissionValidator
-from modules.diagnostic_tools import DiagnosticTools
+from modules.diagnostic_tools import AccessibilityHealthChecker, DiagnosticReportGenerator
 from modules.error_recovery import ErrorRecoveryManager
 from modules.fast_path_performance_monitor import FastPathPerformanceMonitor
 from modules.performance_reporting_system import PerformanceReportingSystem
@@ -233,7 +233,7 @@ class TestDebuggingSystemIntegration:
         })
         
         permission_validator = PermissionValidator()
-        diagnostic_tools = DiagnosticTools()
+        diagnostic_tools = AccessibilityHealthChecker()
         error_recovery = ErrorRecoveryManager()
         performance_monitor = FastPathPerformanceMonitor()
         reporting_system = PerformanceReportingSystem()
@@ -523,7 +523,7 @@ class TestDebuggingFunctionalityValidation(TestDebuggingSystemIntegration):
         for scenario in diagnostic_scenarios:
             try:
                 # Execute comprehensive diagnostics
-                diagnostic_report = diagnostic_tools.run_comprehensive_diagnostics()
+                diagnostic_report = diagnostic_tools.run_comprehensive_health_check()
                 
                 # Verify diagnostic report structure
                 assert 'timestamp' in diagnostic_report
