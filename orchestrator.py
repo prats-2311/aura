@@ -1792,7 +1792,13 @@ class Orchestrator:
             # Update conversation history for context (with error handling)
             try:
                 with self.conversation_lock:
-                    self._update_conversation_history(query, execution_context.get("response", ""))
+                    # Extract response from different possible locations
+                    response = (
+                        execution_context.get("response", "") or  # For conversational queries
+                        execution_context.get("execution_results", {}).get("response", "") or  # For handler results
+                        execution_context.get("execution_results", {}).get("message", "")  # Fallback to message
+                    )
+                    self._update_conversation_history(query, response)
             except Exception as history_error:
                 logger.warning(f"[{execution_id}] Failed to update conversation history: {history_error}")
                 execution_context["warnings"].append(f"Conversation history update failed: {str(history_error)}")
@@ -4279,6 +4285,22 @@ class Orchestrator:
                 }
                 # Return the handler result directly for deferred actions
                 return handler_result
+            
+            # Update conversation history for context (with error handling)
+            try:
+                with self.conversation_lock:
+                    # Extract response from different possible locations
+                    response = (
+                        execution_context.get("response", "") or  # For conversational queries
+                        execution_context.get("execution_results", {}).get("response", "") or  # For handler results
+                        execution_context.get("execution_results", {}).get("message", "")  # Fallback to message
+                    )
+                    if response:  # Only update if we have a meaningful response
+                        self._update_conversation_history(execution_context["command"], response)
+                        logger.debug(f"[{execution_context['execution_id']}] Updated conversation history with response: {response[:50]}...")
+            except Exception as history_error:
+                logger.warning(f"[{execution_context['execution_id']}] Failed to update conversation history: {history_error}")
+                execution_context["warnings"].append(f"Conversation history update failed: {str(history_error)}")
             
             # Update progress
             final_status = CommandStatus.COMPLETED if handler_result.get("status") == "success" else CommandStatus.FAILED

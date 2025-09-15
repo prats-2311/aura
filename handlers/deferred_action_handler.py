@@ -161,10 +161,27 @@ class DeferredActionHandler(BaseHandler):
             else:  # text, essay, article, etc.
                 prompt_template = TEXT_GENERATION_PROMPT
             
-            # Format the prompt with the user's request
+            # Get conversation history from orchestrator for context
+            conversation_context = self._get_conversation_context()
+            
+            # Format context in a clear, readable way for the LLM
+            if conversation_context:
+                context_text = f"""Content Type: {content_type}
+Execution ID: {execution_id}
+
+{conversation_context}
+
+IMPORTANT: Generate code related to the topic discussed in the recent conversation above."""
+            else:
+                context_text = f"""Content Type: {content_type}
+Execution ID: {execution_id}
+
+No recent conversation context available."""
+            
+            # Format the prompt with the user's request and conversation context
             formatted_prompt = prompt_template.format(
                 request=content_request,
-                context=str({'content_type': content_type, 'execution_id': execution_id})
+                context=context_text
             )
             
             # Generate content using reasoning module's API request method
@@ -1035,3 +1052,43 @@ class DeferredActionHandler(BaseHandler):
             
         except Exception as e:
             self.logger.error(f"Error resetting deferred action state: {e}")
+    
+    def _get_conversation_context(self) -> str:
+        """
+        Get recent conversation history from orchestrator for context-aware content generation.
+        
+        Returns:
+            Formatted conversation context string
+        """
+        try:
+            self.logger.info("🔍 Checking for conversation history...")
+            
+            # Get conversation history from orchestrator
+            if hasattr(self.orchestrator, 'conversation_history'):
+                history_length = len(self.orchestrator.conversation_history)
+                self.logger.info(f"📚 Found {history_length} conversation exchanges in orchestrator")
+                
+                if history_length > 0:
+                    recent_history = self.orchestrator.conversation_history[-3:]  # Last 3 exchanges
+                    
+                    context_parts = []
+                    for i, (user_query, assistant_response) in enumerate(recent_history):
+                        context_parts.append(f"User: {user_query}")
+                        context_parts.append(f"AURA: {assistant_response}")
+                        self.logger.info(f"📝 Exchange {i+1}: '{user_query}' -> '{assistant_response[:50]}...'")
+                    
+                    if context_parts:
+                        context_text = "Recent conversation:\n" + "\n".join(context_parts)
+                        self.logger.info(f"✅ Using conversation context: {len(context_parts)} exchanges")
+                        return context_text
+                else:
+                    self.logger.info("📭 Conversation history is empty")
+            else:
+                self.logger.warning("❌ Orchestrator has no conversation_history attribute")
+            
+            self.logger.info("🚫 No conversation history available")
+            return ""
+            
+        except Exception as e:
+            self.logger.error(f"💥 Error getting conversation context: {e}")
+            return ""
