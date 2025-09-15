@@ -276,7 +276,7 @@ class TestFinalSystemIntegration:
         }
         
         # Reasoning Module Mocks
-        mock_reasoning.generate_action_plan.return_value = {
+        mock_reasoning.get_action_plan.return_value = {
             'actions': [
                 {'type': 'click', 'target': 'Sign In button', 'coordinates': [175, 225]}
             ],
@@ -625,7 +625,7 @@ class TestPerformanceBenchmarking(TestFinalSystemIntegration):
             # Simulate vision + reasoning workflow
             orchestrator._test_mocks['vision'].capture_screen()
             orchestrator._test_mocks['vision'].analyze_screen("mock_screenshot.png")
-            orchestrator._test_mocks['reasoning'].generate_action_plan({}, test_command)
+            orchestrator._test_mocks['reasoning'].get_action_plan({}, test_command)
             orchestrator._test_mocks['automation'].execute_action({})
             
             execution_time = time.time() - start_time

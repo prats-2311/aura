@@ -162,7 +162,7 @@ class TestFastPathPerformanceRequirements:
         
         # Mock reasoning module
         mock_reasoning = Mock()
-        mock_reasoning.generate_action_plan.return_value = {
+        mock_reasoning.get_action_plan.return_value = {
             "response": summarized_result,
             "metadata": {"confidence": 0.9}
         }
@@ -332,7 +332,7 @@ class TestTimeoutHandling:
             return {"response": "summary", "metadata": {"confidence": 0.9}}
         
         mock_reasoning = Mock()
-        mock_reasoning.generate_action_plan.side_effect = slow_summarization
+        mock_reasoning.get_action_plan.side_effect = slow_summarization
         
         start_time = time.time()
         

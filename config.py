@@ -32,7 +32,7 @@ VISION_API_BASE = "http://localhost:1234/v1"
 
 # Cloud endpoint for reasoning model (Ollama Cloud or OpenAI)
 REASONING_API_BASE = "https://ollama.com"  # Ollama Cloud endpoint
-REASONING_API_KEY = os.getenv("REASONING_API_KEY", "4a1181add3774859831c5d5bde617ddc.8jshsyAYcMNquYAN7dxYb7kM")
+REASONING_API_KEY = os.getenv("REASONING_API_KEY", "f73e057d598f4f929c5a43a829bf032c.LMJG8ElAPcTqro9eqsN-K9vT")
 
 # Alternative OpenAI configuration (uncomment to use)
 # REASONING_API_BASE = "https://api.openai.com/v1"
@@ -85,11 +85,19 @@ Intent categories:
 - "question_answering": Information requests about screen content, system status, or content comprehension
 - "explain_selected_text": User has highlighted text and is asking for an explanation, summary, or definition of it
 
-Special focus for question_answering intent:
-- Screen content queries: "what's on my screen", "what do you see", "describe this page", "summarize this"
-- Content analysis: "what does this say", "read this to me", "explain this content"
-- Information extraction: "what are the main points", "what's the title", "what buttons are available"
+Special focus for question_answering intent (ONLY for screen/document content):
+- Screen content queries: "what's on my screen", "what do you see", "describe this page", "summarize this page"
+- Current content analysis: "what does this say", "read this to me", "explain this content on screen"
+- Information extraction: "what are the main points on this page", "what's the title of this document", "what buttons are available"
 - Document queries: "what's in this PDF", "summarize this document", "what's this article about"
+- IMPORTANT: Only use this intent when the user is asking about VISIBLE content on their screen or open documents
+
+Special focus for conversational_chat intent:
+- General knowledge questions: "what is a neural network", "how does machine learning work", "explain quantum physics"
+- Factual inquiries: "what's the capital of France", "who invented the telephone", "when was Python created"
+- Conceptual explanations: "how do computers work", "what is artificial intelligence", "explain blockchain"
+- Educational questions: "teach me about X", "help me understand Y", "what are the basics of Z"
+- IMPORTANT: Use this intent when the user is asking for general knowledge, not about their current screen content
 
 Special focus for explain_selected_text intent:
 - Text explanation requests: "explain this", "explain the selected text", "what does this mean"

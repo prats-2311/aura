@@ -503,7 +503,7 @@ class TestPerformanceBenchmarking:
                 'confidence': 0.9
             }
         
-        mock_reasoning.generate_action_plan.side_effect = moderate_reasoning
+        mock_reasoning.get_action_plan.side_effect = moderate_reasoning
         
         # Automation module - fast execution
         def fast_automation(action):
@@ -576,7 +576,7 @@ class TestPerformanceBenchmarking:
             # Simulate full vision-reasoning workflow
             screenshot = mock_orchestrator._test_mocks['vision'].capture_screen()
             analysis = mock_orchestrator._test_mocks['vision'].analyze_screen(screenshot)
-            action_plan = mock_orchestrator._test_mocks['reasoning'].generate_action_plan(analysis, "click test")
+            action_plan = mock_orchestrator._test_mocks['reasoning'].get_action_plan(analysis, "click test")
             result = mock_orchestrator._test_mocks['automation'].execute_action(action_plan['actions'][0])
             return result['success']
         

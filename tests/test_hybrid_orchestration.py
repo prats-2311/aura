@@ -55,7 +55,7 @@ class TestHybridOrchestration:
             'description': 'Login screen with Sign In button'
         }
         
-        mocks['reasoning'].generate_action_plan.return_value = {
+        mocks['reasoning'].get_action_plan.return_value = {
             'actions': [{'type': 'click', 'target': 'Sign In button', 'coordinates': [125, 225]}],
             'confidence': 0.9
         }
@@ -318,7 +318,7 @@ class TestFallbackMechanism(TestHybridOrchestration):
         mock_modules['vision'].analyze_screen.assert_not_called()
         
         # Verify ReasoningModule was NOT called
-        mock_modules['reasoning'].generate_action_plan.assert_not_called()
+        mock_modules['reasoning'].get_action_plan.assert_not_called()
     
     def test_vision_module_used_on_fast_path_failure(self, orchestrator, mock_modules, sample_gui_command):
         """Test that VisionModule is used when fast path fails."""
@@ -427,7 +427,7 @@ class TestPerformanceTracking(TestHybridOrchestration):
             'description': 'Login screen'
         }
         
-        mock_modules['reasoning'].generate_action_plan.return_value = {
+        mock_modules['reasoning'].get_action_plan.return_value = {
             'actions': [{'type': 'click', 'target': 'Sign In button'}],
             'confidence': 0.8
         }
@@ -437,14 +437,14 @@ class TestPerformanceTracking(TestHybridOrchestration):
         # These calls would normally take longer due to vision processing
         mock_modules['vision'].capture_screen()
         mock_modules['vision'].analyze_screen("mock_screenshot")
-        mock_modules['reasoning'].generate_action_plan("mock_analysis", gui_command)
+        mock_modules['reasoning'].get_action_plan("mock_analysis", gui_command)
         slow_time = time.time() - slow_start
         
         # In real scenarios, slow path would be significantly slower
         # Here we just verify the methods were called
         mock_modules['vision'].capture_screen.assert_called()
         mock_modules['vision'].analyze_screen.assert_called()
-        mock_modules['reasoning'].generate_action_plan.assert_called()
+        mock_modules['reasoning'].get_action_plan.assert_called()
     
     def test_hybrid_execution_metrics_collection(self, orchestrator, mock_modules):
         """Test comprehensive metrics collection for hybrid execution."""

@@ -929,7 +929,7 @@ Provide a clear, concise answer that directly addresses the user's question."""
                 try:
                     self.logger.debug(f"Generating Q&A action plan (attempt {attempt + 1}/{max_retries + 1})")
                     
-                    action_plan = reasoning_module.generate_action_plan(
+                    action_plan = reasoning_module.get_action_plan(
                         qa_command,
                         screen_context,
                         mode="question_answering"

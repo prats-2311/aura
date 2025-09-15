@@ -57,7 +57,7 @@ class TestFallbackValidation:
         }
         
         # Setup reasoning module for action planning
-        mocks['reasoning'].generate_action_plan.return_value = {
+        mocks['reasoning'].get_action_plan.return_value = {
             'actions': [
                 {'type': 'click', 'target': 'Sign In button', 'coordinates': [175, 225]}
             ],
