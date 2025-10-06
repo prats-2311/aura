@@ -1,143 +1,279 @@
-### Testing Instructions
+<p align="center">
+  <img src="https://img.shields.io/badge/python-v3.11-brightgreen.svg?style=flat-square" alt="python" />
+  <img src="https://img.shields.io/badge/pytorch-v2.0+-blue.svg?style=flat-square" alt="pytorch" />
+  <a href="https://github.com/prats-2311/aura/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="License: MIT" />
+  </a>
+  <a href="https://github.com/prats-2311/aura/blob/main/.github/contributing.md">
+    <img src="https://img.shields.io/badge/contributions-welcome-orange.svg?style=flat-square" alt="Contributions Welcome" />
+  </a>
+  <img src="https://img.shields.io/badge/platform-macOS-black?style=flat-square" alt="Platform: macOS">
+</p>
 
-This guide provides the necessary steps to set up and test the AURA project. The primary testing path is configured to use a locally-hosted `gpt-oss` model via Ollama, showcasing AURA's capabilities as a true local agent.
+<p align="center">
+  <img src="assets/aura-logo.png" alt="AURA Logo" width="200" />
+</p>
 
-#### **Prerequisites**
+# AURA - Autonomous User-side Robotic Assistant
 
-Before you begin, please ensure you have the following installed:
+AURA (Autonomous User-side Robotic Assistant) is an intelligent AI-powered desktop assistant that combines computer vision, natural language processing, and automation to help users interact with their computers through voice commands and visual understanding. The system can see what's on your screen, understand your voice commands, and perform automated actions to assist with various tasks.
 
-1.  **Python 3.11**
-2.  **Conda** (for environment management)
-3.  **Homebrew** (for installing macOS command-line tools)
-4.  **Ollama:** for running the `gpt-oss` reasoning model locally. ([Download here](https://ollama.com/))
-5.  **LM Studio:** for running the vision model locally. ([Download here](https://lmstudio.ai/))
-6.  **Git** for cloning the repository.
+## 🎥 Demo
 
-#### **1. Environment Setup**
+**Watch AURA in Action:** [YouTube Demo](https://youtu.be/PZizPGygSSk)
 
-First, clone the repository and set up the Python environment.
+## ✨ Key Features
 
-```bash
-# Clone the repository
-git clone [Your-Public-Repo-URL]
-cd aura
+- **🎤 Voice Activation**: Wake word detection using Porcupine for hands-free interaction
+- **👁️ Computer Vision**: Real-time screen analysis and visual understanding
+- **🧠 AI Reasoning**: Advanced language model integration for intelligent responses
+- **🤖 Automation**: Cross-platform GUI automation and control
+- **♿ Accessibility**: macOS Accessibility API integration for enhanced interaction
+- **🔊 Audio Feedback**: Text-to-speech responses and audio notifications
+- **📊 Performance Monitoring**: Real-time performance tracking and optimization
+- **🌐 Web Integration**: Browser automation and web accessibility features
 
-# Create and activate the Conda environment
-conda create --name aura python=3.11 -y
-conda activate aura
+## 🏗️ Architecture
 
-# Install required Python packages
-pip install -r requirements.txt
+AURA follows a modular architecture with clear separation of concerns:
 
-# Install macOS command-line tools required by the AutomationModule
-brew install cliclick
+```
+AURA/
+├── modules/           # Core functionality modules
+│   ├── vision.py      # Computer vision and screen analysis
+│   ├── reasoning.py   # AI language model integration
+│   ├── audio.py       # Voice processing and TTS
+│   ├── automation.py  # GUI automation and control
+│   ├── accessibility.py # macOS Accessibility API
+│   └── feedback.py    # User feedback and notifications
+├── handlers/          # Command and intent handlers
+├── orchestrator.py    # Central coordination system
+├── main.py           # Application entry point
+└── config.py         # Configuration management
 ```
 
-#### **2. Enabling Accessibility Permissions (Critical Step)**
+## 🛠️ Tech Stack
 
-AURA requires Accessibility permissions to see and control other applications on your Mac. This is essential for the "fast path" accessibility features and GUI automation to work.
+### Core Technologies
 
-1.  Open **System Settings** on your Mac.
-2.  Navigate to **Privacy & Security**.
-3.  Scroll down and click on **Accessibility**.
-4.  You will see a list of applications. You need to grant permission to the application you will use to **run the AURA script**.
-      * If you are running `python aura/main.py` from the standard **Terminal**, find `Terminal` in the list and toggle the switch **ON**.
-      * If you are using another terminal like **iTerm2**, enable it for that application.
-      * If you are running the script from within **Visual Studio Code's** integrated terminal, you must grant permissions to `Visual Studio Code`.
-5.  You may be prompted to enter your password to make this change.
+- **Python 3.11** - Primary programming language
+- **PyTorch** - Machine learning framework
+- **Transformers** - Hugging Face model integration
+- **OpenAI Whisper** - Speech recognition
+- **Porcupine** - Wake word detection
 
-*AURA's internal `PermissionValidator` will check for these permissions at startup, and a success message will be logged in `aura.log`*.
+### Computer Vision & Automation
 
-#### **3. Local Model Setup**
+- **OpenCV** - Computer vision processing
+- **Pillow (PIL)** - Image manipulation
+- **PyAutoGUI** - Cross-platform GUI automation
+- **MSS** - Fast screen capture
+- **cliclick** - macOS automation (primary method)
 
-For this demonstration, AURA uses two local models.
+### macOS Integration
 
-**A. Reasoning Model (Ollama):**
+- **PyObjC** - Complete macOS framework bindings
+  - Cocoa, AppKit, ApplicationServices
+  - Accessibility, CoreFoundation, CoreServices
+  - Vision, Speech, AVFoundation frameworks
 
-1.  **Pull the `gpt-oss` Model:** Open your terminal and run the following command to download and serve the required reasoning model with Ollama.
-    ```bash
-    ollama run gpt-oss:120b
-    ```
-    *Note: This is a large model and may take some time to download. You can leave this running in a separate terminal window.*
+### Audio Processing
 
-**B. Vision Model (LM Studio):**
+- **SoundDevice** - Audio I/O operations
+- **PyDub** - Audio file manipulation
+- **pyttsx3** - Text-to-speech synthesis
 
-1.  Open the LM Studio application.
-2.  Search for and download a vision-capable model (e.g., `llava`, `Phi-3-vision`).
-3.  Navigate to the Local Server tab ( **\<-\>** icon) and select the downloaded vision model.
-4.  Click **"Start Server"**. This will host the vision model at `http://localhost:1234/v1`.
+### Web & API
 
-#### **4. AURA Configuration**
+- **FastAPI** - Modern web framework
+- **Uvicorn** - ASGI server
+- **Requests/HTTPX** - HTTP client libraries
+- **WebSockets** - Real-time communication
 
-You must configure AURA to use your local models.
+### Data & Analysis
 
-1.  **Open the configuration file:** `aura/config.py`
-2.  **Configure the Reasoning Model:**
-      * Find the `REASONING_API_BASE` variable and change it to your local Ollama endpoint:
-        ```python
-        # old
-        # REASONING_API_BASE = "https://ollama.com"
-        # new
-        REASONING_API_BASE = "http://localhost:11434"
-        ```
-      * Find the `REASONING_API_KEY` variable and clear it, as a local server does not require a key:
-        ```python
-        # old
-        # REASONING_API_KEY = os.getenv(...)
-        # new
-        REASONING_API_KEY = ""
-        ```
-3.  **Verify the Vision Model Endpoint:**
-      * Ensure the `VISION_API_BASE` is set to the LM Studio default:
-        ```python
-        VISION_API_BASE = "http://localhost:1234/v1"
-        ```
-4.  Save the `config.py` file.
+- **Pandas** - Data manipulation and analysis
+- **NumPy** - Numerical computing
+- **SciPy** - Scientific computing
 
-#### **5. Running AURA**
+### Development Tools
 
-With the environment and configuration set up, you can now run the application.
+- **pytest** - Testing framework
+- **Black** - Code formatting
+- **Flake8** - Code linting
+- **MyPy** - Static type checking
+
+## Getting Started
+
+These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
+
+### Prerequisites
+
+You will need the following properly installed on your computer:
+
+- [Git](http://git-scm.com/)
+- [Python 3.11](https://www.python.org/downloads/)
+- [Conda](https://docs.conda.io/en/latest/miniconda.html) package manager
+- [Homebrew](https://brew.sh/) (for macOS automation tools)
+- macOS (primary support)
+
+## Installing
+
+In a terminal window run these commands:
 
 ```bash
-# From the root directory of the project
-python aura/main.py
+$ git clone https://github.com/prats-2311/aura.git
+$ cd aura
+$ conda create --name aura python=3.11 -y
+$ conda activate aura
+$ pip install -r requirements.txt
+$ brew install cliclick
 ```
 
-Upon successful startup, you will see a message "✅ AURA is running. Press Ctrl+C to stop." and AURA will begin listening for the wake word.
+### Configuration
 
-#### **6. Sample Commands to Test**
+Add necessary API keys to your `config.py` file:
 
-To test AURA's core features, please use the wake word **"Computer"** before each command.
+- Set up your API keys in `config.py`
+- Configure Porcupine API key for wake word detection
+- Set up reasoning model API endpoints
 
-**A. Test Basic Conversation & Introduction**
+### Running AURA
 
-  * `"Computer, introduce yourself."`
-  * `"Computer, how are you today?"`
+```bash
+$ cd aura
+$ conda activate aura
+$ python main.py
+```
 
+You should be able to interact with AURA through voice commands after the wake word activation.
 
-**B. Test Stateful Task Context (Deferred Action - *Wildcard* Feature)**
+## 🎮 Usage
 
-1.  Open a code editor (like VS Code or TextEdit) with a blank file.
-2.  Say: `"Computer, write a Python function that calculates the Fibonacci sequence."`
-3.  AURA will respond: *"Code generated. Click where you want me to place it."*
-4.  Click your mouse anywhere in the blank file. AURA will type the complete, formatted function.
+1. **Start AURA:** Run `python main.py` to start the assistant
+2. **Wake Word:** Say the wake word to activate voice commands
+3. **Voice Commands:** Speak naturally to interact with your computer
+4. **Visual Tasks:** AURA can see and interact with screen elements
+5. **Automation:** Perform complex multi-step tasks through voice
 
-**C. Test Conversational Context (The Correct Way)**
+### Example Commands
 
-This test shows how AURA remembers the context of a conversation to inform a later action.
+- "Click on the search button"
+- "What's on my screen?"
+- "Open the settings menu"
+- "Fill out this form"
+- "Read me the text on the page"
 
-1.  First, have a brief conversation to establish context. Say:
-    `"Computer, what is a neural network?"`
-    *(AURA will give you a spoken explanation. This conversation is now in its short-term memory.)*
-2.  Now, with a code editor open, give a follow-up action command:
-    `"Computer, write a simple one for me in PyTorch."`
-3.  AURA will use the context from your question to understand that **"one"** refers to a neural network and will generate the correct code. This demonstrates its ability to blend conversational context with direct action.
+## 📋 Configuration
 
-**D. Test Visual & Accessibility Context ("Explain Selected Text" - *Wildcard* Feature)**
+Key configuration options in `config.py`:
 
-1.  Open any webpage or PDF with a substantial amount of text.
-2.  Use your mouse to highlight a paragraph.
-3.  Say: `"Computer, can you explain the selected text?"`
-4.  AURA will provide a spoken summary and explanation of the text you highlighted.
+- **API Keys**: Porcupine, reasoning models
+- **Audio Settings**: Microphone, speaker configuration
+- **Vision Models**: Local LM Studio integration
+- **Performance**: Optimization and monitoring settings
+- **Accessibility**: macOS permissions and features
 
------
+## Testing
+
+In a terminal window run these commands:
+
+```bash
+$ cd aura
+$ conda activate aura
+$ pytest tests/
+```
+
+<br>
+
+In a terminal window run these commands to run the test suite with verbose output:
+
+```bash
+$ cd aura
+$ pytest tests/ -v
+```
+
+In a terminal window run these commands to view the test coverage report:
+
+```bash
+$ cd aura
+$ pytest tests/ --cov=modules --cov=handlers
+$ pytest tests/ --cov=modules --cov=handlers --cov-report=html
+```
+
+In a terminal window run these commands for performance testing:
+
+```bash
+$ cd aura
+$ python -m pytest tests/performance/
+```
+
+In a terminal window run these commands to run specific test categories:
+
+```bash
+$ cd aura
+$ pytest tests/test_accessibility.py  # Accessibility tests
+$ pytest tests/test_vision.py         # Computer vision tests
+$ pytest tests/test_audio.py          # Audio processing tests
+```
+
+## 📊 Performance Monitoring
+
+AURA includes comprehensive performance monitoring:
+
+- Real-time latency tracking
+- Resource usage monitoring
+- Performance dashboard
+- Optimization recommendations
+
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting issues and/or pull requests.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes following the [AURA Development Principles](.kiro/steering/AURA_Development_Principles.md)
+4. Add tests for new functionality
+5. Ensure all tests pass (`pytest tests/`)
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Submit a pull request
+
+[CONTRIBUTORS](https://github.com/prats-2311/aura/graphs/contributors)
+
+## License
+
+This project is licensed under the MIT License - please see [LICENSE](LICENSE) for more details.
+
+## 🙏 Acknowledgments
+
+- Picovoice for Porcupine wake word detection
+- Hugging Face for transformer models
+- OpenAI for Whisper speech recognition
+- Apple for macOS Accessibility APIs
+
+## Roadmap
+
+Please checkout our [roadmap](ROADMAP.md) for details of upcoming features and development plans.
+
+### Upcoming Features
+
+- Cross-platform support (Windows, Linux)
+- Enhanced natural language understanding
+- Plugin system for extensibility
+- Advanced automation workflows
+- Improved accessibility features
+
+## Support
+
+For questions, issues, or contributions:
+
+- **GitHub Issues**: [Report bugs or request features](https://github.com/prats-2311/aura/issues)
+- **Discussions**: [Join the community discussion](https://github.com/prats-2311/aura/discussions)
+- **Demo Video**: [Watch the YouTube demo](https://youtu.be/PZizPGygSSk)
+
+---
+
+**AURA** - Making human-computer interaction more natural and accessible through AI.
